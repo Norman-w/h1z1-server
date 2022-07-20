@@ -14,7 +14,7 @@
 const debug = require("debug")("H1Z1Protocol");
 import DataSchema from "h1z1-dataschema";
 import { H1z1ProtocolReadingFormat } from "../types/protocols";
-import { packUnsignedIntWith2bitLengthValue } from "../packets/ClientProtocol/ClientProtocol_860/shared";
+import { packUnsignedIntWith2bitLengthValue } from "../packets/ClientProtocol/ClientProtocol_1080/shared";
 import {
   clearFolderCache,
   eul2quat,
@@ -53,27 +53,31 @@ export class H1Z1Protocol {
   protocolName: string;
   PlayerUpdateManagedPositionOpcode: number;
   VehicleCollisionOpcode: number;
-  VehicleDimissOpcode: any;
+  VehicleDimissOpcode: number;
+  weaponOpcode: number;
 
   constructor(protocolName = "ClientProtocol_860") {
     this.protocolName = protocolName;
     // Maybe will remove this switch later
     switch (this.protocolName) {
+      default:
+        debug(`Protocol ${this.protocolName} unsupported !`);
+        process.exitCode = 0;
       case "ClientProtocol_860": // normal client from 15 january 2015
         this.H1Z1Packets = require("../packets/ClientProtocol/ClientProtocol_860/h1z1packets");
         this.PlayerUpdateManagedPositionOpcode = 0x90;
         this.VehicleCollisionOpcode = 0xac;
         this.VehicleDimissOpcode = 0x8818;
+        this.weaponOpcode = 0x82;
         break;
       case "ClientProtocol_1080": // normal client from 22 december 2016
         this.H1Z1Packets = require("../packets/ClientProtocol/ClientProtocol_1080/h1z1packets");
         this.PlayerUpdateManagedPositionOpcode = 0x91;
         this.VehicleCollisionOpcode = 0xaa;
         this.VehicleDimissOpcode = 0x8918;
+        this.weaponOpcode = 0x83;
         break;
-      default:
-        debug(`Protocol ${this.protocolName} unsupported !`);
-        process.exit();
+      
     }
   }
 
@@ -133,7 +137,7 @@ export class H1Z1Protocol {
         },
       ],
     };
-    const result = DataSchema.parse(schema, data, 0, null).result;
+    const result = DataSchema.parse(schema, data, 0).result;
     return result;
   }
 
@@ -306,7 +310,7 @@ export class H1Z1Protocol {
       },
     ];
     try {
-      const result = DataSchema.parse(schema, data, 0, null).result;
+      const result = DataSchema.parse(schema, data, 0).result;
       return result;
     } catch (e) {
       console.error(e);
@@ -342,7 +346,7 @@ export class H1Z1Protocol {
     };
   }
 
-  pack(packetName: string, object?: any, referenceData?: any): Buffer | null {
+  pack(packetName: string, object: any = {}): Buffer | null {
     const H1Z1Packets = this.H1Z1Packets;
     const packetType: number = H1Z1Packets.PacketTypes[packetName];
     const packet = H1Z1Packets.Packets[packetType];
@@ -351,20 +355,13 @@ export class H1Z1Protocol {
       const packetTypeBytes = getPacketTypeBytes(packetType);
       if (packet.schema) {
         try {
-          packetData = DataSchema.pack(
-            packet.schema,
-            object,
-            null,
-            null,
-            referenceData
-          );
+          packetData = DataSchema.pack(packet.schema, object, null, null);
         } catch (error) {
           console.error(`${packetName} : ${error}`);
+          console.error(`${packetName} : ${JSON.stringify(object)}`);
         }
         if (packetData) {
-          data = new (Buffer as any).alloc(
-            packetTypeBytes.length + packetData.length
-          );
+          data = Buffer.allocUnsafe(packetTypeBytes.length + packetData.length);
           for (let i = 0; i < packetTypeBytes.length; i++) {
             data.writeUInt8(packetTypeBytes[i], i);
           }
@@ -416,12 +413,7 @@ export class H1Z1Protocol {
     return [packet, offset];
   }
 
-  parse(
-    data: Buffer,
-    flag: number,
-    fromClient: boolean,
-    referenceData?: any
-  ): H1z1ProtocolReadingFormat | null {
+  parse(data: Buffer, flag: number): H1z1ProtocolReadingFormat | null {
     const H1Z1Packets = this.H1Z1Packets;
     const opCode = data[0];
     let offset = 0,
@@ -459,8 +451,13 @@ export class H1Z1Protocol {
             offset = 1;
             break;
           }
-          default: {
-            console.error(`unknown packet use flag 3 : ${opCode}`);
+         /* case this.weaponOpcode: {
+            packet = H1Z1Packets.Packets[this.weaponOpcode];
+            offset = 1;
+            break;
+          }*/
+          default: {// temp logic so zonepackethandlers still works the same for now
+            opCode!=0x83?console.error(`unknown packet use flag 3 : ${opCode}`):0;
             [packet, offset] = this.resolveOpcode(opCode, data);
             break;
           }
@@ -482,12 +479,7 @@ export class H1Z1Protocol {
           debug(packet.name);
         }
         try {
-          result = DataSchema.parse(
-            packet.schema,
-            data,
-            offset,
-            referenceData
-          ).result;
+          result = DataSchema.parse(packet.schema, data, offset).result;
         } catch (e) {
           console.error(`${packet.name} : ${e}`);
         }

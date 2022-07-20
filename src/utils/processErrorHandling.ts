@@ -12,29 +12,38 @@
 // ======================================================================
 
 process.on("unhandledRejection", (reason, promise) => {
-  console.log("Unhandled rejection at ", promise, `reason: ${reason}`);
-  process.exit(1);
+  console.log(
+    "Unhandled rejection at ",
+    promise,
+    `reason: ${reason} at ${new Date()}`
+  );
+  process.exitCode = 1;
 });
 
 process.on("uncaughtException", (err) => {
-  console.log(`Uncaught Exception: ${err.message}`);
-  process.exit(1);
+  console.log(`Uncaught Exception: ${err.message} time : ${new Date()}`);
+  console.error(err.stack);
+  process.exitCode = 1;
 });
 
 process.on("SIGTERM", () => {
-  console.log(`Process ${process.pid} received a SIGTERM signal`);
-  process.exit(0);
+  console.log(
+    `Process ${process.pid} received a SIGTERM signal time : ${new Date()}`
+  );
+  process.exitCode = 0;
 });
 
 process.on("SIGINT", () => {
-  console.log(`Process ${process.pid} has been interrupted`);
-  process.exit(0);
+  console.log(
+    `Process ${process.pid} has been interrupted time : ${new Date()}`
+  );
+  process.exitCode = 0;
 });
 
 process.on("beforeExit", (code) => {
-  console.log(`Process will exit with code: ${code}`);
+  console.log(`Process will exit with code: ${code} time : ${new Date()}`);
 });
 
 process.on("exit", (code) => {
-  console.log(`Process exited with code: ${code}`);
+  console.log(`Process exited with code: ${code} time : ${new Date()}`);
 });

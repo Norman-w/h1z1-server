@@ -13,10 +13,9 @@
 
 import {
   attachmentSchema,
+  packItemWeaponData,
   packUnsignedIntWith2bitLengthValue,
   readUnsignedIntWith2bitLengthValue,
-} from "./shared";
-import {
   itemSchema,
   profileSchema,
   respawnLocationSchema,
@@ -36,7 +35,12 @@ export const clientUpdatePackets: any = [
           type: "byteswithlength",
           fields: [
             ...itemSchema,
-            { name: "unknownBoolean2", type: "boolean", defaultValue: false },
+            {
+              name: "unknownData1",
+              type: "custom",
+              defaultValue: {},
+              packer: packItemWeaponData,
+            },
           ],
         },
       ],
@@ -206,7 +210,7 @@ export const clientUpdatePackets: any = [
     {
       fields: [
         { name: "speed", type: "float", defaultValue: 10 },
-        { name: "version?", type: "uint8", defaultValue: 1 },
+        { name: "movementVersion", type: "uint8", defaultValue: 1 },
       ],
     },
   ],
@@ -216,7 +220,7 @@ export const clientUpdatePackets: any = [
     {
       fields: [
         { name: "speed", type: "float", defaultValue: 10 },
-        { name: "version?", type: "uint8", defaultValue: 1 },
+        { name: "movementVersion", type: "uint8", defaultValue: 1 },
       ],
     },
   ],
@@ -226,7 +230,7 @@ export const clientUpdatePackets: any = [
     {
       fields: [
         { name: "speed", type: "float", defaultValue: 10 },
-        { name: "version?", type: "uint8", defaultValue: 1 },
+        { name: "movementVersion", type: "uint8", defaultValue: 1 },
       ],
     },
   ],
@@ -322,7 +326,7 @@ export const clientUpdatePackets: any = [
     "ClientUpdate.NetworkProximityUpdatesComplete",
     0x113500,
     {
-      fields: [{ name: "done", type: "boolean", defaultValue: false }],
+      fields: [],
     },
   ],
   ["ClientUpdate.FileValidationRequest", 0x113600, {}],
