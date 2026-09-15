@@ -1,0 +1,97 @@
+name: Development tests
+on:
+  push:
+jobs:
+  eslint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js 24.12.0
+        uses: actions/setup-node@v3
+        with:
+          node-version: 24.12.0
+      - run: npm i --ignore-scripts
+      - run: npm run lint-quiet
+  prettier:
+    name: prettier
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js 24.12.0
+        uses: actions/setup-node@v3
+        with:
+          node-version: 24.12.0
+      - run: npm i --ignore-scripts
+      - run: npm run check_prettier
+  interfaces-up-to-date:
+    name: interfaces-up-to-date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js 24.12.0
+        uses: actions/setup-node@v3
+        with:
+          node-version: 24.12.0
+      - run: npm i --ignore-scripts
+      - run: npm run gen-packets-types
+      - run: npm run gen-packets-interfaces
+      - run: git diff --exit-code -- src/types/**
+  test-npm-pack-linux:
+    name: npm-pack-linux
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [24.x, 25.x]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm i --ignore-scripts
+      - run: npm pack
+  test-mongo-linux:
+    name: mongo-linux
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [24.x, 25.x]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm i
+      - name: MongoDB in GitHub Actions
+        uses: supercharge/mongodb-github-action@1.6.0
+      - run: npm run test-mongo
+  test-linux-local:
+    name: linux-local
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [24.x, 25.x]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm i
+      - run: npm test
+  test-win-local:
+    name: win-local
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        node-version: [24.x, 25.x]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm i
+      - run: npm test

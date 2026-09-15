@@ -1,0 +1,3439 @@
+// ======================================================================
+//
+//   GNU GENERAL PUBLIC LICENSE
+//   Version 3, 29 June 2007
+//   copyright (C) 2020 - 2021 Quentin Gruber
+//   copyright (C) 2021 - 2026 H1emu community
+//
+//   https://github.com/QuentinGruber/h1z1-server
+//   https://www.npmjs.com/package/h1z1-server
+//
+//   Based on https://github.com/psemu/soe-network
+// ======================================================================
+
+import {
+  characterResourceData,
+  collectionsSchema,
+  currencySchema,
+  effectTagsSchema,
+  equipmentSlotSchema,
+  firemodesSchema,
+  fullNpcSchema,
+  fullPcSchema,
+  itemSchema,
+  lightWeightNpcSchema,
+  lightWeightPcSchema,
+  loadoutSlotsSchema,
+  objectiveSchema,
+  packPositionUpdateData,
+  packUnsignedIntWith2bitLengthValue,
+  readPositionUpdateData,
+  readPositionUpdateDataAndCheckLength,
+  readUnsignedIntWith2bitLengthValue,
+  recipeData,
+  packItemWeaponData,
+  containers,
+  passengerSchema,
+  accountItemsSchema,
+  escrowAccountItemsSchema,
+  itemCollectionSchema,
+  emoteItemsSchema,
+  skinItemsSchema,
+  mountSchema,
+  skillPointDataSchema,
+  interactionDataSchema,
+  broadcastSchema
+} from "./shared";
+import {
+  achievementSchema,
+  identitySchema,
+  profileSchema,
+  rewardBundleSchema,
+  skyData,
+  statSchema
+} from "./shared";
+import { packWeaponPacket, parseWeaponPacket } from "./weapon";
+import { PacketStructures } from "types/packetStructure";
+
+export const basePackets: PacketStructures = [
+  ["Server", 0x01, {}],
+  [
+    "ClientFinishedLoading",
+    0x02,
+    {
+      fields: [
+        { name: "characterReleased", type: "boolean", defaultValue: false } // This value is first set to false, the second time its sent its set to true
+      ]
+    }
+  ],
+  [
+    "SendSelfToClient",
+    0x03,
+    {
+      fields: [
+        {
+          name: "data",
+          type: "byteswithlength",
+          fields: [
+            { name: "guid", type: "uint64string", defaultValue: "" },
+            { name: "characterId", type: "uint64string", defaultValue: "" },
+            {
+              name: "transientId",
+              type: "custom",
+              parser: readUnsignedIntWith2bitLengthValue,
+              packer: packUnsignedIntWith2bitLengthValue
+            },
+            { name: "lastLoginDate", type: "uint64string", defaultValue: "" },
+            { name: "actorModelId", type: "uint32", defaultValue: 0 },
+            { name: "headActor", type: "string", defaultValue: "" },
+            { name: "hairModel", type: "string", defaultValue: "" },
+            { name: "hairTint", type: "uint32", defaultValue: 0 },
+            { name: "eyeTint", type: "uint32", defaultValue: 0 },
+            { name: "emptyTexture", type: "string", defaultValue: "" },
+            { name: "unknownString3", type: "string", defaultValue: "" },
+            { name: "unknownString4", type: "string", defaultValue: "" },
+            { name: "headId", type: "uint32", defaultValue: 0 },
+            { name: "unknownDword6", type: "uint32", defaultValue: 0 },
+            { name: "shaderGroupId", type: "uint32", defaultValue: 0 },
+            { name: "unknownDword9", type: "uint32", defaultValue: 0 },
+            { name: "unknownDword10", type: "uint32", defaultValue: 0 },
+            { name: "position", type: "floatvector4", defaultValue: 0 },
+            { name: "rotation", type: "floatvector4", defaultValue: 0 },
+            { name: "identity", type: "schema", fields: identitySchema },
+            { name: "unknownDword11", type: "uint32", defaultValue: 0 },
+            {
+              name: "currency",
+              type: "array",
+              defaultValue: [],
+              fields: currencySchema
+            },
+            { name: "creationDate", type: "uint64string", defaultValue: "" },
+            { name: "unknownDword15", type: "uint32", defaultValue: 0 },
+            { name: "unknownDword16", type: "uint32", defaultValue: 0 },
+            { name: "unknownBoolean1", type: "boolean", defaultValue: false },
+            { name: "isRespawning", type: "boolean", defaultValue: false },
+            { name: "isMember", type: "uint32", defaultValue: 0 },
+            { name: "unknownDword18", type: "uint32", defaultValue: 0 },
+            { name: "unknownBoolean3", type: "boolean", defaultValue: false },
+            { name: "unknownDword19", type: "uint32", defaultValue: 0 },
+            { name: "unknownDword26", type: "uint32", defaultValue: 0 },
+            { name: "unknownDword21", type: "uint32", defaultValue: 0 },
+            { name: "unknownDword22", type: "uint32", defaultValue: 0 },
+            { name: "unknownDword23", type: "uint32", defaultValue: 0 },
+            { name: "unknownTime1", type: "uint64string", defaultValue: "" },
+            { name: "unknownTime2", type: "uint64string", defaultValue: "" },
+            { name: "unknownDword24", type: "uint32", defaultValue: 0 },
+            { name: "unknownBoolean5", type: "boolean", defaultValue: false },
+            { name: "dailyRibbonCount", type: "uint32", defaultValue: 0 },
+            {
+              name: "profiles",
+              type: "array",
+              defaultValue: [],
+              fields: profileSchema
+            },
+            { name: "currentProfile", type: "uint32", defaultValue: 0 },
+            {
+              name: "unknownArray1",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "unknownDword1", type: "int32", defaultValue: 0 },
+                { name: "unknownDword2", type: "int32", defaultValue: 0 }
+              ]
+            },
+            {
+              name: "collections",
+              type: "array",
+              defaultValue: [],
+              fields: collectionsSchema
+            },
+            {
+              name: "inventory",
+              type: "schema",
+              defaultValue: {},
+              fields: [
+                {
+                  name: "items",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    ...itemSchema,
+                    {
+                      name: "weaponData",
+                      type: "custom",
+                      defaultValue: {},
+                      packer: packItemWeaponData
+                    }
+                  ]
+                },
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 }
+              ]
+            },
+            { name: "gender", type: "uint32", defaultValue: 0 },
+            {
+              name: "characterQuests",
+              type: "schema",
+              defaultValue: {},
+              fields: [
+                {
+                  name: "quests",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword3", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword4", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "unknownBoolean1",
+                      type: "boolean",
+                      defaultValue: true
+                    },
+                    {
+                      name: "unknownGuid1",
+                      type: "uint64string",
+                      defaultValue: ""
+                    },
+                    { name: "unknownDword5", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "unknownBoolean2",
+                      type: "boolean",
+                      defaultValue: true
+                    },
+                    { name: "unknownDword6", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "reward",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: rewardBundleSchema
+                    },
+                    {
+                      name: "unknownArray1",
+                      type: "array",
+                      defaultValue: [],
+                      fields: [
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownData1",
+                          type: "schema",
+                          defaultValue: {},
+                          fields: [
+                            {
+                              name: "unknownDword1",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword2",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword3",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownBoolean1",
+                              type: "boolean",
+                              defaultValue: true
+                            },
+                            {
+                              name: "reward",
+                              type: "schema",
+                              defaultValue: {},
+                              fields: rewardBundleSchema
+                            },
+                            {
+                              name: "unknownDword4",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword5",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword6",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword7",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownBoolean2",
+                              type: "boolean",
+                              defaultValue: true
+                            },
+                            {
+                              name: "unknownDword8",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword9",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownData1",
+                              type: "schema",
+                              defaultValue: {},
+                              fields: [
+                                {
+                                  name: "unknownDword1",
+                                  type: "uint32",
+                                  defaultValue: 0
+                                },
+                                {
+                                  name: "unknownDword2",
+                                  type: "uint32",
+                                  defaultValue: 0
+                                },
+                                {
+                                  name: "unknownDword3",
+                                  type: "uint32",
+                                  defaultValue: 0
+                                },
+                                {
+                                  name: "unknownDword4",
+                                  type: "uint32",
+                                  defaultValue: 0
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    { name: "unknownDword7", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "unknownBoolean3",
+                      type: "boolean",
+                      defaultValue: true
+                    },
+                    {
+                      name: "unknownBoolean4",
+                      type: "boolean",
+                      defaultValue: true
+                    }
+                  ]
+                },
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                {
+                  name: "unknownBoolean1",
+                  type: "boolean",
+                  defaultValue: true
+                },
+                { name: "unknownDword3", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword4", type: "uint32", defaultValue: 0 }
+              ]
+            },
+            {
+              name: "characterAchievements",
+              type: "array",
+              defaultValue: [],
+              fields: achievementSchema
+            },
+            {
+              name: "acquaintances",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                {
+                  name: "unknownGuid1",
+                  type: "uint64string",
+                  defaultValue: ""
+                },
+                { name: "unknownString1", type: "string", defaultValue: "" },
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                {
+                  name: "unknownGuid2",
+                  type: "uint64string",
+                  defaultValue: ""
+                },
+                {
+                  name: "unknownBoolean1",
+                  type: "boolean",
+                  defaultValue: true
+                }
+              ]
+            },
+            {
+              name: "recipes",
+              type: "array",
+              defaultValue: [],
+              fields: recipeData
+            },
+            {
+              name: "mounts",
+              type: "array",
+              defaultValue: [],
+              fields: mountSchema
+            },
+            {
+              name: "sendFirstTimeEvents",
+              type: "boolean",
+              defaultValue: true
+            },
+            {
+              name: "SHADER_PARAMETER_GROUP",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "SHADER_SEMANTIC_ID", type: "uint32", defaultValue: 0 }
+              ]
+            },
+            {
+              name: "unknownArray2",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 }
+              ]
+            },
+            {
+              name: "effectTags",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                {
+                  name: "effectTagData",
+                  type: "schema",
+                  defaultValue: {},
+                  fields: effectTagsSchema
+                },
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                {
+                  name: "unknownBoolean1",
+                  type: "boolean",
+                  defaultValue: true
+                },
+                { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword3", type: "uint32", defaultValue: 0 },
+                {
+                  name: "unknownArray1",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "stats",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "statId", type: "uint32", defaultValue: 0 },
+                {
+                  name: "statData",
+                  type: "schema",
+                  defaultValue: {},
+                  fields: statSchema
+                }
+              ]
+            },
+            {
+              name: "playerTitles",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "titleId", type: "uint32", defaultValue: 0 },
+                { name: "titleType", type: "uint32", defaultValue: 0 },
+                { name: "stringId", type: "uint32", defaultValue: 0 }
+              ]
+            },
+            { name: "currentPlayerTitle", type: "uint32", defaultValue: 0 },
+            {
+              name: "unknownArray13",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword2", type: "uint32", defaultValue: 0 }
+              ]
+            },
+            {
+              name: "unknownArray14",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 }
+              ]
+            },
+            { name: "unknownDword33", type: "uint32", defaultValue: 0 },
+            {
+              name: "FIRE_MODES_1",
+              type: "array",
+              defaultValue: [],
+              fields: firemodesSchema
+            },
+            {
+              name: "FIRE_MODES_2",
+              type: "array",
+              defaultValue: [],
+              fields: firemodesSchema
+            },
+            {
+              name: "unknownArray17",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                {
+                  name: "unknownBoolean1",
+                  type: "boolean",
+                  defaultValue: true
+                }
+              ]
+            },
+
+            { name: "unknownDword34", type: "uint32", defaultValue: 0 },
+            { name: "unknownDword35", type: "uint32", defaultValue: 0 },
+            {
+              // related to Abilities
+              name: "unknownAbilityData1",
+              type: "schema",
+              defaultValue: {},
+              fields: [
+                {
+                  name: "unknownArray1",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "unknownData1",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownArray1",
+                          type: "array",
+                          defaultValue: [],
+                          fields: [
+                            {
+                              name: "unknownDword1",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword2",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword3",
+                              type: "uint32",
+                              defaultValue: 0
+                            }
+                          ]
+                        },
+                        {
+                          name: "unknownDword2",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownDword3",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownByte1",
+                          type: "uint8",
+                          defaultValue: 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  name: "unknownArray2",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "unknownData1",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownArray1",
+                          type: "array",
+                          defaultValue: [],
+                          fields: [
+                            {
+                              name: "unknownDword1",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword2",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword3",
+                              type: "uint32",
+                              defaultValue: 0
+                            }
+                          ]
+                        },
+                        {
+                          name: "unknownDword2",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownDword3",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownByte1",
+                          type: "uint8",
+                          defaultValue: 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  name: "unknownArray3",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 }
+                  ]
+                }
+              ]
+            },
+
+            {
+              name: "unknownAbilityData2",
+              type: "schema",
+              defaultValue: {},
+              fields: [
+                {
+                  name: "abilityLines1",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "abilityLineId", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "abilityLineData",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "abilityLineId",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        { name: "abilityId", type: "uint32", defaultValue: 0 },
+                        {
+                          name: "abilityLineIndex",
+                          type: "uint32",
+                          defaultValue: 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  name: "abilityLines2",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "abilityLineId", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "abilityLineData",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "abilityLineId",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        { name: "abilityId", type: "uint32", defaultValue: 0 },
+                        {
+                          name: "abilityLineIndex",
+                          type: "uint32",
+                          defaultValue: 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  name: "abilityLines3",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "abilityLineId", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "abilityLineData",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "abilityLineId",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        { name: "abilityId", type: "uint32", defaultValue: 0 },
+                        {
+                          name: "abilityLineIndex",
+                          type: "uint32",
+                          defaultValue: 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  name: "abilityLines4",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "abilityLineId", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "abilityLineData",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "abilityLineId",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        { name: "abilityId", type: "uint32", defaultValue: 0 },
+                        {
+                          name: "abilityLineIndex",
+                          type: "uint32",
+                          defaultValue: 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                {
+                  name: "unknownArray1", // inventory / items related (ps2 dump)
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "unknownData1",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownDword2",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownDword3",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownGuid1",
+                          type: "uint64string",
+                          defaultValue: ""
+                        },
+                        {
+                          name: "unknownGuid2",
+                          type: "uint64string",
+                          defaultValue: ""
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  name: "unknownArray2",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "unknownData1",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownDword2",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownDword3",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownGuid1",
+                          type: "uint64string",
+                          defaultValue: ""
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  name: "unknownArray3",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 }
+                  ]
+                },
+                {
+                  name: "unknownArray4",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 }
+                  ]
+                }
+              ]
+            },
+            {
+              // sub_1403653E0
+              name: "unknownData1",
+              type: "schema",
+              defaultValue: {},
+              fields: [
+                {
+                  // sub_140381D50
+                  name: "unknownArray1",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    {
+                      // sub_140373AD0
+                      name: "unknownData1",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownDword2",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownQword1",
+                          type: "uint64string",
+                          defaultValue: ""
+                        }
+                      ]
+                    },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 }
+                  ]
+                },
+                {
+                  // sub_140386A60
+                  name: "unknownArray2",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    { name: "unknownByte1", type: "uint8", defaultValue: 0 },
+                    {
+                      // sub_1403775E0
+                      name: "unknownData1",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          // sub_140373AD0 -- There's more calls to this
+                          name: "unknownData1",
+                          type: "schema",
+                          defaultValue: {},
+                          fields: [
+                            {
+                              name: "unknownDword1",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword2",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownQword1",
+                              type: "uint64string",
+                              defaultValue: ""
+                            }
+                          ]
+                        },
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownByte1",
+                          type: "uint8",
+                          defaultValue: 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                { name: "unknownByte1", type: "uint8", defaultValue: 0 }
+              ]
+            },
+            {
+              name: "unknownData2",
+              type: "schema",
+              defaultValue: {},
+              fields: [
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                {
+                  name: "unknownData1",
+                  type: "schema",
+                  defaultValue: {},
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword3", type: "uint32", defaultValue: 0 }
+                  ]
+                },
+                {
+                  name: "unknownData11",
+                  type: "schema",
+                  defaultValue: {},
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword3", type: "uint32", defaultValue: 0 }
+                  ]
+                },
+                { name: "unknownDword2", type: "uint32", defaultValue: 0 }
+              ]
+            },
+            { name: "unknownDword37", type: "uint32", defaultValue: 0 },
+            {
+              name: "characterStateData",
+              type: "schema",
+              defaultValue: {},
+              fields: [
+                {
+                  name: "unknownQword1",
+                  type: "uint64string",
+                  defaultValue: ""
+                },
+                ...interactionDataSchema,
+                { name: "unknownByte1", type: "uint8", defaultValue: 0 }
+              ]
+            },
+            {
+              name: "unknownArray18",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword2", type: "uint32", defaultValue: 0 }
+              ]
+            },
+            {
+              name: "unknownData4",
+              type: "schema",
+              defaultValue: {},
+              fields: [
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword3", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword4", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword5", type: "uint32", defaultValue: 0 }
+              ]
+            },
+            {
+              name: "unknownArray19",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword3", type: "uint32", defaultValue: 0 }
+              ]
+            },
+            {
+              name: "unknownArray20",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                {
+                  name: "unknownQword1",
+                  type: "uint64string",
+                  defaultValue: ""
+                },
+                { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword3", type: "uint32", defaultValue: 0 }
+              ]
+            },
+            {
+              name: "unknownArray21", // related to DefinitionFilter
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                {
+                  name: "unknownGuid1",
+                  type: "uint64string",
+                  defaultValue: ""
+                },
+                {
+                  name: "unknownArray1",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "unknownArray22", // related to unknownArray4 in LightWeightToFullNpc
+              type: "array",
+              defaultValue: [],
+              fields: [
+                {
+                  name: "unknownQword1",
+                  type: "uint64string",
+                  defaultValue: ""
+                },
+                {
+                  name: "unknownEffectData",
+                  type: "schema",
+                  defaultValue: {},
+                  fields: [
+                    {
+                      name: "unknownQword1",
+                      type: "uint64string",
+                      defaultValue: ""
+                    },
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "unknownData1",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownDword2",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownDword3",
+                          type: "uint32",
+                          defaultValue: 0
+                        }
+                      ]
+                    },
+                    {
+                      name: "unknownData2",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownDword2",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownDword3",
+                          type: "uint32",
+                          defaultValue: 0
+                        }
+                      ]
+                    },
+                    {
+                      name: "unknownData3",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownQword1",
+                          type: "uint64string",
+                          defaultValue: ""
+                        },
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownQword2",
+                          type: "uint64string",
+                          defaultValue: ""
+                        }
+                      ]
+                    },
+                    {
+                      name: "unknownData4",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownQword1",
+                          type: "uint64string",
+                          defaultValue: ""
+                        },
+                        {
+                          name: "unknownQword2",
+                          type: "uint64string",
+                          defaultValue: ""
+                        },
+                        {
+                          name: "unknownFloatVector4",
+                          type: "floatvector4",
+                          defaultValue: [0, 0, 0, 0]
+                        }
+                      ]
+                    },
+                    {
+                      name: "unknownData5",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownDword2",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownDword3",
+                          type: "uint32",
+                          defaultValue: 0
+                        }
+                      ]
+                    },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                    { name: "unknownByte1", type: "uint8", defaultValue: 0 }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "unknownArray23", // related to unknownArray5 in LightWeightToFullNpc
+              type: "array",
+              defaultValue: [],
+              fields: [
+                {
+                  name: "unknownQword1",
+                  type: "uint64string",
+                  defaultValue: ""
+                },
+                {
+                  name: "unknownData1",
+                  type: "schema",
+                  defaultValue: {},
+                  fields: [
+                    {
+                      name: "unknownQword1",
+                      type: "uint64string",
+                      defaultValue: ""
+                    },
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword3", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "unknownQword2",
+                      type: "uint64string",
+                      defaultValue: ""
+                    },
+                    { name: "unknownDword4", type: "uint32", defaultValue: 0 }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "equipment",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "profileId", type: "uint32", defaultValue: 0 },
+                {
+                  name: "unknownData1",
+                  type: "schema",
+                  defaultValue: {},
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "tintAlias",
+                      type: "string",
+                      defaultValue: "Default"
+                    },
+                    { name: "decalAlias", type: "string", defaultValue: "#" },
+                    {
+                      name: "equipmentSlots",
+                      type: "array",
+                      defaultValue: [],
+                      fields: equipmentSlotSchema
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "unknownArray25", // playerRanks (from ps2 sendself dump) -- related to Experience
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                {
+                  name: "unknownData1",
+                  type: "schema",
+                  defaultValue: {},
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword3", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword4", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword5", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword6", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword7", type: "uint32", defaultValue: 0 }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "unknownData5",
+              type: "schema",
+              defaultValue: {},
+              fields: [
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword3", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword4", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword5", type: "uint32", defaultValue: 0 }
+              ]
+            },
+            {
+              name: "unknownData6",
+              type: "schema",
+              defaultValue: {},
+              fields: [
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword3", type: "uint32", defaultValue: 0 }
+              ]
+            },
+            {
+              // related to implant packets
+              name: "implantSlots",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                {
+                  name: "unknownData1",
+                  type: "schema",
+                  defaultValue: {},
+                  fields: [
+                    {
+                      name: "unknownData1",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownDword2",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownQword1",
+                          type: "uint64string",
+                          defaultValue: ""
+                        }
+                      ]
+                    },
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword3", type: "uint32", defaultValue: 0 }
+                  ]
+                }
+              ]
+            },
+            ...accountItemsSchema,
+            ...escrowAccountItemsSchema,
+            {
+              name: "unknownData7",
+              type: "schema",
+              defaultValue: {},
+              fields: [
+                {
+                  // sub_140373A20 - This is called at other places as well - Jason
+                  name: "unknownData1",
+                  type: "schema",
+                  defaultValue: {},
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "unknownQword1",
+                      type: "uint64string",
+                      defaultValue: ""
+                    },
+                    {
+                      name: "unknownQword2",
+                      type: "uint64string",
+                      defaultValue: ""
+                    }
+                  ]
+                },
+                {
+                  // sub_14037CF80
+                  name: "unknownArray1",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    {
+                      // sub_140373A20
+                      name: "unknownData1",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownDword2",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownQword1",
+                          type: "uint64string",
+                          defaultValue: ""
+                        },
+                        {
+                          name: "unknownQword2",
+                          type: "uint64string",
+                          defaultValue: ""
+                        }
+                      ]
+                    },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 }
+                  ]
+                },
+                {
+                  // sub_140373AD0 -- Called in other places - Jason
+                  name: "unknownData2",
+                  type: "schema",
+                  defaultValue: {},
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "unknownQword1",
+                      type: "uint64string",
+                      defaultValue: ""
+                    }
+                  ]
+                },
+                {
+                  // sub_14037D0F0
+                  name: "unknownArray2",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    {
+                      // sub_1403702F0
+                      name: "unknownData1",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          // sub_140373AD0
+                          name: "unknownData1",
+                          type: "schema",
+                          defaultValue: {},
+                          fields: [
+                            {
+                              name: "unknownDword1",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword2",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownQword1",
+                              type: "uint64string",
+                              defaultValue: ""
+                            }
+                          ]
+                        },
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownDword2",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownByte1",
+                          type: "uint8",
+                          defaultValue: 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  // sub_14037CE40
+                  name: "unknownArray3",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    {
+                      // sub_1403701A0
+                      name: "unknownData1",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownData1",
+                          type: "schema",
+                          defaultValue: {},
+                          fields: [
+                            {
+                              name: "unknownDword1",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword2",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownQword1",
+                              type: "uint64string",
+                              defaultValue: ""
+                            }
+                          ]
+                        },
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownDword2",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownByte1",
+                          type: "uint8",
+                          defaultValue: 0
+                        }
+                      ]
+                    }
+                  ]
+                },
+                { name: "unknownByte1", type: "uint8", defaultValue: 0 }
+              ]
+            },
+            {
+              name: "skinItems",
+              type: "schema",
+              defaultValue: {},
+              fields: [
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                { name: "unknownString1", type: "string", defaultValue: "" },
+                ...skinItemsSchema,
+                ...emoteItemsSchema,
+                ...itemCollectionSchema
+              ]
+            },
+            {
+              name: "loadoutSlots",
+              type: "schema",
+              defaultValue: {},
+              fields: loadoutSlotsSchema
+            },
+            {
+              name: "unknownArray27",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword2", type: "uint32", defaultValue: 0 }
+              ]
+            },
+            {
+              name: "unknownData9",
+              type: "schema",
+              defaultValue: {},
+              fields: [
+                {
+                  // sub_140385D00 - related to missions
+                  name: "unknownArray1",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    {
+                      name: "unknownData1",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownQword1",
+                          type: "uint64string",
+                          defaultValue: ""
+                        },
+                        {
+                          name: "unknownByte1",
+                          type: "uint8",
+                          defaultValue: 0
+                        }
+                      ]
+                    },
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword3", type: "uint32", defaultValue: 0 }
+                  ]
+                },
+                {
+                  name: "unknownArray2",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    {
+                      name: "unknownData1",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownQword1",
+                          type: "uint64string",
+                          defaultValue: ""
+                        },
+                        {
+                          name: "unknownByte1",
+                          type: "uint8",
+                          defaultValue: 0
+                        }
+                      ]
+                    },
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword3", type: "uint32", defaultValue: 0 }
+                  ]
+                },
+                {
+                  name: "unknownArray3",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    {
+                      name: "unknownData1",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownQword1",
+                          type: "uint64string",
+                          defaultValue: ""
+                        },
+                        {
+                          name: "unknownByte1",
+                          type: "uint8",
+                          defaultValue: 0
+                        }
+                      ]
+                    },
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "unknownQword1",
+                      type: "uint64string",
+                      defaultValue: ""
+                    }
+                  ]
+                },
+                {
+                  name: "unknownArray4",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    {
+                      name: "unknownData1",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownQword1",
+                          type: "uint64string",
+                          defaultValue: ""
+                        },
+                        {
+                          name: "unknownByte1",
+                          type: "uint8",
+                          defaultValue: 0
+                        }
+                      ]
+                    },
+                    {
+                      name: "unknownData2",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownData1",
+                          type: "schema",
+                          defaultValue: {},
+                          fields: [
+                            {
+                              name: "unknownDword1",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownQword1",
+                              type: "uint64string",
+                              defaultValue: ""
+                            },
+                            {
+                              name: "unknownByte1",
+                              type: "uint8",
+                              defaultValue: 0
+                            }
+                          ]
+                        },
+                        {
+                          name: "unknownData2",
+                          type: "schema",
+                          defaultValue: {},
+                          fields: [
+                            {
+                              name: "unknownDword1",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword2",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword3",
+                              type: "uint32",
+                              defaultValue: 0
+                            }
+                          ]
+                        },
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownData3",
+                          type: "schema",
+                          defaultValue: {},
+                          fields: [
+                            {
+                              name: "unknownDword1",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword2",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownFloatVector4",
+                              type: "floatvector4",
+                              defaultValue: [0, 0, 0, 0]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  name: "unknownArray5",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    {
+                      name: "unknownData1",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownQword1",
+                          type: "uint64string",
+                          defaultValue: ""
+                        },
+                        {
+                          name: "unknownByte1",
+                          type: "uint8",
+                          defaultValue: 0
+                        }
+                      ]
+                    },
+                    {
+                      name: "unknownData2",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: [
+                        {
+                          name: "unknownData1",
+                          type: "schema",
+                          defaultValue: {},
+                          fields: [
+                            {
+                              name: "unknownDword1",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownQword1",
+                              type: "uint64string",
+                              defaultValue: ""
+                            },
+                            {
+                              name: "unknownByte1",
+                              type: "uint8",
+                              defaultValue: 0
+                            }
+                          ]
+                        },
+                        {
+                          name: "unknownData2",
+                          type: "schema",
+                          defaultValue: {},
+                          fields: [
+                            {
+                              name: "unknownDword1",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword2",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword3",
+                              type: "uint32",
+                              defaultValue: 0
+                            }
+                          ]
+                        },
+                        {
+                          name: "unknownDword1",
+                          type: "uint32",
+                          defaultValue: 0
+                        },
+                        {
+                          name: "unknownData3",
+                          type: "schema",
+                          defaultValue: {},
+                          fields: [
+                            {
+                              name: "unknownDword1",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownDword2",
+                              type: "uint32",
+                              defaultValue: 0
+                            },
+                            {
+                              name: "unknownFloatVector4",
+                              type: "floatvector4",
+                              defaultValue: [0, 0, 0, 0]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              name: "characterResources",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "resourceType", type: "uint32", defaultValue: 0 },
+                {
+                  name: "resourceData",
+                  type: "schema",
+                  defaultValue: {},
+                  fields: characterResourceData
+                }
+              ]
+            },
+            ...skillPointDataSchema,
+            {
+              name: "skills",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "skillLineId", type: "uint32", defaultValue: 0 },
+                { name: "skillId", type: "uint32", defaultValue: 0 }
+              ]
+            },
+            {
+              name: "containers",
+              type: "array",
+              defaultValue: [],
+              fields: containers
+            },
+            {
+              name: "unknownArray28",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+                { name: "unknownDword3", type: "uint32", defaultValue: 0 },
+                {
+                  name: "currency",
+                  type: "array",
+                  defaultValue: [],
+                  fields: currencySchema
+                }
+              ]
+            },
+            {
+              name: "unknownArray29",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                {
+                  name: "unknownArray1",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                    { name: "unknownDword2", type: "uint32", defaultValue: 0 }
+                  ]
+                }
+              ]
+            },
+            { name: "quizComplete", type: "boolean", defaultValue: false },
+            { name: "unknownQword1", type: "uint64string", defaultValue: "" },
+            { name: "unknownDword38", type: "uint32", defaultValue: 0 },
+            {
+              name: "vehicleLoadoutRelatedQword",
+              type: "uint64string",
+              defaultValue: "0x0"
+            },
+            {
+              name: "unknownQword3",
+              type: "uint64string",
+              defaultValue: "0x0"
+            },
+            {
+              name: "vehicleLoadoutRelatedDword",
+              type: "uint32",
+              defaultValue: 0
+            },
+            { name: "unknownDword40", type: "int32", defaultValue: -1 },
+            { name: "isAdmin", type: "boolean", defaultValue: true },
+            { name: "firstPersonOnly", type: "boolean", defaultValue: false },
+            { name: "spectatorFlags", type: "uint8", defaultValue: 0 }
+          ]
+        }
+      ]
+    }
+  ],
+  [
+    "ClientIsReady",
+    0x04,
+    {
+      fields: []
+    }
+  ],
+  [
+    "ZoneDoneSendingInitialData",
+    0x05,
+    {
+      fields: []
+    }
+  ],
+  ["ClientLogout", 0x07, {}],
+  ["TargetClientNotOnline", 0x08, {}],
+  [
+    "ClientBeginZoning",
+    0x0b,
+    {
+      fields: [
+        { name: "zoneName", type: "string", defaultValue: "Z1" },
+        { name: "zoneType", type: "int32", defaultValue: 4 },
+        { name: "position", type: "floatvector4", defaultValue: [0, 0, 0, 1] },
+        { name: "rotation", type: "floatvector4", defaultValue: [0, 0, 0, 1] },
+        { name: "skyData", type: "schema", fields: skyData },
+        { name: "movementVersion", type: "uint8", defaultValue: 5 },
+        { name: "zoneId1", type: "uint32", defaultValue: 5 },
+        { name: "zoneId2", type: "uint32", defaultValue: 0 },
+        { name: "geometryId", type: "uint32", defaultValue: 0 },
+        { name: "nameId", type: "uint32", defaultValue: 0 },
+        { name: "unknownBoolean1", type: "boolean", defaultValue: true },
+        { name: "waitForZoneReady", type: "boolean", defaultValue: false },
+        { name: "unknownBoolean3", type: "boolean", defaultValue: false }
+      ]
+    }
+  ],
+  // gets triggered if you're on top of a vehicle, and shoot down into the windshield
+  // may also get triggered if a client is cheating but not 100% sure -Meme
+  [
+    "ProjectileDebug",
+    0x0d,
+    {
+      fields: [
+        { name: "weaponDefinitionId", type: "uint32", defaultValue: 0 },
+        { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+        { name: "unknownDword3", type: "uint32", defaultValue: 0 },
+
+        // don't know if these next 6 are correct
+        { name: "unknownDword4", type: "uint32", defaultValue: 0 },
+        { name: "unknownDword5", type: "uint32", defaultValue: 0 },
+        { name: "unknownDword6", type: "uint32", defaultValue: 0 },
+        { name: "unknownByte1", type: "uint8", defaultValue: 0 },
+        { name: "unknownDword7", type: "uint32", defaultValue: 0 },
+        { name: "unknownWord1", type: "uint16", defaultValue: 0 },
+
+        { name: "unknownString1", type: "nullstring", defaultValue: "" },
+        {
+          name: "projectileLocation",
+          type: "floatvector3",
+          defaultValue: [0, 0, 0]
+        },
+        {
+          name: "playerLocation",
+          type: "floatvector3",
+          defaultValue: [0, 0, 0]
+        },
+        { name: "unknownByte5", type: "uint8", defaultValue: 0 }
+      ]
+    }
+  ],
+  ["Mail", 0x0e, {}],
+  ["MiniGame", 0x12, {}],
+  ["Encounter", 0x14, {}],
+  ["Inventory", 0x15, {}],
+  [
+    "SendZoneDetails",
+    0x16,
+    {
+      fields: [
+        { name: "zoneName", type: "string", defaultValue: "" },
+        { name: "zoneType", type: "uint32", defaultValue: 0 },
+        { name: "unknownBoolean1", type: "boolean", defaultValue: false },
+        { name: "skyData", type: "schema", fields: skyData },
+        { name: "zoneId1", type: "uint32", defaultValue: 0 },
+        { name: "geometryId", type: "uint32", defaultValue: 0 },
+        { name: "nameId", type: "uint32", defaultValue: 0 },
+        { name: "unknownBoolean2", type: "boolean", defaultValue: false },
+        { name: "lighting", type: "string", defaultValue: "" },
+        { name: "isInvitational", type: "boolean", defaultValue: false }
+      ]
+    }
+  ],
+  ["Objective", 0x18, {}],
+  ["Debug", 0x19, {}],
+  ["Quest", 0x1b, {}],
+  ["Reward", 0x1c, {}],
+  [
+    "Reward.AddRewardItem",
+    0x1c01,
+    {
+      fields: [
+        ...rewardBundleSchema,
+        { name: "unknownBoolean2", type: "boolean", defaultValue: true }
+      ]
+    }
+  ],
+  [
+    "Reward.AddNonRewardItem",
+    0x1c02,
+    {
+      fields: [
+        { name: "itemDefId", type: "uint32", defaultValue: 10 },
+        { name: "nameId", type: "uint32", defaultValue: 1 },
+        { name: "iconId", type: "uint32", defaultValue: 7 },
+        { name: "time4", type: "uint32", defaultValue: 0 },
+        { name: "count", type: "uint32", defaultValue: 2 },
+        { name: "time6", type: "uint32", defaultValue: 0 }
+      ]
+    }
+  ],
+  [
+    "GameTimeSync",
+    0x1d,
+    {
+      fields: [
+        { name: "time", type: "uint64string", defaultValue: "0" },
+        { name: "cycleSpeed", type: "float", defaultValue: 0.0 },
+        { name: "unknownBoolean1", type: "boolean", defaultValue: false }
+      ]
+    }
+  ],
+  ["Pet", 0x1e, {}],
+  ["PointOfInterestDefinitionRequest", 0x1f, {}],
+  ["PointOfInterestDefinitionReply", 0x20, {}],
+  ["WorldTeleportRequest", 0x21, {}],
+  ["Trade", 0x22, {}],
+  ["EscrowGivePackage", 0x23, {}],
+  ["EscrowGotPackage", 0x24, {}],
+  ["UpdateEncounterDataCommon", 0x25, {}],
+
+  ["Report", 0x29, {}],
+  ["LiveGamer", 0x2a, {}],
+  ["Acquaintance", 0x2b, {}],
+  ["ClientServerShuttingDown", 0x2c, {}],
+
+  [
+    "Broadcast.Local",
+    0x2e0000,
+    {
+      fields: broadcastSchema
+    }
+  ],
+  [
+    "Broadcast.Zone",
+    0x2e0200,
+    {
+      fields: broadcastSchema
+    }
+  ],
+  [
+    "Broadcast.World",
+    0x2e0300,
+    {
+      fields: broadcastSchema
+    }
+  ],
+  ["ClientKickedFromServer", 0x2f, {}],
+  [
+    "UpdateClientSessionData",
+    0x30,
+    {
+      fields: [
+        { name: "sessionId", type: "string", defaultValue: "" },
+        { name: "stationName", type: "string", defaultValue: "" },
+        { name: "unknownBoolean1", type: "boolean", defaultValue: false },
+        { name: "unknownString1", type: "string", defaultValue: "" },
+        { name: "unknownString2", type: "string", defaultValue: "" },
+        { name: "stationCode", type: "string", defaultValue: "" },
+        { name: "unknownString3", type: "string", defaultValue: "" }
+      ]
+    }
+  ],
+  ["BugSubmission", 0x31, {}],
+  [
+    "WorldDisplayInfo",
+    0x32,
+    {
+      fields: [{ name: "worldId", type: "uint32", defaultValue: 0 }]
+    }
+  ],
+  ["MOTD", 0x33, {}],
+  [
+    "SetLocale",
+    0x34,
+    {
+      fields: [{ name: "locale", type: "string", defaultValue: "" }]
+    }
+  ],
+  ["SetClientArea", 0x35, {}],
+  ["ZoneTeleportRequest", 0x36, {}],
+  ["TradingCard", 0x37, {}],
+  [
+    "WorldShutdownNotice",
+    0x38,
+    {
+      fields: [
+        {
+          name: "timeBeforeShutdown",
+          type: "uint64string",
+          defaultValue: "600EB251"
+        },
+        { name: "message", type: "string", defaultValue: "" }
+      ]
+    }
+  ],
+  ["LoadWelcomeScreen", 0x39, {}],
+  ["ShipCombat", 0x3a, {}],
+  ["AdminMiniGame", 0x3b, {}],
+  [
+    "KeepAlive",
+    0x3c,
+    {
+      fields: [{ name: "gameTime", type: "uint32", defaultValue: 0 }]
+    }
+  ],
+  [
+    "ClientExitLaunchUrl",
+    0x3d,
+    {
+      fields: [{ name: "url", type: "string", defaultValue: "" }]
+    }
+  ],
+  ["ClientPendingKickFromServer", 0x3f, {}],
+  [
+    "MembershipActivation",
+    0x40,
+    {
+      fields: [{ name: "unknown", type: "uint32", defaultValue: 0 }]
+    }
+  ],
+  [
+    "ShowSystemMessage",
+    0x43,
+    {
+      fields: [
+        { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+        { name: "message", type: "string", defaultValue: "" },
+        { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+        { name: "color", type: "uint32", defaultValue: 0 }
+      ]
+    }
+  ],
+  [
+    "POIChangeMessage",
+    0x44,
+    {
+      fields: [
+        { name: "messageStringId", type: "uint32", defaultValue: 0 },
+        { name: "id", type: "uint32", defaultValue: 0 },
+        { name: "unknownDword1", type: "uint32", defaultValue: 0 }
+      ]
+    }
+  ],
+  ["ClientMetrics", 0x45, {}],
+  [
+    "FirstTimeEvent.NotifySystem",
+    0x4601,
+    {
+      fields: [
+        { name: "unknownDword1", type: "int32", defaultValue: 0 },
+        { name: "unknownBoolean1", type: "boolean", defaultValue: false },
+        { name: "displayElement", type: "int32", defaultValue: 0 }
+      ]
+    }
+  ],
+  [
+    "FirstTimeEvent.State",
+    0x4602,
+    {
+      fields: [
+        { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+        { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+        { name: "unknownBoolean1", type: "boolean", defaultValue: false }
+      ]
+    }
+  ],
+  [
+    "FirstTimeEvent.Unknown2",
+    0x4603,
+    {
+      fields: []
+    }
+  ],
+  [
+    "FirstTimeEvent.Unknown3",
+    0x4604,
+    {
+      fields: []
+    }
+  ],
+  [
+    "FirstTimeEvent.Script",
+    0x4605,
+    {
+      fields: [
+        { name: "unknownString1", type: "string", defaultValue: "" },
+        {
+          name: "unknownArray1",
+          type: "array",
+          defaultValue: [],
+          fields: [{ name: "unknownDword1", type: "uint32", defaultValue: 0 }]
+        },
+        { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+        { name: "unknownBoolean1", type: "boolean", defaultValue: false }
+      ]
+    }
+  ],
+  [
+    "FirstTimeEvent.Unknown4",
+    0x4607,
+    {
+      fields: [
+        { name: "unknownString1", type: "string", defaultValue: "" },
+        {
+          name: "unknownArray1",
+          type: "array",
+          defaultValue: [],
+          fields: [{ name: "unknownDword1", type: "uint32", defaultValue: 0 }]
+        },
+        { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+        { name: "unknownBoolean1", type: "boolean", defaultValue: false }
+      ]
+    }
+  ],
+  ["Claim", 0x47, {}],
+  [
+    "ClientLog",
+    0x48,
+    {
+      fields: [
+        { name: "file", type: "string", defaultValue: "" },
+        { name: "message", type: "string", defaultValue: "" }
+      ]
+    }
+  ],
+  ["Ignore", 0x49, {}],
+  ["SnoopedPlayer", 0x4a, {}],
+  ["Promotional", 0x4b, {}],
+  ["AddClientPortraitCrc", 0x4c, {}],
+  ["ObjectiveTarget", 0x4d, {}],
+  ["CommerceSessionRequest", 0x4e, {}], // empty
+  [
+    "CommerceSessionResponse",
+    0x4f,
+    {
+      fields: [
+        { name: "unknownBoolean1", type: "boolean", defaultValue: true },
+        { name: "sessionToken", type: "string", defaultValue: "" }
+      ]
+    }
+  ],
+  ["TrackedEvent", 0x50, {}],
+  [
+    "LoginFailed",
+    0x51,
+    {
+      fields: []
+    }
+  ],
+  ["LoginToUChat", 0x52, {}],
+  ["ZoneSafeTeleportRequest", 0x53, {}],
+  ["RemoteInteractionRequest", 0x54, {}],
+  ["UpdateCamera", 0x57, {}],
+  [
+    // name isn't in client, packet triggers when player collides with a zombie or with /run any object
+    // also happens when the player lags and triggers "Security"
+    "NpcCollision",
+    0x58,
+    {
+      fields: [
+        { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+        { name: "unknownDword2", type: "uint32", defaultValue: 0 }, // 1 when it's an npc
+        { name: "unknownDword3", type: "uint32", defaultValue: 0 },
+        { name: "unknownDword4", type: "uint32", defaultValue: 0 },
+        { name: "unknownDword5", type: "uint32", defaultValue: 0 }
+      ]
+    }
+  ],
+  ["AdminGuild", 0x5a, {}],
+  ["BattleMages", 0x5b, {}],
+  ["WorldToWorld", 0x5c, {}],
+  ["PerformAction", 0x5d, {}],
+  ["EncounterMatchmaking", 0x5e, {}],
+  ["ClientLuaMetrics", 0x5f, {}],
+  ["RepeatingActivity", 0x60, {}],
+  [
+    "ClientGameSettings",
+    0x61,
+    {
+      fields: [
+        { name: "deprecated", type: "uint32", defaultValue: 0 }, // not used anywhere in client
+        { name: "interactionCheckRadius", type: "uint32", defaultValue: 3 }, // client doesnt send interactionstring by distance but still sends interactrequest
+        { name: "unknownBoolean1", type: "boolean", defaultValue: false },
+        { name: "timescale", type: "float", defaultValue: 1.0 },
+        { name: "enableWeapons", type: "uint32", defaultValue: 0 },
+        { name: "Unknown5", type: "uint32", defaultValue: 0 },
+        { name: "unknownFloat1", type: "float", defaultValue: 0.0 },
+        {
+          name: "fallDamageVelocityThreshold",
+          type: "float",
+          defaultValue: 0.0
+        },
+        {
+          name: "fallDamageVelocityMultiplier",
+          type: "float",
+          defaultValue: 1.0
+        } // 0 = crash
+      ]
+    }
+  ],
+  [
+    "ClientTrialProfileUpsell",
+    0x62,
+    {
+      fields: [
+        { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+        { name: "unknownDword2", type: "uint32", defaultValue: 0 }
+      ]
+    }
+  ],
+  ["ActivityManager.ProfileActivityList", 0x6301, {}],
+  ["ActivityManager.JoinErrorString", 0x6302, {}],
+  ["RequestSendItemDefinitionsToClient", 0x64, {}],
+  ["Inspect", 0x65, {}],
+  [
+    "Achievement.Add",
+    0x6602,
+    {
+      fields: [
+        { name: "achievementId", type: "uint32", defaultValue: 0 },
+        {
+          name: "achievementData",
+          type: "schema",
+          fields: objectiveSchema
+        }
+      ]
+    }
+  ],
+  [
+    "Achievement.Initialize",
+    0x6603,
+    {
+      fields: [
+        {
+          name: "clientAchievements",
+          type: "array",
+          defaultValue: [{}],
+          fields: achievementSchema
+        },
+        {
+          name: "achievementData",
+          type: "byteswithlength",
+          fields: [
+            {
+              name: "achievements",
+              type: "array",
+              defaultValue: [{}],
+              fields: achievementSchema
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  ["Achievement.Complete", 0x6604, {}],
+  ["Achievement.ObjectiveAdded", 0x6605, {}],
+  ["Achievement.ObjectiveActivated", 0x6606, {}],
+  ["Achievement.ObjectiveUpdate", 0x6607, {}],
+  ["Achievement.ObjectiveComplete", 0x6608, {}],
+  [
+    "PlayerTitle",
+    0x67,
+    {
+      fields: [
+        { name: "unknown1", type: "uint8", defaultValue: 0 },
+        { name: "titleId", type: "uint32", defaultValue: 0 }
+      ]
+    }
+  ],
+  ["MatchHistory", 0x68, {}],
+  [
+    "UpdateUserAge",
+    0x69,
+    {
+      fields: [{ name: "age", type: "uint32", defaultValue: 0 }]
+    }
+  ],
+  ["ActionBarManager", 0x6b, {}],
+  ["ClientTrialProfileUpsellRequest", 0x6c, {}],
+  ["PlayerUpdateJump", 0x6d, {}],
+
+  [
+    "InitializationParameters",
+    0x6f,
+    {
+      fields: [
+        { name: "ENVIRONMENT", type: "string", defaultValue: "" },
+        { name: "unknownString1", type: "string", defaultValue: "" },
+        {
+          name: "rulesetDefinitions",
+          type: "array",
+          defaultValue: [],
+          fields: [
+            { name: "RULESET_ID", type: "uint32", defaultValue: 0 },
+            { name: "RULESET_ID_", type: "uint32", defaultValue: 0 },
+            { name: "ruleset", type: "string", defaultValue: "" },
+            { name: "unknownString2", type: "string", defaultValue: "" },
+            {
+              name: "rulesets",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "ID", type: "uint32", defaultValue: 0 },
+                {
+                  name: "DATA",
+                  type: "schema",
+                  defaultValue: {},
+                  fields: [
+                    { name: "ID", type: "uint32", defaultValue: 0 },
+                    { name: "RULESET_ID", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "CONTENT_PACK_ID",
+                      type: "uint32",
+                      defaultValue: 0
+                    },
+                    {
+                      name: "CONTENT_PACK_ACTION_ID",
+                      type: "uint32",
+                      defaultValue: 0
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+
+  [
+    "ClientInitializationDetails",
+    0x72,
+    {
+      fields: [{ name: "unknownDword1", type: "uint32", defaultValue: 0 }]
+    }
+  ],
+  ["ClientAreaTimer", 0x73, {}],
+  ["LoyaltyReward.GiveLoyaltyReward", 0x7401, {}],
+  ["Rating", 0x75, {}],
+  ["ClientActivityLaunch", 0x76, {}],
+  ["ServerActivityLaunch", 0x77, {}],
+  [
+    "ClientFlashTimer",
+    0x78,
+    {
+      fields: [
+        { name: "unknownBoolean1", type: "boolean", defaultValue: false },
+        { name: "unknownDword1", type: "uint32", defaultValue: 0 }
+      ]
+    }
+  ],
+  [
+    "PlayerUpdatePosition",
+    0x79,
+    {
+      fields: [
+        {
+          name: "transientId",
+          type: "custom",
+          parser: readUnsignedIntWith2bitLengthValue,
+          packer: packUnsignedIntWith2bitLengthValue
+        },
+        {
+          name: "positionUpdate",
+          type: "custom",
+          parser: readPositionUpdateData,
+          packer: packPositionUpdateData
+        }
+      ]
+    }
+  ],
+  ["InviteAndStartMiniGame", 0x7a, {}],
+  ["Quiz", 0x7b, {}],
+  ["PlayerUpdate.PositionOnPlatform", 0x7c, {}],
+  ["ClientMembershipVipInfo", 0x7d, {}],
+  ["Target", 0x7e, {}],
+  ["GuideStone", 0x80, {}],
+  ["Raid", 0x81, {}],
+  [
+    "Weapon.Weapon",
+    0x8300,
+    {
+      fields: [
+        {
+          name: "weaponPacket",
+          type: "custom",
+          parser: parseWeaponPacket,
+          packer: packWeaponPacket
+        }
+      ]
+    }
+  ],
+  ["MatchSchedule", 0x84, {}],
+  ["Grief", 0x8a, {}],
+  ["SpotPlayer", 0x8b, {}],
+  ["Faction", 0x8c, {}],
+  [
+    "Synchronization",
+    0x8d,
+    {
+      fields: [
+        { name: "clientHoursMs", type: "uint64string", defaultValue: "0" }, // seems like hours since a 12h trip in ms UTC time
+        { name: "clientHoursMs2", type: "uint64string", defaultValue: "0" },
+        { name: "clientTime", type: "uint64string", defaultValue: "0" },
+        { name: "serverTime", type: "uint64string", defaultValue: "0" },
+        { name: "serverTime2", type: "uint64string", defaultValue: "0" },
+        { name: "time3", type: "uint64string", defaultValue: "0" } // maybe drift ?
+      ]
+    }
+  ],
+  [
+    "ResourceEvent",
+    0x8e00,
+    {
+      fields: [
+        { name: "gameTime", type: "uint32", defaultValue: 0 },
+        {
+          name: "eventData",
+          type: "variabletype8",
+          types: {
+            1: [
+              // SetCharacterResources
+              { name: "characterId", type: "uint64string", defaultValue: "0" },
+              {
+                name: "characterResources",
+                type: "array",
+                defaultValue: [],
+                fields: [
+                  { name: "resourceType", type: "uint32", defaultValue: 0 },
+                  {
+                    name: "resourceData",
+                    type: "schema",
+                    fields: characterResourceData
+                  }
+                ]
+              }
+            ],
+            2: [
+              // SetCharacterResource
+              { name: "characterId", type: "uint64string", defaultValue: "0" },
+              {
+                name: "resourceData",
+                type: "schema",
+                fields: characterResourceData
+              }
+            ],
+            3: [
+              // UpdateCharacterResource
+              { name: "characterId", type: "uint64string", defaultValue: "0" },
+              { name: "resourceId", type: "uint32", defaultValue: 0 },
+              { name: "resourceType", type: "uint32", defaultValue: 0 },
+
+              { name: "initialValue", type: "uint32", defaultValue: 0 },
+              { name: "unknownDword4", type: "uint32", defaultValue: 0 },
+              { name: "unknownFloat5", type: "float", defaultValue: 0.0 },
+              { name: "unknownFloat6", type: "float", defaultValue: 0.0 },
+              { name: "unknownFloat7", type: "float", defaultValue: 0.0 },
+              { name: "unknownDword8", type: "uint32", defaultValue: 0 },
+              { name: "unknownDword9", type: "uint32", defaultValue: 0 },
+              { name: "unknownDword10", type: "uint32", defaultValue: 0 },
+
+              { name: "unknownByte1", type: "uint8", defaultValue: 0 },
+              { name: "unknownByte2", type: "uint8", defaultValue: 0 },
+              { name: "unknownGuid3", type: "uint64string", defaultValue: "0" },
+              { name: "unknownGuid4", type: "uint64string", defaultValue: "0" },
+              { name: "unknownGuid5", type: "uint64string", defaultValue: "0" },
+
+              { name: "unknownBoolean", type: "boolean", defaultValue: false }
+            ],
+            4: [
+              // RemoveCharacterResource
+              { name: "characterId", type: "uint64string", defaultValue: "0" },
+              { name: "resourceId", type: "uint32", defaultValue: 0 }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+
+  ["Leaderboard", 0x90, {}],
+  [
+    "PlayerUpdateManagedPosition",
+    0x91,
+    {
+      fields: [
+        {
+          name: "transientId",
+          type: "custom",
+          parser: readUnsignedIntWith2bitLengthValue,
+          packer: packUnsignedIntWith2bitLengthValue,
+          defaultValue: 1
+        },
+        {
+          name: "positionUpdate",
+          type: "custom",
+          parser: readPositionUpdateDataAndCheckLength,
+          packer: packPositionUpdateData,
+          defaultValue: 1
+        }
+      ]
+    }
+  ],
+  [
+    "AddSimpleNpc",
+    0x92,
+    {
+      fields: [
+        { name: "characterId", type: "uint64string", defaultValue: "0" },
+        {
+          name: "transientId",
+          type: "custom",
+          parser: readUnsignedIntWith2bitLengthValue,
+          packer: packUnsignedIntWith2bitLengthValue
+        },
+        { name: "unknownByte1", type: "uint8", defaultValue: 0 },
+        { name: "position", type: "floatvector3", defaultValue: [0, 0, 0] },
+        { name: "rotation", type: "floatvector3", defaultValue: [0, 0, 0] },
+        { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+        { name: "terrainObjectId", type: "uint32", defaultValue: 0 },
+        { name: "modelId", type: "uint32", defaultValue: 0 },
+        { name: "scale", type: "floatvector4", defaultValue: [1, 1, 1, 1] },
+        { name: "unknownDword3", type: "uint32", defaultValue: 0 },
+        { name: "unknownByte2", type: "uint8", defaultValue: 0 },
+        { name: "health", type: "float", defaultValue: 100 }
+      ]
+    }
+  ],
+  ["PlayerUpdateUpdateVehicleWeapon", 0x93, {}],
+  [
+    "ContinentBattleInfo",
+    0x97,
+    {
+      fields: [
+        {
+          name: "zones",
+          type: "array",
+          defaultValue: [{}],
+          fields: [
+            { name: "id", type: "uint32", defaultValue: 0 },
+            { name: "nameId", type: "uint32", defaultValue: 0 },
+            { name: "descriptionId", type: "uint32", defaultValue: 0 },
+            {
+              name: "population",
+              type: "array",
+              defaultValue: [{}],
+              elementType: "uint8"
+            },
+            {
+              name: "regionPercent",
+              type: "array",
+              defaultValue: [{}],
+              elementType: "uint8"
+            },
+            {
+              name: "populationBuff",
+              type: "array",
+              defaultValue: [{}],
+              elementType: "uint8"
+            },
+            {
+              name: "populationTargetPercent",
+              type: "array",
+              defaultValue: [{}],
+              elementType: "uint8"
+            },
+            { name: "name", type: "string", defaultValue: "" },
+            { name: "hexSize", type: "float", defaultValue: 0.0 },
+            { name: "isProductionZone", type: "uint8", defaultValue: 0 }
+          ]
+        }
+      ]
+    }
+  ],
+  [
+    "GetContinentBattleInfo",
+    0x98,
+    {
+      fields: []
+    }
+  ],
+  [
+    "SendSecurityPacketAndSelfDestruct",
+    0x99,
+    {
+      fields: [{ name: "unk", type: "uint32", defaultValue: 4294967295 }]
+    }
+  ],
+  [
+    "GetRespawnLocations",
+    0x9a,
+    {
+      fields: []
+    }
+  ],
+  ["ClientInGamePurchase", 0x9d, {}],
+
+  [
+    "Security",
+    0xa3,
+    {
+      fields: [{ name: "code", type: "uint32", defaultValue: 0 }]
+    }
+  ],
+  ["HudManager", 0xa5, {}],
+  [
+    "AcquireTimers",
+    0xa600,
+    {
+      fields: [
+        { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+        {
+          // sub_140381D50
+          name: "unknownArray1",
+          type: "array",
+          defaultValue: [],
+          fields: [
+            { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+            {
+              // sub_140373AD0
+              name: "unknownData1",
+              type: "schema",
+              defaultValue: {},
+              fields: [
+                {
+                  name: "unknownDword1",
+                  type: "uint32",
+                  defaultValue: 0
+                },
+                {
+                  name: "unknownDword2",
+                  type: "uint32",
+                  defaultValue: 0
+                },
+                {
+                  name: "unknownQword1",
+                  type: "uint64string",
+                  defaultValue: ""
+                }
+              ]
+            },
+            { name: "unknownDword2", type: "uint32", defaultValue: 0 }
+          ]
+        },
+        {
+          // sub_140386A60
+          name: "unknownArray2",
+          type: "array",
+          defaultValue: [],
+          fields: [
+            { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+            { name: "unknownByte1", type: "uint8", defaultValue: 0 },
+            {
+              // sub_1403775E0
+              name: "unknownData1",
+              type: "schema",
+              defaultValue: {},
+              fields: [
+                {
+                  // sub_140373AD0 -- There's more calls to this
+                  name: "unknownData1",
+                  type: "schema",
+                  defaultValue: {},
+                  fields: [
+                    {
+                      name: "unknownDword1",
+                      type: "uint32",
+                      defaultValue: 0
+                    },
+                    {
+                      name: "unknownDword2",
+                      type: "uint32",
+                      defaultValue: 0
+                    },
+                    {
+                      name: "unknownQword1",
+                      type: "uint64string",
+                      defaultValue: ""
+                    }
+                  ]
+                },
+                {
+                  name: "unknownDword1",
+                  type: "uint32",
+                  defaultValue: 0
+                },
+                {
+                  name: "unknownByte1",
+                  type: "uint8",
+                  defaultValue: 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          name: "unknownByte1",
+          type: "uint8",
+          defaultValue: 0
+        }
+      ]
+    }
+  ],
+  ["LoginBase", 0xa7, {}],
+  [
+    "ServerPopulationInfo",
+    0xa8,
+    {
+      fields: [
+        {
+          name: "population",
+          type: "array",
+          defaultValue: [{}],
+          elementtype: "uint16"
+        },
+        {
+          name: "populationPercent",
+          type: "array",
+          defaultValue: [{}],
+          elementType: "uint8"
+        },
+        {
+          name: "populationBuff",
+          type: "array",
+          defaultValue: [{}],
+          elementType: "uint8"
+        }
+      ]
+    }
+  ],
+  [
+    "GetServerPopulationInfo",
+    0xa9,
+    {
+      fields: []
+    }
+  ],
+  [
+    "VehicleCollision",
+    0xaa,
+    {
+      fields: [
+        {
+          name: "transientId",
+          type: "custom",
+          parser: readUnsignedIntWith2bitLengthValue,
+          packer: packUnsignedIntWith2bitLengthValue
+        },
+        { name: "damage", type: "float", defaultValue: 0 }
+      ]
+    }
+  ],
+  [
+    "PlayerStop",
+    0xab,
+    {
+      fields: [
+        {
+          name: "transientId",
+          type: "custom",
+          parser: readUnsignedIntWith2bitLengthValue,
+          packer: packUnsignedIntWith2bitLengthValue
+        },
+        { name: "state", type: "boolean", defaultValue: false }
+      ]
+    }
+  ],
+
+  ["PlayerUpdate.AttachObject", 0xae, {}],
+  ["PlayerUpdate.DetachObject", 0xaf, {}],
+  [
+    "ClientSettings",
+    0xb0,
+    {
+      fields: [
+        { name: "helpUrl", type: "string", defaultValue: "" },
+        { name: "shopUrl", type: "string", defaultValue: "" },
+        { name: "shop2Url", type: "string", defaultValue: "" }
+      ]
+    }
+  ],
+  [
+    "RewardBuffInfo",
+    0xb1,
+    {
+      fields: [
+        { name: "unknownFloat1", type: "float", defaultValue: 0.0 },
+        { name: "unknownFloat2", type: "float", defaultValue: 0.0 },
+        { name: "unknownFloat3", type: "float", defaultValue: 0.0 },
+        { name: "unknownFloat4", type: "float", defaultValue: 0.0 },
+        { name: "unknownFloat5", type: "float", defaultValue: 0.0 },
+        { name: "unknownFloat6", type: "float", defaultValue: 0.0 },
+        { name: "unknownFloat7", type: "float", defaultValue: 0.0 },
+        { name: "unknownFloat8", type: "float", defaultValue: 0.0 },
+        { name: "unknownFloat9", type: "float", defaultValue: 0.0 },
+        { name: "unknownFloat10", type: "float", defaultValue: 0.0 },
+        { name: "unknownFloat11", type: "float", defaultValue: 0.0 },
+        { name: "unknownFloat12", type: "float", defaultValue: 0.0 }
+      ]
+    }
+  ],
+  [
+    "GetRewardBuffInfo",
+    0xb2,
+    {
+      fields: []
+    }
+  ],
+  ["Cais", 0xb3, {}],
+
+  ["RequestPromoEligibilityUpdate", 0xb5, {}],
+  ["PromoEligibilityReply", 0xb6, {}],
+  ["RequestWalletTopupUpdate", 0xb8, {}],
+  ["StationCashActivePromoRequestUpdate", 0xb9, {}],
+  [
+    "WordFilter.Data",
+    0xbd01,
+    {
+      fields: [{ name: "wordFilterData", type: "byteswithlength" }]
+    }
+  ],
+
+  ["ProxiedPlayer", 0xbf, {}],
+  ["Resists", 0xc0, {}],
+  ["InGamePurchasing", 0xc1, {}],
+  ["BusinessEnvironments", 0xc2, {}],
+  ["EmpireScore", 0xc3, {}],
+  ["CharacterSelectSessionRequest", 0xc4, {}],
+  [
+    "CharacterSelectSessionResponse",
+    0xc5,
+    {
+      fields: [
+        { name: "status", type: "uint8", defaultValue: 0 },
+        { name: "sessionId", type: "string", defaultValue: "" }
+      ]
+    }
+  ],
+  ["Score", 0xc7, {}],
+  ["Resources", 0xc8, {}],
+  [
+    "UpdateWeatherData",
+    0xcb,
+    {
+      fields: skyData
+    }
+  ],
+  ["NavGen", 0xcc, {}],
+  [
+    "Locks.ShowMenu",
+    0xcd05,
+    {
+      fields: [
+        { name: "characterId", type: "uint64string", defaultValue: "0" },
+        { name: "unknownDword1", type: "uint32", defaultValue: 1 },
+        { name: "lockType", type: "uint32", defaultValue: 1 }, // 1-lock, 2-enter password
+        { name: "objectCharacterId", type: "uint64string", defaultValue: "0" }
+      ]
+    }
+  ],
+  [
+    "Locks.SetLock",
+    0xcd0300,
+    {
+      fields: [
+        { name: "unknownDword1", type: "uint32", defaultValue: 1 },
+        { name: "unknownDword2", type: "uint32", defaultValue: 1 },
+        { name: "password", type: "uint32", defaultValue: 0 }
+      ]
+    }
+  ],
+  [
+    "AddLightweightPc",
+    0xd6,
+    {
+      fields: lightWeightPcSchema
+    }
+  ],
+  [
+    "AddLightweightNpc",
+    0xd7,
+    {
+      fields: lightWeightNpcSchema
+    }
+  ],
+  [
+    "AddLightweightVehicle",
+    0xd8,
+    {
+      fields: [
+        { name: "npcData", type: "schema", fields: lightWeightNpcSchema },
+        { name: "unknownGuid1", type: "uint64string", defaultValue: "0" },
+        { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+        { name: "unknownDword2", type: "uint32", defaultValue: 0 },
+        {
+          name: "positionUpdate",
+          type: "custom",
+          parser: readPositionUpdateData,
+          packer: packPositionUpdateData
+        },
+        { name: "unknownString1", type: "string", defaultValue: "" }
+      ]
+    }
+  ],
+  [
+    "AddProxiedObject",
+    0xd9,
+    {
+      fields: [
+        { name: "guid", type: "uint64string", defaultValue: "0" },
+        {
+          name: "transientId",
+          type: "custom",
+          parser: readUnsignedIntWith2bitLengthValue,
+          packer: packUnsignedIntWith2bitLengthValue
+        },
+        { name: "unknownByte1", type: "uint8", defaultValue: 0 },
+        { name: "position", type: "floatvector3", defaultValue: [0, 0, 0] },
+        { name: "rotation", type: "floatvector3", defaultValue: [0, 0, 0] }
+      ]
+    }
+  ],
+  ["LightweightToFullPc", 0xda, { fields: fullPcSchema }],
+  [
+    "LightweightToFullNpc",
+    0xdb,
+    {
+      fields: fullNpcSchema
+    }
+  ],
+  [
+    "LightweightToFullVehicle",
+    0xdc,
+    {
+      fields: [
+        { name: "npcData", type: "schema", fields: fullNpcSchema },
+        { name: "engineState", type: "uint8", defaultValue: 0 },
+        { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+        {
+          name: "unknownArray1",
+          type: "array",
+          defaultValue: [],
+          fields: [
+            { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+            { name: "unknownBoolean1", type: "boolean", defaultValue: false }
+          ]
+        },
+        {
+          name: "unknownArray2",
+          type: "array",
+          defaultValue: [],
+          fields: [
+            { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+            { name: "unknownByte1", type: "boolean", defaultValue: false }
+          ]
+        },
+        {
+          name: "unknownVector1",
+          type: "floatvector4",
+          defaultValue: [0, 0, 0, 0]
+        },
+        {
+          name: "unknownVector2",
+          type: "floatvector4",
+          defaultValue: [0, 0, 0, 0]
+        },
+        { name: "unknownByte3", type: "uint8", defaultValue: 0 },
+        {
+          name: "passengers",
+          type: "array",
+          defaultValue: [],
+          fields: passengerSchema
+        },
+        {
+          name: "unknownArray3",
+          type: "array",
+          defaultValue: [],
+          fields: [
+            {
+              name: "unknownString1",
+              type: "string",
+              defaultValue: ""
+            }
+          ]
+        },
+        {
+          name: "stats",
+          type: "array",
+          defaultValue: [],
+          fields: [
+            { name: "statId", type: "uint32", defaultValue: 0 },
+            {
+              name: "statData",
+              type: "schema",
+              defaultValue: {},
+              fields: statSchema
+            }
+          ]
+        },
+        {
+          name: "unknownArray4",
+          type: "array",
+          defaultValue: [],
+          fields: [
+            { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+            {
+              name: "unknownArray1",
+              type: "array",
+              defaultValue: [],
+              fields: [
+                { name: "unknownDword1", type: "uint32", defaultValue: 0 },
+                {
+                  name: "stats",
+                  type: "array",
+                  defaultValue: [],
+                  fields: [
+                    { name: "statId", type: "uint32", defaultValue: 0 },
+                    {
+                      name: "statData",
+                      type: "schema",
+                      defaultValue: {},
+                      fields: statSchema
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  [
+    "Audio.SetState",
+    0xdd01,
+    {
+      fields: [
+        { name: "unknownString1", type: "string", defaultValue: "" },
+        { name: "unknownString2", type: "string", defaultValue: "" }
+      ]
+    }
+  ],
+  [
+    "Audio.SetSwitch",
+    0xdd02,
+    {
+      fields: [
+        { name: "characterId", type: "uint64string", defaultValue: "0" },
+        { name: "unknownString1", type: "string", defaultValue: "ShoeType" },
+        { name: "unknownString2", type: "string", defaultValue: "Sneaker" }
+      ]
+    }
+  ],
+  [
+    "Audio.PostEvent",
+    0xdd03,
+    {
+      fields: [{ name: "unknownString1", type: "string", defaultValue: "" }]
+    }
+  ],
+  ["CheckLocalValues", 0xde, {}],
+  ["ChronicleBase", 0xdf, {}],
+  [
+    "Grinder.ExchangeRequest",
+    0xe00100,
+    {
+      fields: [
+        {
+          name: "items",
+          type: "array",
+          defaultValue: [],
+          fields: [
+            { name: "itemDefinitionId", type: "uint32", defaultValue: 0 },
+            { name: "count", type: "uint32", defaultValue: 0 }
+          ]
+        }
+      ]
+    }
+  ],
+  [
+    "Grinder.ExchangeResponse",
+    0xe00200,
+    {
+      fields: [
+        {
+          name: "items",
+          type: "array",
+          defaultValue: [],
+          fields: [
+            { name: "itemDefinitionId", type: "uint32", defaultValue: 0 },
+            { name: "count", type: "uint32", defaultValue: 0 }
+          ]
+        }
+      ]
+    }
+  ],
+  ["RequestObject", 0xe1, {}],
+  ["WhitelistBase", 0xe4, {}],
+  [
+    "NpcFoundationPermissionsManagerBase.ShowPermissions",
+    0xe505,
+    {
+      fields: [
+        { name: "characterId", type: "uint64string", defaultValue: "0" },
+        { name: "characterId2", type: "uint64string", defaultValue: "0" },
+        {
+          name: "permissions",
+          type: "array",
+          defaultValue: [],
+          fields: [
+            { name: "characterId", type: "uint64string", defaultValue: "0" },
+            { name: "characterName", type: "string", defaultValue: "0" },
+            { name: "useContainers", type: "boolean", defaultValue: false },
+            { name: "build", type: "boolean", defaultValue: false },
+            { name: "demolish", type: "boolean", defaultValue: false },
+            { name: "visit", type: "boolean", defaultValue: false }
+          ]
+        }
+      ]
+    }
+  ],
+
+  [
+    "NpcFoundationPermissionsManager.AddPermission",
+    0xe501,
+    {
+      fields: [
+        { name: "objectCharacterId", type: "uint64string", defaultValue: "0" },
+        { name: "characterName", type: "string", defaultValue: "" },
+        { name: "unk", type: "uint64string", defaultValue: "0" },
+        { name: "permissionSlot", type: "uint32", defaultValue: 0 }
+      ]
+    }
+  ],
+
+  [
+    "NpcFoundationPermissionsManager.EditPermission",
+    0xe502,
+    {
+      fields: [
+        { name: "objectCharacterId", type: "uint64string", defaultValue: "0" },
+        { name: "unk", type: "uint64string", defaultValue: "0" },
+        { name: "characterName", type: "string", defaultValue: "" },
+
+        { name: "permissionSlot", type: "uint32", defaultValue: 0 }
+      ]
+    }
+  ],
+  ["BattlEyeData", 0xe6, {}],
+  ["OnlineIdBase", 0xe7, {}],
+  ["Ps4PlayGoBase", 0xe8, {}],
+  [
+    "SynchronizedTeleport.WaitingForPlayers",
+    0xe90100,
+    {
+      fields: [
+        { name: "unknownBoolean1", type: "boolean", defaultValue: false }
+      ]
+    }
+  ],
+  [
+    "SynchronizedTeleport.NotifyReady",
+    0xe90200,
+    {
+      fields: []
+    }
+  ],
+  [
+    "SynchronizedTeleport.PlayersReady",
+    0xe90300,
+    {
+      fields: [
+        { name: "cooldown", type: "uint32", defaultValue: 5000 },
+        { name: "unknownBoolean1", type: "boolean", defaultValue: false }
+      ]
+    }
+  ],
+  [
+    "SynchronizedTeleport.Release",
+    0xe90400,
+    {
+      fields: [
+        { name: "unknownBoolean1", type: "boolean", defaultValue: false }
+      ]
+    }
+  ],
+  ["StaticViewBase", 0xea, {}],
+  ["DatasheetsBase", 0xec, {}],
+  ["PlayerWorldTransferRequest", 0xed, {}],
+  ["PlayerWorldTransferReply", 0xee, {}],
+  ["CancelQueueOnWorld", 0xef, {}],
+  ["DeclineEnterGameOnWorld", 0xf0, {}],
+  [
+    "ShaderParameterOverrideBase", // This is used for items with ShaderParameterOverride code factory name
+    0xf20100,
+    {
+      fields: [
+        { name: "characterId", type: "uint64string", defaultValue: "0" },
+        { name: "itemDefinitionId", type: "uint32", defaultValue: 0 },
+        { name: "slotId", type: "uint32", defaultValue: 0 }, // PARAM1
+        { name: "unknownDword2", type: "uint32", defaultValue: 0 }, // PARAM2
+        { name: "shaderGroupId", type: "uint32", defaultValue: 0 } // PARAM3
+      ]
+    }
+  ],
+  [
+    "VehicleSkinSetVehicleSkinManager",
+    0xf301,
+    {
+      fields: [
+        { name: "vehicleId", type: "uint64string", defaultValue: "0" },
+        { name: "characterId", type: "uint64string", defaultValue: "0" },
+        { name: "shaderGroupId", type: "uint32", defaultValue: 0 }
+      ]
+    }
+  ],
+  ["WeaponLagLockParameters", 0xf5, {}],
+  ["CrateOpeningBase", 0xf6, {}],
+  ["PlayerHeatWarning", 0xf7, {}],
+  [
+    "Animation.Request",
+    0xf801,
+    {
+      fields: [{ name: "itemDefinitionId", type: "uint32", defaultValue: 0 }]
+    }
+  ],
+  [
+    "Animation.Play",
+    0xf802,
+    {
+      fields: [
+        { name: "characterId", type: "uint64string", defaultValue: "0" },
+        { name: "animationId", type: "uint32", defaultValue: 0 }
+      ]
+    }
+  ],
+  // These packets are sent when using data from KOTK
+  [
+    "Ping",
+    0x7f00,
+    {
+      fields: [
+        // Theres 1204 more bytes, which I can't make sense of
+      ]
+    }
+  ],
+  [
+    "Pong",
+    0x7f01,
+    {
+      fields: [
+        { name: "unknownQword1", type: "uint64string", defaultValue: "0" }
+      ]
+    }
+  ]
+];

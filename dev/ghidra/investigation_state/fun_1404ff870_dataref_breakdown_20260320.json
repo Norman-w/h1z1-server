@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-03-20",
+  "purpose": "对 `QueryXref to 0x1404ff870` 的 **6×DATA** 逐地址归类：哪些是 **PE/EH 元数据**、哪些是 **真实 vtable 槽0**；并记录 **一次可读的间接调度链**（指向 **+0x100** 槽，非槽0）。",
+  "references": {
+    "queryXrefTo4ff870": "dev/ghidra/analysis/output/QueryXref__to__0x1404ff870__20260320_000625_166.log"
+  },
+  "classification": [
+    {
+      "address": "143e4591c",
+      "role": "FALSE_POSITIVE_GAME_VTABLE",
+      "evidence": "ReadPointers：位于 `_IMAGE_RUNTIME_FUNCTION_ENTRY`（**.pdata / RUNTIME_FUNCTION**）区域内；邻域字面值含 unwind / `FUN_140500fb0` 等，语义为 **异常展开元数据**，不是角色对象的运行时 vtable。",
+      "log": "dev/ghidra/analysis/output/ReadPointers__0x143e4591c__6__20260320_091310_238.log"
+    },
+    {
+      "address": "142620320",
+      "role": "CPP_EXCEPTION_IP_TO_STATE_MAP",
+      "note": "VA `0x142620320`；与符号 **`IPToStateMapEntry_ARRAY_142620320`** 一致。",
+      "symbol": "IPToStateMapEntry_ARRAY_142620320",
+      "evidence": "ReadPointers：首 QWORD → `FUN_1404ff870`，后续为 `LAB_1404ff96a` / `LAB_140500b9a` 及 `UNWIND_INFO` —— 符合 **IP-to-State / Try 映射**（Compiler EH），**不是**「游戏逻辑虚表槽0」的调用凭证。",
+      "xrefToThisArray": {
+        "from": "1420bec08",
+        "type": "DATA",
+        "logTo142620320": "dev/ghidra/analysis/output/QueryXref__to__0x142620320__20260320_091241_268.log"
+      },
+      "xrefTo1420bec08": {
+        "refsToParent": 0,
+        "log": "dev/ghidra/analysis/output/QueryXref__to__0x1420bec08__20260320_091257_353.log",
+        "note": "父指针仍 **0 CODE xref** — 与既有「需 GUI / 手工跟 `.pdata` 邻域」结论一致。"
+      },
+      "log": "dev/ghidra/analysis/output/ReadPointers__0x142620320__8__20260320_091319_181.log"
+    },
+    {
+      "address": "1420c1f58",
+      "role": "PRIMARY_VTABLE_BASE_A",
+      "evidence": "`QueryXref to` **本地址 = 0 ref**（vtable 常量区常态）；ReadPointers 展示槽分布。",
+      "slot0": "1404ff870 (FUN_1404ff870)",
+      "slot5at0x28": "140520e20 (FUN_140520e20)",
+      "slot32at0x100": "14050??  — 实测 **LAB_14050bb20** @ `1420c2058`",
+      "siblingBasesSameLayout": ["1420eb218", "14214e0f0", "1421513c0"],
+      "readPointers40": "dev/ghidra/analysis/output/ReadPointers__0x1420c1f58__40__20260320_091358_486.log"
+    }
+  ],
+  "indirectChainExample": {
+    "summary": "从 **vtable 槽5** 进入的薄函数再经 **`FUN_1404e57d0`** 做 **子对象 +0xd8** 调用与 **`param_1+0x308`** 派生 vptr，最后 **`JMP [vptr+0x100]`** —— 命中 **槽32**（`LAB_14050bb20`），**不是**槽0 的 `FUN_1404ff870`。",
+    "functions": [
+      { "name": "FUN_140520e20", "decompile": "dev/ghidra/analysis/output/DumpDecompile__0x140520e20__1__100__20260320_091329_998.log" },
+      { "name": "FUN_1404e57d0", "decompile": "dev/ghidra/analysis/output/DumpDecompile__0x1404e57d0__1__200__20260320_091349_613.log" },
+      { "name": "FUN_1404e57d0 callee", "note": "`140520e29` UNCONDITIONAL_CALL → `FUN_1404e57d0`", "xref": "dev/ghidra/analysis/output/QueryXref__to__0x1404e57d0__20260320_091341_703.log" }
+    ],
+    "vtableSlot0StillOpen": "谁以 **`CALL/JMP [* + 0]`**（或等价）调度 **槽0** → `FUN_1404ff870` 仍为 **xref 盲区**；不可用 `QueryXref to 0x1404ff870` 直接枚举。"
+  },
+  "alternateVtableLayout": {
+    "base": "1420ba5b8",
+    "note": "**不含** 槽0 的 `FUN_1404ff870`；`FUN_1404e5070` 的 DATA 来源之一。`FUN_1404e5070` 仅调 **`+0xb8`**。",
+    "log": "dev/ghidra/analysis/output/ReadPointers__0x1420ba5b8__10__20260320_091349_854.log",
+    "decompile5070": "dev/ghidra/analysis/output/DumpDecompile__0x1404e5070__1__120__20260320_091417_994.log"
+  },
+  "toolingCaveat": {
+    "findIndirectDisp0": "~~旧版~~ **已修（2026-03-20）**：`dev/ghidra/FindIndirectCallsByOffset.py` 改为从 **`[...]`** 解析 **尾项位移**；详见 **`pyghidra_cli_20260320_findindirect_slot0_scan.json`**。"
+  }
+}

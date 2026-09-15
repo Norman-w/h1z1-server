@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 7,
+  "updatedAt": "2026-03-20",
+  "purpose": "CLI：**八段** disp0 **366**（**`0x140760000`**）；第 **8** 段单段 **110**（**`FUN_140750600`** 等密集 **`CALL [RAX]`**）；**`FUN_14071af10`** **`RSI+0x20`** 子对象槽0；**`71af10`** 无 **`4ff870`/`0xa3`**。",
+  "scriptFix": {
+    "file": "dev/ghidra/FindIndirectCallsByOffset.py",
+    "fixes": [
+      "从 **`[...]`** 解析 **尾项 `+` 位移**（含 **`-0x8`**）；纯 **`[REG]`** → **disp=0**。",
+      "**`CALL qword ptr [0x1440……]`**（括号内 **仅** 绝对址）**不计入** `wanted==0`（IAT/绝对间接，**非** `*[reg+0]` 槽0）。"
+    ]
+  },
+  "scanIndirectDispZero": {
+    "chunks": [
+      {
+        "range": ["0x1404e0000", "0x140530000"],
+        "log": "dev/ghidra/analysis/output/FindIndirectCallsByOffset__0__0x1404e0000__0x140530000__20260320_091905_534.log",
+        "matchCount": 32
+      },
+      {
+        "range": ["0x140530000", "0x140580000"],
+        "log": "dev/ghidra/analysis/output/FindIndirectCallsByOffset__0__0x140530000__0x140580000__20260320_094426_348.log",
+        "matchCount": 28
+      },
+      {
+        "range": ["0x140580000", "0x1405d0000"],
+        "log": "dev/ghidra/analysis/output/FindIndirectCallsByOffset__0__0x140580000__0x1405d0000__20260320_100013_679.log",
+        "matchCount": 44
+      },
+      {
+        "range": ["0x1405d0000", "0x140620000"],
+        "log": "dev/ghidra/analysis/output/FindIndirectCallsByOffset__0__0x1405d0000__0x140620000__20260320_100111_397.log",
+        "matchCount": 24,
+        "note": "**已排除** **`CALL [0x1440a0…]`** 共 **24** 条假阳性（未修正前同段 **48** 条：`…100049_960.log`）。"
+      },
+      {
+        "range": ["0x140620000", "0x140670000"],
+        "log": "dev/ghidra/analysis/output/FindIndirectCallsByOffset__0__0x140620000__0x140670000__20260320_100150_321.log",
+        "matchCount": 51
+      },
+      {
+        "range": ["0x140670000", "0x1406c0000"],
+        "log": "dev/ghidra/analysis/output/FindIndirectCallsByOffset__0__0x140670000__0x1406c0000__20260320_101412_225.log",
+        "matchCount": 31
+      },
+      {
+        "range": ["0x1406c0000", "0x140710000"],
+        "log": "dev/ghidra/analysis/output/FindIndirectCallsByOffset__0__0x1406c0000__0x140710000__20260320_101532_562.log",
+        "matchCount": 46
+      },
+      {
+        "range": ["0x140710000", "0x140760000"],
+        "log": "dev/ghidra/analysis/output/FindIndirectCallsByOffset__0__0x140710000__0x140760000__20260320_102006_582.log",
+        "matchCount": 110,
+        "note": "**`FUN_140750600`** 单函数贡献 **~20+** 条 **`CALL [RAX]`**（状态机/大 switch 风格）；**不等于** 已定位 **`4ff870`**。"
+      }
+    ],
+    "totalMatchesListed": 366
+  },
+  "patternRBXPlus8Slot0": {
+    "summary": "多处 Listing：**`CMP ECX,1` → `LEA RCX,[RBX+8]` → `MOV RAX,[RCX]` → `CALL [RAX]`** — **嵌入块 +8** 上的小 vtable **槽0**，与 **实体根 `*this`** 不同。",
+    "examples": [
+      {
+        "func": "FUN_140578cc0",
+        "log": "dev/ghidra/analysis/output/DescribeAddress__0x140578d9e__20260320_094448_150.log"
+      },
+      {
+        "func": "FUN_140586490",
+        "log": "dev/ghidra/analysis/output/DescribeAddress__0x1405865d4__20260320_100034_395.log"
+      },
+      {
+        "func": "FUN_1405948b0",
+        "log": "dev/ghidra/analysis/output/DescribeAddress__0x1405949e0__20260320_100034_912.log"
+      },
+      {
+        "func": "FUN_14059d760",
+        "log": "dev/ghidra/analysis/output/DescribeAddress__0x14059deb8__20260320_100036_507.log",
+        "note": "反编译约 **730 行**；**`SearchDecompile … FUN_1404ff870`**：**0**（`…100037_738.log`）。"
+      },
+      {
+        "func": "FUN_140672830",
+        "log": "dev/ghidra/analysis/output/DescribeAddress__0x14067290b__20260320_101420_756.log"
+      }
+    ],
+    "search5948b0_0xa3": "dev/ghidra/analysis/output/SearchDecompile__0x1405948b0__0xa3__6__20260320_100038_237.log",
+    "hits0xa3": 0
+  },
+  "FUN_1405261a0_CALL_RAX": {
+    "site": "140526281",
+    "listing": "dev/ghidra/analysis/output/DescribeAddress__0x140526281__20260320_091906_669.log",
+    "semantics": "**`0x39f0` 链表节点** 的 **vtable 槽0**（析构/回调），**非** `1420c1f58` 实体首槽。",
+    "parentTick": {
+      "caller": "FUN_140508740",
+      "condition": "`param_1[0x724] != 0` → **`FUN_1405261a0`**",
+      "searchLog": "dev/ghidra/analysis/output/SearchDecompile__0x140508740__5261a0__5__20260320_091955_355.log"
+    }
+  },
+  "FUN_14053dba0_plus630_then_5347b0": {
+    "decompile": "dev/ghidra/analysis/output/DumpDecompile__0x14053dba0__1__80__20260320_094512_909.log",
+    "listingCall5347": "dev/ghidra/analysis/output/DescribeAddress__0x14053dc14__20260320_094503_985.log",
+    "semantics": "当 **`param_2!=0`** 且 **`param_1[0x1ec]==DAT_142b249a0`**：先 **`(**(*param_1+0x630))(..., DAT_142b24880, DAT_1425ba090)`**（**图参 `+0x630` 虚槽**），再 **`FUN_1405347b0(param_1)`**；后者对 **`param_1+0xf70`** 子对象 **`CALL [vptr+0]`** 后清空 **`[RBX+0xf70]`**。→ **文档化 `+0x630` 与「槽0 清理」在同一段 grapple 类逻辑里顺序出现**；**仍无** **`FUN_1404ff870`** 字面。",
+    "chainNote": "`FUN_14053dba0` 在 **`chain_eliminated.json`**（grapple）；对 **UCS/0x8cf** 主链仅作 **「+630 与 slot0 相邻模式」** 参考。"
+  },
+  "FUN_1405347b0_CALL_RAX": {
+    "site": "1405347db",
+    "log": "dev/ghidra/analysis/output/DescribeAddress__0x1405347db__20260320_094446_895.log",
+    "pattern": "`RCX=[*(RBX)+0xf70]` → **`CALL [*(RCX)+0]`**"
+  },
+  "searchDecompile508740_511840": {
+    "needle4ff870": {
+      "508740": "dev/ghidra/analysis/output/SearchDecompile__0x140508740__4ff870__5__20260320_094426_799.log",
+      "511840": "dev/ghidra/analysis/output/SearchDecompile__0x140511840__4ff870__5__20260320_094435_216.log",
+      "FUN_name_508740": "dev/ghidra/analysis/output/SearchDecompile__0x140508740__FUN_1404ff870__5__20260320_094446_089.log",
+      "FUN_name_511840": "dev/ghidra/analysis/output/SearchDecompile__0x140511840__FUN_1404ff870__5__20260320_094453_041.log",
+      "hits": 0,
+      "note": "**反编译全文**不出现 **`4ff870` / `FUN_1404ff870`** — 与 **间接虚调** 预期一致。"
+    },
+    "needle0xa3_508740": "dev/ghidra/analysis/output/SearchDecompile__0x140508740__0xa3__8__20260320_094447_360.log",
+    "hits0xa3": 0,
+    "needle0xa3_5347b0": "dev/ghidra/analysis/output/SearchDecompile__0x1405347b0__0xa3__8__20260320_094453_609.log",
+    "hits0xa3_5347": 0
+  },
+  "FUN_140508740_hits0x630": {
+    "log": "dev/ghidra/analysis/output/SearchDecompile__0x140508740__0x630__8__20260320_094427_485.log",
+    "note": "多处 **`(**(*param_1+0x630))(...)`** — 与 **图参 writer 族** 一致；**不等价于** 调 **`4ff870`**。"
+  },
+  "entityPlus0xa3StoreScan": {
+    "command": "PyGhidraCli FindMemoryRefsByOffset 0xa3 store 0x140700000 0x140900000",
+    "log": "dev/ghidra/analysis/output/FindMemoryRefsByOffset__0xa3__store__0x140700000__0x140900000__20260320_091939_251.log",
+    "matchCount": 0
+  },
+  "FUN_140511840_CALL_RAX_5136be": {
+    "log": "dev/ghidra/analysis/output/DescribeAddress__0x1405136be__20260320_092026_751.log",
+    "semantics": "**`+0x388a8`** 管理器侧对象 **槽0**；非 **`1420c1f58`** 直接证据。"
+  },
+  "patternDat19780_plus_388a8_slot0": {
+    "summary": "自 **`DAT_142b19780`** 取 **`[global+0x388a8]`** → **`MOV RAX,[RCX]; CALL [RAX]`** → 常跟 **`CMP EAX, imm`**（**`511840`** 用 **`0x21`**，**`6ad8f0`** 用 **`0x23`**）— **同一「注册对象」首槽体检/派发** 模板再次出现。",
+    "instances": [
+      { "func": "FUN_140511840", "site": "1405136be", "cmp": "0x21", "log": "dev/ghidra/analysis/output/DescribeAddress__0x1405136be__20260320_092026_751.log" },
+      { "func": "FUN_1406ad8f0", "site": "1406ad9c7", "cmp": "0x23", "log": "dev/ghidra/analysis/output/DescribeAddress__0x1406ad9c7__20260320_101422_027.log" },
+      { "func": "FUN_1406bf040", "site": "1406c0682", "cmp": "0x23", "log": "dev/ghidra/analysis/output/DescribeAddress__0x1406c0682__20260320_101545_439.log" }
+    ],
+    "searchDecompile6ad8f0": {
+      "FUN_1404ff870": "dev/ghidra/analysis/output/SearchDecompile__0x1406ad8f0__FUN_1404ff870__3__20260320_101421_508.log",
+      "0xa3": "dev/ghidra/analysis/output/SearchDecompile__0x1406ad8f0__0xa3__6__20260320_101423_569.log",
+      "hits": 0
+    },
+    "searchDecompile6bf040": {
+      "FUN_1404ff870": "dev/ghidra/analysis/output/SearchDecompile__0x1406bf040__FUN_1404ff870__3__20260320_101629_602.log",
+      "0xa3": "dev/ghidra/analysis/output/SearchDecompile__0x1406bf040__0xa3__6__20260320_101633_313.log",
+      "hits": 0,
+      "note": "反编译约 **800 行** 仍 **无** **`4ff870`/`0xa3`** 字面。"
+    },
+    "note": "**仍不能**静态断言槽0=**`4ff870`**；若要钉死需 **运行时 vtable / GUI 跟到具体 fn-ptr**。"
+  },
+  "orphanIndirectCall": {
+    "address": "1406da56f",
+    "log": "dev/ghidra/analysis/output/DescribeAddress__0x1406da56f__20260320_101540_651.log",
+    "note": "**`No containing function`** — 可能落在 **未建函数边界 / 间隙**；Listing 上为 **`CALL qword ptr [RAX]`**，**勿单独当证据**。"
+  },
+  "FUN_1406df130_CALL_slot0_rdi": {
+    "site": "1406df16f",
+    "log": "dev/ghidra/analysis/output/DescribeAddress__0x1406df16f__20260320_101541_422.log",
+    "pattern": "**`RBX = qword ptr [RDI]`** → **`CALL qword ptr [RBX]`** → **`CALL qword ptr [RBX+0x60]`** — 标准 **`RDI=this`** 的 **vtable 槽0 + 槽+0x60**（**仍为间接**，未联 `4ff870`）。"
+  },
+  "FUN_1406ffb40_CALL_r10": {
+    "site": "1406ffb9d",
+    "log": "dev/ghidra/analysis/output/DescribeAddress__0x1406ffb9d__20260320_101541_891.log",
+    "pattern": "**`R10 = [RCX]`** → **`CALL [R10]`** — **`RCX`** 指向对象头时的 **槽0** 形态；需再跟 **`RCX` 是否实体**。"
+  },
+  "FUN_1406b3090_CALL_RDI": {
+    "site": "1406b3406",
+    "log": "dev/ghidra/analysis/output/DescribeAddress__0x1406b3406__20260320_101423_048.log",
+    "semantics": "**`CALL [RDI]`** — **寄存器传入的函数指针**（非从 **`[this]`** 取固定 vtable）；与 **`1420c1f58` 槽0** 链无关。"
+  },
+  "FUN_14071af10_embedded_slot0_RSI_plus_20": {
+    "chainIndex": "`RegisterEntityInProxiedCharacterManager`（`chain_entity_apply_family.json`）",
+    "site": "14071af55",
+    "log": "dev/ghidra/analysis/output/DescribeAddress__0x14071af55__20260320_102015_114.log",
+    "pattern": "**`LEA RCX,[RSI+0x20]`** → **`RDX=[RCX]`** → **`CALL [RDX]`** — **嵌入子对象 @ +0x20** 的 **vtable 槽0**，后接链表扫描 **`CMP RAX,RBP`**；**非** **`RSI` 本体首槽**。",
+    "searchDecompile": {
+      "FUN_1404ff870": "dev/ghidra/analysis/output/SearchDecompile__0x14071af10__FUN_1404ff870__5__20260320_102015_876.log",
+      "0xa3": "dev/ghidra/analysis/output/SearchDecompile__0x14071af10__0xa3__8__20260320_102016_390.log",
+      "hits": 0
+    }
+  },
+  "nextCli": [
+    "**`0x140760000 .. 0x1407b0000`** 第九段 **`FindIndirectCallsByOffset 0`**（**<32MB**）。",
+    "若继续扫 **`disp0`** 收益递减：**暂停全表扫**，优先 **GUI References**：**`1420c1f58[0]`**、**`MOV DWORD [reg+0xA3]`**。",
+    "可选：**`SearchDecompile 0x140750600 FUN_1404ff870`**（大函数，慢，预期仍 0）。"
+  ]
+}

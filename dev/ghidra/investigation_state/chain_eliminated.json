@@ -1,0 +1,314 @@
+{
+  "schemaVersion": 1,
+  "language": "zh-CN",
+  "updatedAt": "2026-03-16",
+  "scope": "已排除的侧链：经调查确认与僵尸追击/攻击动画无关的函数，包括 grapple、武器/载具/座位切换、movement smoothing、落地复位、挂点/附着等。",
+  "resourceAnchors": [
+    "ZombieMale_Skin_01.adr -> AnimationNetwork fileName=ThirdPersonZombiePhysics.mrn, animSetName=Zombie001",
+    "ZombieFemale_Skin_01.adr -> AnimationNetwork fileName=ThirdPersonZombiePhysics.mrn, animSetName=Zombie001Female",
+    "客户端解包资源实际文件名带平台后缀：ThirdPersonZombiePhysicsX64.mrn / ThirdPersonZombie_AnimationX64.mrn / ThirdPersonZombieAIX64.mrn；ADR 中的无后缀名当前可视为运行时资源别名",
+    "ThirdPersonZombiePhysicsX64.mrn 可见 Attack_Grapple / AttackMove_Ping/Pong / AttackStand_Ping/Pong / Attack_Walker / Attack_Runner / Spit / GrappleLoop / Bite 等状态与动画名",
+    "ThirdPersonZombieAIX64.mrn 与 ThirdPersonZombie_AnimationX64.mrn 都可见 Idle_Locomotion / DeathOrDormant / Feeding / Flinch / Attacks 等图状态，以及 InAttack / NPC_AttackSpeed / AttackRegion / HeadLookTarget / DeathType 等控制参数名"
+  ],
+  "functions": [
+    {
+      "address": "FUN_14053dba0",
+      "guessedName": "SwitchGrappleTargetAndLatchStateGrappling",
+      "guessedNameConfidence": 0.79,
+      "purpose": "这一支当前也可以从 zombie 攻击主线候选中排除。函数先从 `param_2 + 0x630` 取出一个对象/句柄，缓存到 `entity+0xf60` 与 `entity+0xf68`，若旧值此前等于全局默认哨兵 `DAT_142b249a0`，则额外通过实体 `virtual +0x630` 把 `State_Grappling` 写成 0，并调用 `FUN_1405347b0` 做后续复位。结合 `FUN_140507f40` 的对称清零实现看，这更像 grapple/抓取关联对象切换时的状态锁存与复位，而不是 zombie 的追击/攻击 phase writer。",
+      "purposeConfidence": 0.95,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "entity*",
+          "guessedPurpose": "持有 grapple 关联对象缓存（`+0xf60/+0xf68`）并暴露图参数接口的实体对象。",
+          "confidence": 0.84
+        },
+        {
+          "index": 1,
+          "type": "object*",
+          "guessedPurpose": "可从 `+0x630 -> +0x68` 取回某个被缓存对象/句柄的来源对象。",
+          "confidence": 0.62
+        },
+        {
+          "index": 2,
+          "type": "uint32",
+          "guessedPurpose": "与缓存对象一同锁存到 `entity+0xf68` 的附加状态/子类型值。",
+          "confidence": 0.46
+        }
+      ],
+      "relations": [
+        "`DAT_142b24880` 已确认是 `State_Grappling`（注册点 `FUN_1400ab180`）",
+        "在 `0x14053dc04` 若旧缓存等于 `DAT_142b249a0`，则调用实体 `virtual +0x630(entity, State_Grappling, 0)`",
+        "随后调用 `FUN_1405347b0` 做与 grapple 状态相关的后续复位/同步",
+        "`FUN_140507f40` 会执行对称清零：写 `State_Grappling = 0`，并把 `entity+0xf60` 复位为 `DAT_142b249a0`、`entity+0xf68` 清零",
+        "整体更像 grapple 关联对象锁存/复位链，而不是僵尸攻击动画驱动"
+      ]
+    },
+    {
+      "address": "FUN_14053ca80",
+      "guessedName": "ApplyWeaponVehicleSeatContextBundle",
+      "guessedNameConfidence": 0.72,
+      "purpose": "这一支现在也基本可以从 zombie 攻击主线里移除。函数先调用 `FUN_14053b960` 清理/同步当前角色的武器相关上下文，然后通过实体 `virtual +0x630` 写 `State_Weapon`，并在命中相关对象时通过 `virtual +0x638` 继续推送同一参数及一个浮点值。后半段若角色处在某类挂接/座位上下文（`param_1[0x724] != 0`），会进入 `FUN_14053efb0`，该 helper 会继续对目标对象写 `Vehicle`、`SeatType`、`State_CanFire`，以及一个当前字符串名仍未回填的附加参数 `DAT_142b24840`；主函数本体还会读取 `WeightClass`。整体形状明显更像武器/载具/座位上下文切换与同步链，而不是僵尸追人/攻击 phase writer。",
+      "purposeConfidence": 0.9,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "entity*",
+          "guessedPurpose": "持有武器/载具/座位状态并暴露 `+0x630/+0x638/+0x568` 接口的角色实体。",
+          "confidence": 0.83
+        },
+        {
+          "index": 1,
+          "type": "context/object*",
+          "guessedPurpose": "可被 `FUN_1404e30e0` 展开成目标对象/上下文树的外部上下文，后续用于写入 vehicle/seat/can-fire 一组参数。",
+          "confidence": 0.58
+        }
+      ],
+      "relations": [
+        "在 `0x14053cb28` 通过实体 `virtual +0x630` 写 `DAT_142b243e0 = State_Weapon`（注册点 `FUN_1400ab6d0`）",
+        "随后可能通过实体 `virtual +0x638` 把同一 `State_Weapon` 及 `(float)(int)param_1[0x124]` 推给另一对象",
+        "当 `param_1[0x724] == 0` 时直接对目标对象写 `DAT_142b24120 = Vehicle`；否则进入 `FUN_14053efb0` 走更完整的挂接/座位上下文同步",
+        "`FUN_14053efb0` 会继续写 `Vehicle`、`DAT_142b24840`（名称待回填）、`SeatType`、`State_CanFire`",
+        "主函数中还会读取 `DAT_142b248d0 = WeightClass`，进一步说明这条链落在角色武器/载具类别上下文，而不是 zombie 近战攻击相位",
+        "当前应把这整支从 `InAttack` 候选里降级移除"
+      ]
+    },
+    {
+      "address": "FUN_14053c700",
+      "guessedName": "ApplyWeaponActiveIronsightAmmoBundle",
+      "guessedNameConfidence": 0.82,
+      "purpose": "这一支也已能高置信度地从 zombie 攻击主线里排除。函数会清零 `entity+0x405c`，把 `param_3` 缩放后写入 `entity+0x4060` 一带，并立即通过实体 `virtual +0x630/+0x620/+0x638/+0x648` 推送一组明显偏武器状态的参数：`IronSightsDuration`、`Active`、`State_Ironsights`、`AmmoCount`、`State_Weapon`。其上游 `FUN_1405367c0` 还会围绕 `param_1[0x124]` 的取值 0/1/2 做状态切换，并调用 `virtual +0x7b8/+0x838/+0x840` 与 `FUN_141762810/FUN_1417634e0`，整体形状非常像武器启用/收起/切镜状态切换链，而不是僵尸追人/近战攻击 phase writer。",
+      "purposeConfidence": 0.96,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "entity*",
+          "guessedPurpose": "持有武器活动状态、镜瞄状态与弹药计数，并暴露多组 graph/runtime 接口的角色实体。",
+          "confidence": 0.87
+        },
+        {
+          "index": 1,
+          "type": "bool/enum-like",
+          "guessedPurpose": "上游 caller 传入 0/1，用于区分当前是进入还是退出某种武器活动/镜瞄状态。",
+          "confidence": 0.58
+        },
+        {
+          "index": 2,
+          "type": "uint32",
+          "guessedPurpose": "被缩放后写入 `IronSightsDuration`/过渡时长相关字段的原始计时值。",
+          "confidence": 0.72
+        }
+      ],
+      "relations": [
+        "在 `0x14053c742` 通过 `+0x630` 写 `DAT_142b24d48 = IronSightsDuration`（注册点 `FUN_1400a8ef0`）",
+        "在 `0x14053c755` 通过 `+0x620` 推 `DAT_142b242a0 = Active`（注册点 `FUN_1400a6f10`）",
+        "在 `0x14053c7ba` 通过 `+0x638` 推 `DAT_142b244b8 = State_Ironsights`",
+        "在 `0x14053c7e8` 通过 `+0x638` 推 `DAT_142b24838 = AmmoCount`（注册点 `FUN_1400a7000`）",
+        "末尾还通过 `+0x630/+0x638` 写 `DAT_142b243e0 = State_Weapon`",
+        "caller `FUN_1405367c0` 会按 `param_2` 与 `entity+0x124` 的状态切换触发本函数，明显更像武器 equip/holster/ADS 切换，而不是 zombie 攻击相位"
+      ]
+    },
+    {
+      "address": "FUN_14051fdf0",
+      "guessedName": "ClearFallingStateDuringVehicleTransition",
+      "guessedNameConfidence": 0.84,
+      "purpose": "这是一个非常紧凑的共享状态复位 helper。它会先通过实体 `virtual +0x630` 把 `State_Falling` 清零，然后调用实体 `virtual +0x420(0)` 与 `virtual +0x688()` 做后续状态提交。其已知 caller `FUN_14091e2b0` 明确落在 `HudHandler:OnVehicleEntered` 语境，并伴随 `FUN_140558310 / FUN_140555a30 / FUN_1404e1de0 / virtual +0x3f8` 等共享流程，因此这支当前应归入“进入载具时清空下落状态”的共享过渡链，而不是 zombie 追击/攻击 writer。",
+      "purposeConfidence": 0.97,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "entity*",
+          "guessedPurpose": "在进入载具/切换上下文时需要清理 falling 状态并触发后续共享 hook 的角色实体。",
+          "confidence": 0.9
+        }
+      ],
+      "relations": [
+        "在 `0x14051fdfc` 通过实体 `virtual +0x630` 写 `DAT_142b24580 = State_Falling` 为 0",
+        "随后调用实体 `virtual +0x420(0)` 与 `virtual +0x688()`，像一组共享状态提交/刷新 hook",
+        "已知 caller `FUN_14091e2b0` 会在 `HudHandler:OnVehicleEntered` 语境中调用本函数",
+        "当前应整体从 zombie `InAttack` / attack-phase 候选集中移除"
+      ]
+    },
+    {
+      "address": "FUN_140932240",
+      "guessedName": "ResetCurrentCharacterStateThenGround",
+      "guessedNameConfidence": 0.7,
+      "purpose": "一个明显偏全局 movement/state reset 的上层包装。它会先检查 `FUN_1403f54c0(DAT_142b19780)` 的全局状态值是否为 `0x1e / 0x24 / 0x25`，若命中则对 `DAT_142b19780 + 0x388a8` 当前对象调用 `virtual +0x2d0(0)` 与 `virtual +0x2d8(0)`，随后直接 tail-call 到 `FUN_140530cb0`。当前更像“重置当前角色状态并落地回归 grounded pack”的共享包装，而不是僵尸攻击分支。",
+      "purposeConfidence": 0.86,
+      "relations": [
+        "在 `0x1409322a3` 直接 `JMP 0x140530cb0`",
+        "前置条件只依赖 `FUN_1403f54c0(DAT_142b19780)` 的全局状态值，与攻击目标/伤害/近战上下文无关",
+        "进一步支持 `FUN_140530cb0` 整支属于 movement/state reset，而不是攻击 phase"
+      ]
+    },
+    {
+      "address": "FUN_14054a820",
+      "guessedName": "AttachBridgeObjectToEntity",
+      "guessedNameConfidence": 0.62,
+      "purpose": "根据某个外部资源/对象创建分支，把结果存入实体的 0x2e0/0x2e8，再尝试通过 DAT_142b19b38 -> entity+0x1100 -> FUN_140b683a0 把桥对象同步到实体的下级容器。当前更像附着/桥接同步，不像主 locomotion/attack 状态机。",
+      "purposeConfidence": 0.69,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "entity*",
+          "guessedPurpose": "宿主实体。",
+          "confidence": 0.84
+        },
+        {
+          "index": 1,
+          "type": "undefined8",
+          "guessedPurpose": "桥对象初始化所需参数。",
+          "confidence": 0.34
+        },
+        {
+          "index": 2,
+          "type": "undefined8",
+          "guessedPurpose": "资源/模板标识。",
+          "confidence": 0.39
+        },
+        {
+          "index": 3,
+          "type": "char",
+          "guessedPurpose": "左右手/槽位/分支标记。",
+          "confidence": 0.31
+        }
+      ],
+      "relations": [
+        "下游涉及 FUN_140b5e930 / FUN_140b5e860 / FUN_140b5e940",
+        "当前判断属于侧链而不是僵尸主动画本体"
+      ]
+    },
+    {
+      "address": "FUN_14054b620",
+      "guessedName": "FlushAttachedBridgeObjectToEntity",
+      "guessedNameConfidence": 0.58,
+      "purpose": "处理实体上 0x2e0/0x2e8 保存的桥对象，清标志并尝试把它们同步回 entity+0x1100 管理的下级对象集合。更像附着/挂点/桥接对象的 flush。",
+      "purposeConfidence": 0.68,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "entity*",
+          "guessedPurpose": "宿主实体。",
+          "confidence": 0.88
+        }
+      ],
+      "relations": [
+        "调用 FUN_140b683a0 / FUN_140b5df70 / FUN_140b5e860",
+        "很可能不是主 locomotion/attack 状态机"
+      ]
+    },
+    {
+      "address": "FUN_140b683a0",
+      "guessedName": "FindBridgeNodeByGuid",
+      "guessedNameConfidence": 0.66,
+      "purpose": "在 entity+0x1100 指向的容器中，按 GUID 查找下级桥对象/节点。看起来像一个 4 桶哈希表查找器。",
+      "purposeConfidence": 0.74,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "bridgeManager*",
+          "guessedPurpose": "实体下级桥对象管理器。",
+          "confidence": 0.71
+        },
+        {
+          "index": 1,
+          "type": "guid*",
+          "guessedPurpose": "目标子对象的 GUID。",
+          "confidence": 0.92
+        }
+      ],
+      "relations": [
+        "被 FUN_1405113e0 某个条件跳转间接触达",
+        "被 FUN_14054a820 / FUN_14054b620 等侧链频繁使用"
+      ]
+    },
+    {
+      "address": "FUN_140b5e940",
+      "guessedName": "EnsureMuzzleLikeAttachmentSlots",
+      "guessedNameConfidence": 0.41,
+      "purpose": "若对象 +0x390 为 0，则循环构造 muzzle1..muzzle4 一类字符串并初始化对应槽位。因为明确出现 muzzle 字符串，所以当前将其归类为挂点/附着侧链，不纳入僵尸主动作状态机主线。",
+      "purposeConfidence": 0.88,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "bridgeNode*",
+          "guessedPurpose": "需要初始化挂点槽位的桥对象。",
+          "confidence": 0.63
+        }
+      ],
+      "relations": [
+        "帮助排除错误主线：它更像挂点系统而不是主动画系统"
+      ]
+    },
+    {
+      "address": "FUN_140934050",
+      "guessedName": "Caller_FUN_140934050",
+      "guessedNameConfidence": 0.5,
+      "purpose": "上层实体/场景处理函数；在 0x140934083 处根据条件调用 `FUN_14091f730`，进一步触发 `FUN_14053c010` 链路（实体更新/参数写入）。",
+      "purposeConfidence": 0.5,
+      "relations": [
+        "在 0x140934083 处存在条件跳转到 0x140934090，随后在 0x140934090 调用 `FUN_14091f730`（CALL 0x14091f730）。",
+        "DescribeAddress 输出表明该函数的 callers 来自若干数据表（0x143e8a640 / 0x1426cb150 / 0x142151380），参见 dev/ghidra/analysis/output/DescribeAddress__0x140934083__20260317_122656_221.log。",
+        "结论/下一步：该函数处于更高层的实体/场景更新路径，当前链路为 `FUN_140934050` -> `FUN_14091f730` -> `FUN_14053c010` -> `FUN_14053fde0` -> DAT_* 写入/读取。未发现直接来自 `FUN_140511840` 的调用；可选择对数据表引用点或 `FUN_14091f730` 的 callers 做进一步 QueryXref/DescribeAddress。"
+      ]
+    },
+    {
+      "address": "FUN_14053c010",
+      "guessedName": "TickLocomotionStateAndPushGraphPack",
+      "guessedNameConfidence": 0.68,
+      "purpose": "这是当前已知 `FUN_14053fde0` 的直接上层 caller。函数会先处理一系列对象/引用与状态门控，然后推进实体速度/移动计时字段（当前至少可见 `entity+0x80a` 与 `entity+0x4054`），随后调用 `FUN_14053fde0(param_1, param_2[1])` 把一整组 locomotion/posture/movement 参数灌进图。其后还会处理 `entity+0x8ca bit 0x40` 与 `entity+0x1a84` 的组合：当该 float 计时值跨到 `<= 0` 且不等于 `0` 时，会把 `0x8ca` 上的 `0x40` 清掉并转成 `0x80`。当前整体更像移动/状态 tick 与状态位过渡管理，而不是僵尸攻击 phase 启动器。",
+      "purposeConfidence": 0.84,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "entity*",
+          "guessedPurpose": "持有移动状态、图参数与多组运行时位域/计时器的实体对象。",
+          "confidence": 0.84
+        },
+        {
+          "index": 1,
+          "type": "int*",
+          "guessedPurpose": "本帧/本次更新输入状态块，`param_2[1]` 会被传给 `FUN_14053fde0` 作为 delta 或局部状态值。",
+          "confidence": 0.53
+        }
+      ],
+      "relations": [
+        "在 `0x14053c2cb` 直接调用 `FUN_14053fde0(param_1, param_2[1])`，说明它是当前已知 locomotion/posture state pack writer 的上层驱动点",
+        "其数据引用 `0x14261ecf0` 已被 Ghidra 标成 `IPToStateMapEntry[7]`，进一步说明这条 locomotion/perception tick 也挂在 state-map 家族里，而不只是散落的共享 helper",
+        "`SearchDecompile 0x14053c010 0x80a 24` 显示函数会推进 `entity+0x80a` 浮点速度样字段，并使用 `entity+0x4054` 作为整型冷却/累计计时",
+        "在 `SearchDecompile 0x14053c010 0x1a84 24` 中可见：若 `entity+0x8ca` 含 `0x40`，则函数会先清掉该位，再在 `entity+0x1a84 <= 0 且 != 0` 时把 `0x80` 置回去；这更像共享状态位过渡，而不是直接写 MRN 攻击参数",
+        "其 caller 包括 `0x1406c6a84` 与 `0x14091f7ad` 两条更上层流程；最新补查显示这两支也都更偏运动/挂点/加减速平滑而不是攻击 phase",
+        "后续若要找 `InAttack`，更应该沿这些上层 caller 继续向上分流，或转查别的 graph writer，而不是把本函数当最终攻击入口"
+      ]
+    },
+    {
+      "address": "FUN_1406c6a20",
+      "guessedName": "UpdateEntityAttachmentAndCallLocomotionTick",
+      "guessedNameConfidence": 0.55,
+      "purpose": "这是 `FUN_14053c010` 的一个上层 caller，但当前看起来更明确地属于共享实体更新/挂点同步层，而不是攻击 phase 入口。函数先确保 `param_2+0x90` 的一次性处理位，然后调用 `FUN_14053c010()`；其后会从 `param_1+0x4bd8` 取对象，检查该对象 `+0x618` 链是否为空，再把 `+0x200` 子对象里两组局部空间点经矩阵变换后喂给 `param_2+8 -> +0x3d8` 对象的 `virtual +0x60/+0x90`。后半段还会围绕 `param_1+0x6660/0x6658/0x6668/0x666c` 一组数组/计数字段遍历多个子对象与槽位，并调用 `FUN_1406b93c0 / FUN_1416fc090 / FUN_1406b9a30` 这类明显偏附件/子节点同步的 helper。整体更像挂点、观察点或附属节点更新，而不是 zombie 主动攻击分叉。",
+      "purposeConfidence": 0.71,
+      "relations": [
+        "在 `0x1406c6a84` 调用 `FUN_14053c010`",
+        "前半段会读取 `*(param_1 + 0x4bd8)` 及其 `+0x618/+0x200` 子对象，生成两组空间向量并喂给 `param_2+8 -> +0x3d8` 对象的 `virtual +0x60/+0x90`；这更像把两个骨点/观察点/挂点位置同步给外部对象",
+        "其数据引用 `0x14265bf40` 已被 Ghidra 标成 `IPToStateMapEntry[11]`，说明它同样是 state-map 家族中的具体实现成员，只是业务语义更偏附件/观察点同步",
+        "`SearchDecompile 0x1406c6a20 0x6658 50` 进一步显示后半会遍历 `param_1+0x6660` 指向的 8-byte 指针数组，以及 `param_1+0x6658/0x6668/0x666c` 这组计数/容量字段；这类形状更像附件槽或子节点列表，而不是攻击目标状态",
+        "循环体里还会对这些子对象调用 `FUN_1416fc090(..., *(undefined4 *)(param_2 + 4))` 并维护 `lVar4+0x428/0x430/0x438/0x43c` 一组动态数组，进一步支持它偏向子节点/附件刷新",
+        "当前应归入上层实体/挂点同步链，而不是僵尸攻击动画驱动主线"
+      ]
+    },
+    {
+      "address": "FUN_14091f730",
+      "guessedName": "UpdateMovementSmoothingAndCallLocomotionTick",
+      "guessedNameConfidence": 0.67,
+      "purpose": "这是 `FUN_14053c010` 的另一条上层 caller，且已明显表现为 movement smoothing / acceleration 参数更新层。函数先调用 `FUN_14053c010()`，随后从 stat 系统读取 `SprintAccelerationTime / SprintDecelerationTime / ForwardAccelerationTime / BackAccelerationTime / StrafeAccelerationTime` 等一整组 `StatId.*` 参数，更新 `entity+0x4b90/+0x4b98/+0x4b9c` 等平滑状态，并把这些值继续写回 `param_2+0x10` 所指对象。当前它更像运动参数调谐与平滑层，而不是攻击/近战 phase writer。",
+      "purposeConfidence": 0.87,
+      "relations": [
+        "在 `0x14091f7ad` 调用 `FUN_14053c010`",
+        "直接读取 `StatId.SprintAccelerationTime / SprintDecelerationTime / ForwardAccelerationTime / ForwardDecelerationTime / BackAccelerationTime / BackDecelerationTime / StrafeAccelerationTime / StrafeDecelerationTime / SprintSpeedModifier`",
+        "调用 `FUN_140920450` 两次以更新前后/左右两个移动平滑通道，并维护 `entity+0x4b90/+0x4b98/+0x4b9c`",
+        "当前可作为又一条排除项：这支上层 caller 仍在 movement smoothing 层，不像 `InAttack` 或攻击 phase 入口"
+      ]
+    }
+  ]
+}

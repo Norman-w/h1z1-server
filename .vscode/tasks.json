@@ -1,0 +1,658 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "npm",
+			"script": "build",
+			"group": "build",
+			"problemMatcher": [],
+			"label": "npm: build",
+			"detail": "tsc -p ./tsconfig.json"
+		},
+		{
+			"label": "PyGhidraCli Describe 0x1405358c0",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x1405358c0"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Xref 0x1405357c0",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"QueryXref",
+				"0x1405357c0"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Xref 0x1405189c0",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"QueryXref",
+				"0x1405189c0"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Xref to 0x1405357c0",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"QueryXref",
+				"to",
+				"0x1405357c0"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Xref to 0x1405189c0",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"QueryXref",
+				"to",
+				"0x1405189c0"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x140513236",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x140513236"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x14092b15d",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x14092b15d"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x14261f698",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x14261f698"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x143e47df4",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x143e47df4"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x1420c2250",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x1420c2250"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x14214e3e8",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x14214e3e8"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Xref to 0x1405189f0",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"QueryXref",
+				"to",
+				"0x1405189f0"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Xref to 0x140535930",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"QueryXref",
+				"to",
+				"0x140535930"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x140518a00",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x140518a00"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x140535940",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x140535940"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x1405189f0",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x1405189f0"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x140518a10",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x140518a10"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x140518a20",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x140518a20"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x1420c31c0",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x1420c31c0"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x1420c2000",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x1420c2000"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x1420c1ff0",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x1420c1ff0"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x1420c2010",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x1420c2010"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli QueryXref to 0x1420c2000",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"QueryXref",
+				"to",
+				"0x1420c2000"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x1420c1fc0",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x1420c1fc0"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x1420c1fd0",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x1420c1fd0"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x1420c1b30",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x1420c1b30"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Xref to 0x1420c1b30",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"QueryXref",
+				"to",
+				"0x1420c1b30"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x140516120",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x140516120"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x140537a20",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x140537a20"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Xref to 0x140516120",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"QueryXref",
+				"to",
+				"0x140516120"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Xref to 0x140537a20",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"QueryXref",
+				"to",
+				"0x140537a20"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x1404e4c90",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x1404e4c90"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x14071af10",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x14071af10"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x1404e7600",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x1404e7600"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli QueryXref to 0x142b19b38",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"QueryXref",
+				"to",
+				"0x142b19b38"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli QueryXref to 0x1404e4c10",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"QueryXref",
+				"to",
+				"0x1404e4c10"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x1404e4c10",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x1404e4c10"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli QueryXref to 0x14071af10",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"QueryXref",
+				"to",
+				"0x14071af10"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x140529d77",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x140529d77"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x14051f78f",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x14051f78f"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x1404fd030",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x1404fd030"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x140527e63",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x140527e63"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x14052f1e4",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x14052f1e4"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x14053f1a9",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x14053f1a9"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x14071c9e7",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x14071c9e7"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x14054b681",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x14054b681"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x140b683a0",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x140b683a0"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x140b5df70",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x140b5df70"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x140b5e860",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x140b5e860"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli QueryXref to 0x140b683a0",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"QueryXref",
+				"to",
+				"0x140b683a0"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x1405113aa",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x1405113aa"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x14054a911",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x14054a911"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x14054b78e",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x14054b78e"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x140ca6f60",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x140ca6f60"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x140b5e930",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x140b5e930"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x140b5e940",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x140b5e940"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli QueryXref to 0x140b5e930",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"QueryXref",
+				"to",
+				"0x140b5e930"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli QueryXref to 0x140b5e940",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"QueryXref",
+				"to",
+				"0x140b5e940"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x14032f360",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x14032f360"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli QueryXref to 0x14032f360",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"QueryXref",
+				"to",
+				"0x14032f360"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x14071e830",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x14071e830"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x14071ee60",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x14071ee60"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "PyGhidraCli Describe 0x14071ef00",
+			"type": "shell",
+			"command": "PyGhidraCli",
+			"args": [
+				"DescribeAddress",
+				"0x14071ef00"
+			],
+			"isBackground": false
+		}
+	]
+}

@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 2,
+  "updatedAt": "2026-03-19",
+  "description": "武器/战斗离散动作：`FUN_1402ee3a0(…)` 在 **静态初始化** 中写入 **`DAT_143c08xxxx`**（低 dword 为 handle，`& 0x7fffffff`），供 **`FUN_140521700` 第二参 `&DAT_*`** 使用。与 **`DAT_142b24xxxx`**（MRN 图侧 `+0x620` 比较链）是 **不同命名空间**。",
+  "scopeNote": {
+    "whatThisIs": "客户端内 **持武器/战斗物品** 的离散标签译码层（`FUN_140b5e*`/`b5f*` thunk → `FUN_140521700`）。",
+    "whatThisIsNot": "**不是** `UpdateCharacterState` / `0x0f0a` / `FUN_140511840` case 9 收包链；`QueryXref` 已确认二者 **无 CODE 调用边**。",
+    "zombieVsPlayer": "**僵尸通常无「开火/换弹」语义**：`FIRE_LOOP`、`FIRE_SLASH`、`RELOAD*`、`CHAMBER*`、`SPIN_UP*`、`DRYFIRE` 等应优先理解为 **玩家或通用武器状态机**，勿默认 NPC/僵尸动画由这一路驱动。僵尸动画/姿态更应查 **UCS case 9 → `FUN_14053d4e0` / `FUN_140526310`**、**locomotion / `FUN_14051a870` / `FUN_14053fde0`**、以及 **`DAT_142b24*` 图参链**。`MELEE_ATTACK` 等标签仍可能与 **近战武器挥击** 相关，需在 **实体是否持械、走哪条 vtable** 上区分，勿与「无枪僵尸」划等号。",
+    "ucsWireCrossRef": "UCS case9 以完整包首消费 **22B**；H1EMU **12B** schema 尾与 opcode/characterId 合计正好 22B。详见 `re-track-update-character-state-chain.md` 与 `packet-format-mismatch.md`；与本表 **并行、叙事分离**。"
+  },
+  "sources": [
+    "PyGhidraCli DumpDecompile 0x1401d8090 .. 0x1401d8bb0（各 30 行）20260319",
+    "PyGhidraCli QueryXref to 0x143c08*（WRITE 钉 `1401d8xxx`）20260319",
+    "PyGhidraCli DescribeAddress 0x1420bba9c、ReadMemory 0x1420bba90（DescribeAddress 首字节 0x46）20260319"
+  ],
+  "entries": [
+    { "datLow": "143c089a8", "literal": "ENTER_FIRE_STATE", "initEntry": "1401d8360" },
+    { "datLow": "143c089b0", "literal": "RELOAD_LOOP_ITERATE", "initEntry": "1401d88e0" },
+    { "datLow": "143c089b8", "literal": "FIRE_SLASH", "literalNote": "FUN_1402ee3a0(&DAT_1420bba9c)：Ghidra 未单独建 string；1420bba9c 位于 KnifeSlash(1420bba90) 与 LeftWristIKBlend(1420bbaa8) 之间 12B 间隙，DescribeAddress@bba9c 首字节 0x46='F'；长度上可容纳 FIRE_SLASH\\0（11B）。FUN_140b5f0d0 在 FIRE_LOOP 条件分支之后无条件第二路调用。", "initEntry": "1401d8400", "stringPtr": "1420bba9c" },
+    { "datLow": "143c089d0", "literal": "UNEQUIP", "initEntry": "1401d8b60" },
+    { "datLow": "143c089d8", "literal": "DRYFIRE", "initEntry": "1401d8310" },
+    { "datLow": "143c089f8", "literal": "CHANGE_FIRE_MODE_COMPLETE", "initEntry": "1401d81d0" },
+    { "datLow": "143c08a20", "literal": "SPIN_UP", "initEntry": "1401d89d0" },
+    { "datLow": "143c08a40", "literal": "DELAY_FIRE", "initEntry": "1401d82c0" },
+    { "datLow": "143c08a48", "literal": "MELEE_ATTACK", "initEntry": "1401d8590" },
+    { "datLow": "143c08a58", "literal": "CHANGE_FIRE_GROUP_START", "initEntry": "1401d8180" },
+    { "datLow": "143c08a60", "literal": "FIRE_LOOP", "initEntry": "1401d8450" },
+    { "datLow": "143c08a78", "literal": "THROW_END", "initEntry": "1401d8ac0" },
+    { "datLow": "143c08a80", "literal": "LEAVE_FIRE_STATE", "initEntry": "1401d8540" },
+    { "datLow": "143c08ab0", "literal": "SPIN_UP_END", "initEntry": "1401d8a20" },
+    { "datLow": "143c08ab8", "literal": "RELOAD_WITH_CHAMBER", "initEntry": "1401d8980" },
+    { "datLow": "143c08ac0", "literal": "RELOAD_EXPIRED", "initEntry": "1401d87a0" },
+    { "datLow": "143c08ac8", "literal": "OVERHEATED", "initEntry": "1401d8630" },
+    { "datLow": "143c08af8", "literal": "COOLDOWN", "initEntry": "1401d8270" },
+    { "datLow": "143c08ae8", "literal": "CHAMBER_ROUND", "initEntry": "1401d80e0" },
+    { "datLow": "143c08b08", "literal": "RELOAD", "initEntry": "1401d8700" },
+    { "datLow": "143c08b18", "literal": "LEAVE_FIRE_LOOP", "initEntry": "1401d84f0" },
+    { "datLow": "143c08b28", "literal": "RELOAD_LOOP_START", "initEntry": "1401d8930" },
+    { "datLow": "143c08b40", "literal": "RELOAD_LOOP_END", "initEntry": "1401d8840" },
+    { "datLow": "143c08b78", "literal": "CHAMBER_INTERRUPT", "initEntry": "1401d8090" },
+    { "datLow": "143c08b88", "literal": "CHANGE_FIRE_MODE_START", "initEntry": "1401d8220" },
+    { "datLow": "143c08ba8", "literal": "EQUIP", "initEntry": "1401d83b0" },
+    { "datLow": "143c08de0", "literal": "RELOAD_COMPLETE", "initEntry": "1401d8750" },
+    { "datLow": "143c08e00", "literal": "CHANGE_FIRE_GROUP_COMPLETE", "initEntry": "1401d8130" },
+    { "datLow": "143c08e18", "literal": "THROW_BEGIN", "initEntry": "1401d8a70" },
+    { "datLow": "143c08e78", "literal": "HIT_FIRE_BLOCK", "initEntry": "1401d84a0" },
+    { "datLow": "143c08e80", "literal": "TRIGGER_ITEM_ABILITY", "initEntry": "1401d8b10" },
+    { "datLow": "143c08f40", "literal": "RELOAD_INTERRUPT", "initEntry": "1401d87f0" },
+    { "datLow": "143c089c0", "literal": "RELOAD_LOOP_END_WITH_CHAMBER", "initEntry": "1401d8890" }
+  ],
+  "branchingThunks": [
+    {
+      "func": "FUN_140b5f800",
+      "signature": "void (longlong *param_1, char param_2)",
+      "rules": [
+        { "when": "param_2 == 0", "param2": "&DAT_143c08b40", "literal": "RELOAD_LOOP_END" },
+        { "when": "param_2 != 0", "param2": "&DAT_143c089c0", "literal": "RELOAD_LOOP_END_WITH_CHAMBER" }
+      ]
+    },
+    {
+      "func": "FUN_140b5f900",
+      "signature": "void (longlong *param_1, char param_2)",
+      "rules": [
+        { "when": "param_2 == 0", "param2": "&DAT_143c08b08", "literal": "RELOAD" },
+        { "when": "param_2 != 0", "param2": "&DAT_143c08ab8", "literal": "RELOAD_WITH_CHAMBER" }
+      ]
+    },
+    {
+      "func": "FUN_140b5fe60",
+      "signature": "void (longlong *param_1, undefined8 param_2, undefined4 param_3)",
+      "rules": [
+        { "when": "always", "param2": "caller-supplied pointer", "literal": null, "note": "透传 `param_2`/`param_3` 至 `521700`，非本表静态 DAT" }
+      ]
+    }
+  ]
+}

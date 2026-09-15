@@ -1,0 +1,57 @@
+{
+  "generated": "2026-03-16T00:00:00Z",
+  "notes": "Sample extracted tokens from ADRs (ADR text values to use for code/handle mapping).",
+  "entries": [
+    {
+      "adr": "d:/WindowsOnly/Games/H1EMU_Client/Resources/Assets/unpacked/NPCSpawner_ZombieWalker.adr",
+      "tokens": [
+        "NPCSpawner_ZombieWalker_LOD0.dme",
+        "NPCSpawner_ZombieWalker_Lod0.dma",
+        "NPCSpawner_ZombieWalker.cdt",
+        "black.dds",
+        "Default0",
+        "default0"
+      ]
+    },
+    {
+      "adr": "d:/WindowsOnly/Games/H1EMU_Client/Resources/Assets/unpacked/NPCSpawner_ZombieLazy.adr",
+      "tokens": [
+        "NPCSpawner_ZombieWalker_LOD0.dme",
+        "NPCSpawner_ZombieLazy_Lod0.dma",
+        "NPCSpawner_ZombieLazy.cdt",
+        "default0",
+        "Default0"
+      ]
+    },
+    {
+      "adr": "d:/WindowsOnly/Games/H1EMU_Client/Resources/Assets/unpacked/NPCSpawner_Wolf001.adr",
+      "tokens": [
+        "NPCSpawner_Wolf001_LOD0.dme",
+        "NPCSpawner_Wolf001_Lod0.dma",
+        "Wolf_S.dds",
+        "Wolf_N.dds",
+        "orange.dds",
+        "default0"
+      ]
+    },
+    {
+      "adr": "d:/WindowsOnly/Games/H1EMU_Client/Resources/Assets/unpacked/Bear_Brown.adr",
+      "tokens": [
+        "AnimalsPhysics.mrn",
+        "Bear001",
+        "Bear_Brown_LOD0.dme",
+        "Bear_Brown_Lod0.dma",
+        "grey.dds",
+        "detail_cube.dds",
+        "Bear_Brown_S.dds",
+        "Bear_Brown_N.dds",
+        "Bear_Brown_C.dds",
+        "Bear_Brown_LOD1.dme",
+        "Bear_Brown_Lod1.dma",
+        "Bear_Brown_LOD2.dme",
+        "Bear_Brown_Lod2.dma",
+        "Bear_Brown_COL.apx"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9812 @@
+// ======================================================================
+//
+//   GNU GENERAL PUBLIC LICENSE
+//   Version 3, 29 June 2007
+//   copyright (C) 2020 - 2021 Quentin Gruber
+//   copyright (C) 2021 - 2026 H1emu community
+//
+//   https://github.com/QuentinGruber/h1z1-server
+//   https://www.npmjs.com/package/h1z1-server
+//
+//   Based on https://github.com/psemu/soe-network
+// ======================================================================
+
+const debugName = "ZoneServer",
+  debug = require("debug")(debugName);
+
+import { EventEmitter } from "node:events";
+import { H1Z1Protocol } from "../../protocols/h1z1protocol";
+import { LoginConnectionManager } from "../LoginZoneConnection/loginconnectionmanager";
+import { LZConnectionClient } from "../LoginZoneConnection/shared/lzconnectionclient";
+import { Resolver } from "node:dns";
+
+import { promisify } from "node:util";
+import { ZonePacketHandlers } from "./zonepackethandlers";
+import { ZoneClient2016 as Client } from "./classes/zoneclient";
+import { Vehicle2016 as Vehicle, Vehicle2016 } from "./entities/vehicle";
+import { GridCell } from "./classes/gridcell";
+import { SpawnCell } from "./classes/spawncell";
+import { WorldObjectManager } from "./managers/worldobjectmanager";
+import { VoiceChatManager } from "./managers/voicechatmanager";
+import { SmeltingManager } from "./managers/smeltingmanager";
+import { DecayManager } from "./managers/decaymanager";
+import { AbilitiesManager } from "./managers/abilitiesmanager";
+import {
+  ContainerErrors,
+  EquipSlots,
+  Items,
+  LoadoutIds,
+  LoadoutSlots,
+  MovementModifiers,
+  ResourceIds,
+  ResourceTypes,
+  VehicleIds,
+  ConstructionPermissionIds,
+  ItemUseOptions,
+  HealTypes,
+  Effects,
+  WeaponDefinitionIds,
+  ItemTypes,
+  ItemClasses,
+  ResourceIndicators,
+  GameModes,
+  ReplicationPropertyHash
+} from "./models/enums";
+import { WeatherManager } from "./managers/weathermanager";
+
+import {
+  AccountDefinition,
+  AccountItem,
+  ClientBan,
+  clientEffect,
+  ConstructionEntity,
+  DamageInfo,
+  DamageRecord,
+  EntityDictionary,
+  FireHint,
+  HudIndicator,
+  ItemDefinition,
+  modelData,
+  PropInstance,
+  RandomReward,
+  RewardCrateDefinition,
+  ScreenEffect,
+  StanceFlags,
+  UseOption
+} from "../../types/zoneserver";
+import { h1z1PacketsType2016 } from "../../types/packets";
+import {
+  remoteWeaponPacketsType,
+  remoteWeaponUpdatePacketsType,
+  weaponPacketsType
+} from "../../types/weaponPackets";
+import { Character2016 as Character } from "./entities/character";
+import {
+  _,
+  generateRandomGuid,
+  Int64String,
+  isPosInRadius,
+  isPosInRadiusWithY,
+  getDistance,
+  randomIntFromInterval,
+  generateTransientId,
+  getRandomFromArray,
+  getRandomKeyFromAnObject,
+  toBigHex,
+  toHex,
+  calculate_falloff,
+  resolveHostAddress,
+  getDifference,
+  logClientActionToMongo,
+  removeUntransferableFields,
+  getDistance2d,
+  TimeWrapper,
+  getCurrentServerTimeWrapper,
+  flhash,
+  getDateString,
+  loadJson,
+  chance,
+  quat2heading
+} from "../../utils/utils";
+
+import { Db, MongoClient, WithId } from "mongodb";
+import { BaseFullCharacter } from "./entities/basefullcharacter";
+import { ItemObject } from "./entities/itemobject";
+import {
+  DEFAULT_CRYPTO_KEY,
+  EXTERNAL_CONTAINER_GUID,
+  LOADOUT_CONTAINER_ID
+} from "../../utils/constants";
+import { TrapEntity } from "./entities/trapentity";
+import { DoorEntity } from "./entities/doorentity";
+import { Npc } from "./entities/npc";
+import { ExplosiveEntity } from "./entities/explosiveentity";
+import { BaseLightweightCharacter } from "./entities/baselightweightcharacter";
+import { BaseSimpleNpc } from "./entities/basesimplenpc";
+import { TemporaryEntity } from "./entities/temporaryentity";
+import { BaseEntity } from "./entities/baseentity";
+import { ConstructionDoor } from "./entities/constructiondoor";
+import { ConstructionParentEntity } from "./entities/constructionparententity";
+import { ConstructionChildEntity } from "./entities/constructionchildentity";
+import {
+  ConstructionParentSaveData,
+  FullCharacterSaveData,
+  LootableConstructionSaveData,
+  PlantingDiameterSaveData,
+  TrapSaveData
+} from "types/savedata";
+import {
+  constructContainers,
+  constructLoadout,
+  FetchedWorldData,
+  WorldDataManager
+} from "./managers/worlddatamanager";
+import { UseOptions } from "./data/useoptions";
+import {
+  CONNECTION_REJECTION_FLAGS,
+  DB_COLLECTIONS,
+  GAME_VERSIONS,
+  KILL_TYPE,
+  LOGIN_KICK_REASON
+} from "../../utils/enums";
+
+import {
+  AddLightweightNpc,
+  AddLightweightPc,
+  AddLightweightVehicle,
+  AddSimpleNpc,
+  CharacterAddEffectTagCompositeEffect,
+  CharacterDroppedItemNotification,
+  CharacterKilledBy,
+  CharacterManagedObject,
+  CharacterPlayWorldCompositeEffect,
+  CharacterRemovePlayer,
+  CharacterRespawnReply,
+  CharacterSelectSessionResponse,
+  CharacterStartMultiStateDeath,
+  CharacterUpdateCharacterState,
+  CharacterWeaponStance,
+  ClientExitLaunchUrl,
+  ClientGameSettings,
+  ClientUpdateDeathMetrics,
+  ClientUpdateItemAdd,
+  ClientUpdateItemDelete,
+  ClientUpdateItemUpdate,
+  ClientUpdateManagedObjectResponseControl,
+  ClientUpdateModifyMovementSpeed,
+  ClientUpdateNpcRelevance,
+  ClientUpdateProximateItems,
+  ClientUpdateStartTimer,
+  ClientUpdateUpdateLocation,
+  ClientUpdateUpdateLockoutTimes,
+  CommandPlayDialogEffect,
+  ContainerError,
+  ContainerInitEquippedContainers,
+  ContainerUpdateEquippedContainer,
+  DtoObjectInitialData,
+  GameTimeSync,
+  H1emuPrintToConsole,
+  InitializationParameters,
+  ItemsRemoveAccountItem,
+  ItemsUpdateAccountItem,
+  LoginFailed,
+  MountDismountResponse,
+  MountMountResponse,
+  MountSeatChangeRequest,
+  MountSeatChangeResponse,
+  POIChangeMessage,
+  PlayerUpdatePosition,
+  ReplicationCreateComponent,
+  ReplicationCreateRepData,
+  ResourceEvent,
+  RewardAddNonRewardItem,
+  SendSelfToClient,
+  SendZoneDetails,
+  SynchronizedTeleportPlayersReady,
+  SynchronizedTeleportRelease,
+  SynchronizedTeleportWaitingForPlayers,
+  UiConfirmHit,
+  VehicleAutoMount,
+  VehicleOccupy,
+  VehicleOwner,
+  WeaponWeapon,
+  zone2016packets
+} from "types/zone2016packets";
+import { getCharacterModelData } from "../shared/functions";
+import { HookManager } from "./managers/hookmanager";
+import { BaseItem } from "./classes/baseItem";
+import { LoadoutItem } from "./classes/loadoutItem";
+import { LoadoutContainer } from "./classes/loadoutcontainer";
+import { Weapon } from "./classes/weapon";
+import { Lootbag } from "./entities/lootbag";
+import { BaseLootableEntity } from "./entities/baselootableentity";
+import { LootableConstructionEntity } from "./entities/lootableconstructionentity";
+import { LootableProp } from "./entities/lootableprop";
+import { PlantingDiameter } from "./entities/plantingdiameter";
+import { Plant } from "./entities/plant";
+import { SmeltingEntity } from "./classes/smeltingentity";
+import { spawn, Worker } from "threads";
+import { WorldDataManagerThreaded } from "./managers/worlddatamanagerthread";
+import { logVersion } from "../../utils/processErrorHandling";
+import { TaskProp } from "./entities/taskprop";
+import { ChatManager } from "./managers/chatmanager";
+import { Crate } from "./entities/crate";
+import { ConfigManager } from "./managers/configmanager";
+import {
+  RConManager,
+  RconMessage,
+  RconMessageType
+} from "./managers/rconmanager";
+import { DevHttpServer } from "./managers/devhttpserver";
+import { GroupManager } from "./managers/groupmanager";
+import { SpeedTreeManager } from "./managers/speedtreemanager";
+import { ConstructionManager } from "./managers/constructionmanager";
+import { FairPlayManager } from "./managers/fairplaymanager";
+import { PluginManager } from "./managers/pluginmanager";
+import { Destroyable } from "./entities/destroyable";
+import { FileHashTypeList, ReceivedPacket } from "types/shared";
+import { SOEOutputChannels } from "../../servers/SoeServer/soeoutputstream";
+import { scheduler } from "node:timers/promises";
+import { GatewayChannels } from "h1emu-core";
+import { IngameTimeManager } from "./managers/gametimemanager";
+import { H1z1ProtocolReadingFormat } from "types/protocols";
+import { GatewayServer } from "../GatewayServer/gatewayserver";
+import { WaterSource } from "./entities/watersource";
+import { WebSocket } from "ws";
+import { CommandHandler } from "./handlers/commands/commandhandler";
+import { AccountInventoryManager } from "./managers/accountinventorymanager";
+import { PlayTimeManager } from "./managers/playtimemanager";
+import { RewardManager } from "./managers/rewardmanager";
+import { DynamicAppearance } from "types/zonedata";
+import { clearInterval, setInterval } from "node:timers";
+import { NavManager } from "../../utils/recast";
+import { ProjectileEntity } from "./entities/projectileentity";
+import { ChallengeManager, ChallengeType } from "./managers/challengemanager";
+import { RandomEventsManager } from "./managers/randomeventsmanager";
+import { AiManager } from "./managers/aimanager";
+import { AirdropManager } from "./managers/airdropmanager";
+//import { TaskManager } from "./managers/tasksmanager";
+
+const spawnLocations2 = require("../../../data/2016/zoneData/Z1_gridSpawns.json"),
+  deprecatedDoors = require("../../../data/2016/sampleData/deprecatedDoors.json"),
+  itemDefinitions = require("./../../../data/2016/dataSources/ServerItemDefinitions.json"),
+  containerDefinitions = require("./../../../data/2016/dataSources/ContainerDefinitions.json"),
+  profileDefinitions = require("./../../../data/2016/dataSources/ServerProfileDefinitions.json"),
+  projectileDefinitons = require("./../../../data/2016/dataSources/ServerProjectileDefinitions.json"),
+  itemClassDefinitions = require("./../../../data/2016/dataSources/ServerItemClassDefinitions.json"),
+  loadoutSlotItemClasses = require("./../../../data/2016/dataSources/LoadoutSlotItemClasses.json"),
+  equipSlotItemClasses = require("./../../../data/2016/dataSources/EquipSlotItemClasses.json"),
+  weaponDefinitions = require("../../../data/2016/dataSources/ServerWeaponDefinitions"),
+  resourceDefinitions = require("../../../data/2016/dataSources/Resources"),
+  Z1_POIs = require("../../../data/2016/zoneData/Z1_POIs"),
+  hudIndicators = require("../../../data/2016/dataSources/HudIndicators"),
+  screenEffects = require("../../../data/2016/sampleData/screenEffects.json"),
+  clientEffectsDataSource = require("../../../data/2016/dataSources/ClientEffects.json"),
+  itemUseOptionsDataSource = require("../../../data/2016/dataSources/ItemUseOptions"),
+  gameRulesSource = require("../../../data/2016/dataSources/ServerGameRules"),
+  models = require("../../../data/2016/dataSources/Models"),
+  accountItemConversions = require("./../../../data/2016/dataSources/AcctItemConversions.json"),
+  rewardCrates = require("./../../../data/2016/dataSources/AccountCrates.json"),
+  equipmentModelTexturesMapping: Record<
+    string,
+    Record<string, string[]>
+  > = require("../../../data/2016/sampleData/equipmentModelTexturesMapping.json");
+
+export class ZoneServer2016 extends EventEmitter {
+  /** Networking layer - allows sending game data to the game client,
+   * lays on top of the H1Z1 protocol (on top of the actual H1Z1 packets)
+   */
+  _gatewayServer: GatewayServer;
+  readonly _protocol: H1Z1Protocol;
+  _db!: Db;
+  readonly _soloMode: boolean;
+  _serverName = process.env.SERVER_NAME || "";
+  readonly _mongoAddress: string;
+  private _clientProtocol: string;
+  protected _loginConnectionManager!: LoginConnectionManager;
+  _serverGuid = generateRandomGuid();
+  _worldId = 0;
+  _grid: GridCell[] = [];
+  _spawnGrid: SpawnCell[] = [];
+
+  saveTimeInterval: number = 600000;
+
+  nextSaveTime: number = Date.now() + this.saveTimeInterval;
+
+  /** Total amount of clients on the server */
+  readonly _clients: { [characterId: string]: Client } = {};
+
+  /** Global dictionaries for all entities */
+  _characters: EntityDictionary<Character> = {};
+  _npcs: EntityDictionary<Npc> = {};
+  /** 最近一次用测试命令刷出的 NPC characterId，供开发工具默认选中（世界循环刷的不写入） */
+  _lastSpawnedNpcCharacterId: string | null = null;
+  /** 开发用物种可见性探针；与僵尸回放租约分开，避免互相覆盖清理。 */
+  _testSpeciesProbeNpcCharacterId: string | null = null;
+  /** 物种可见性探针的有限运动计时器；永不进入生产 AI。 */
+  _testSpeciesProbeTimer: ReturnType<typeof setInterval> | null = null;
+  /** 开发工具「朝我走来」时，测试僵尸要走向的玩家 characterId；设后 AI 只移动不攻击 */
+  _testZombieWalkToCharacterId: string | null = null;
+  /** 自动进场测试僵尸锁定的玩家；即使开发 HTTP 默认暂停普通 AI，也继续追击和攻击。 */
+  _testZombieChaseAttackCharacterId: string | null = null;
+  _spawnedItems: EntityDictionary<ItemObject> = {};
+  _plants: EntityDictionary<Plant> = {};
+  _doors: EntityDictionary<DoorEntity> = {};
+  _explosives: EntityDictionary<ExplosiveEntity> = {};
+  _traps: EntityDictionary<TrapEntity> = {};
+  _temporaryObjects: EntityDictionary<TemporaryEntity | PlantingDiameter> = {};
+  _vehicles: EntityDictionary<Vehicle> = {};
+  _lootbags: EntityDictionary<Lootbag> = {};
+  _lootableConstruction: EntityDictionary<LootableConstructionEntity> = {};
+  _constructionFoundations: EntityDictionary<ConstructionParentEntity> = {};
+  _constructionDoors: EntityDictionary<ConstructionDoor> = {};
+  _constructionSimple: EntityDictionary<ConstructionChildEntity> = {};
+  _lootableProps: EntityDictionary<LootableProp> = {};
+  _taskProps: EntityDictionary<TaskProp> = {};
+  _crates: EntityDictionary<Crate> = {};
+  _destroyables: EntityDictionary<Destroyable> = {};
+  _worldLootableConstruction: EntityDictionary<LootableConstructionEntity> = {};
+  _worldSimpleConstruction: EntityDictionary<ConstructionChildEntity> = {};
+  _throwableProjectiles: EntityDictionary<ProjectileEntity> = {};
+
+  _destroyableDTOlist: number[] = [];
+  _hudIndicators: { [indicatorId: string]: HudIndicator } = {};
+  _screenEffects: { [screenEffectName: string]: ScreenEffect } = {};
+  _clientEffectsData: { [effectId: number]: clientEffect } = {};
+  _modelsData: { [modelId: number]: modelData } = {};
+  _syncTeleport: { [characterId: string]: boolean } = {};
+  blockSyncTeleportTicks: number = 0;
+
+  /** Interactible options for items - See (ZonePacketHandlers.ts or datasources/ItemUseOptions) */
+  _itemUseOptions: { [optionId: number]: UseOption } = {};
+  _decoys: {
+    [transientId: number]: {
+      characterId: string;
+      transientId: number;
+      position: Float32Array;
+      action: string;
+    };
+  } = {};
+
+  _serverStartTime: TimeWrapper = new TimeWrapper(0);
+  _transientIds: { [transientId: number]: string } = {};
+  _characterIds: { [characterId: string]: number } = {};
+
+  /** Determines which login server is used, Localhost by default. */
+  readonly _loginServerInfo: { address?: string; port: number } = {
+    address: process.env.LOGINSERVER_IP,
+    port: 1110
+  };
+  worldRoutineTimer!: NodeJS.Timeout;
+  _allowedCommands: string[] = process.env.ALLOWED_COMMANDS
+    ? JSON.parse(process.env.ALLOWED_COMMANDS)
+    : [];
+
+  /** Handles all packets for H1Z1 */
+  _packetHandlers: ZonePacketHandlers;
+
+  /** Managers used for handling core functionalities */
+  accountInventoriesManager: AccountInventoryManager;
+  rewardManager: RewardManager;
+  worldObjectManager: WorldObjectManager;
+  voiceChatManager: VoiceChatManager;
+  smeltingManager: SmeltingManager;
+  decayManager: DecayManager;
+  abilitiesManager: AbilitiesManager;
+  weatherManager: WeatherManager;
+  worldDataManager!: WorldDataManagerThreaded;
+  hookManager: HookManager;
+  chatManager: ChatManager;
+  rconManager: RConManager;
+  _devHttpServer?: DevHttpServer;
+  private _devHttpPort: number = 0;
+  getDevHttpPort(): number {
+    return this._devHttpPort;
+  }
+  groupManager: GroupManager;
+  speedtreeManager: SpeedTreeManager;
+  constructionManager: ConstructionManager;
+  fairPlayManager: FairPlayManager;
+  pluginManager: PluginManager;
+  configManager: ConfigManager;
+  playTimeManager: PlayTimeManager;
+  aiManager: AiManager;
+  airdropManager: AirdropManager;
+
+  _ready: boolean = false;
+
+  /** Information from ServerItemDefinitions.json */
+  _itemDefinitions: { [itemDefinitionId: number]: ItemDefinition } =
+    itemDefinitions;
+  _weaponDefinitions: { [weaponDefinitionId: number]: any } =
+    weaponDefinitions.WEAPON_DEFINITIONS;
+  _firegroupDefinitions: { [firegroupId: number]: any } =
+    weaponDefinitions.FIRE_GROUP_DEFINITIONS;
+  _firemodeDefinitions: { [firemodeId: number]: any } =
+    weaponDefinitions.FIRE_MODE_DEFINITIONS;
+  _accountItemDefinitions: { [ACCOUNT_ITEM_ID: number]: AccountDefinition } =
+    accountItemConversions;
+  _rewardCrateDefinitions: RewardCrateDefinition[] = rewardCrates.map(
+    (crate: RewardCrateDefinition) => ({
+      ...crate,
+      rewards: crate.rewards.map((reward) => ({
+        ...reward,
+        rewardChance: Math.ceil(reward.rewardChance) // Don't fuck with floats, this makes the server crash since it tries to convert the reward chance into an array and floats are not valid indexes.
+      }))
+    })
+  );
+  itemDefinitionsCache?: Buffer;
+  dynamicAppearanceCache?: Buffer;
+  weaponDefinitionsCache?: Buffer;
+  initialDataStaticDtoCache?: Buffer;
+  projectileDefinitionsCache?: Buffer;
+  profileDefinitionsCache?: Buffer;
+  itemClassDefinitionsCache?: Buffer;
+  _containerDefinitions: { [containerDefinitionId: number]: any } =
+    containerDefinitions;
+  lastItemGuid: bigint = 0x3000000000000000n;
+  private readonly _transientIdGenerator = generateTransientId();
+  enableWorldSaves: boolean;
+  readonly gameVersion: GAME_VERSIONS = GAME_VERSIONS.H1Z1_6dec_2016;
+  isSaving: boolean = false;
+  private _isSaving: boolean = false;
+  readonly worldSaveVersion: number = 2;
+  enablePacketInputLogging: boolean = false;
+  shutdownStartedTime: number = 0;
+  isRebooting: boolean = false;
+  abortShutdown: boolean = false;
+  shutdownStarted: boolean = false;
+  isLocked: boolean = false;
+  staticDTOs: Array<PropInstance> = [];
+  serverGameRules: string;
+  routinesLoopTimer?: NodeJS.Timeout;
+  private _mongoClient?: MongoClient;
+  rebootTimeTimer?: NodeJS.Timeout;
+  inGameTimeManager: IngameTimeManager = new IngameTimeManager();
+  commandHandler: CommandHandler;
+  dynamicappearance: DynamicAppearance;
+
+  /** MANAGED BY CONFIGMANAGER - See defaultConfig.yaml for more information */
+  proximityItemsDistance!: number;
+  interactionDistance!: number;
+  charactersRenderDistance!: number;
+  tickRate!: number;
+  worldRoutineRate!: number;
+  welcomeMessage!: string;
+  adminMessage!: string;
+  enableLoginServerKickRequests!: boolean;
+  rebootTime!: number; // in hours
+  rebootWarnTime!: number; // in seconds
+  isPvE!: boolean;
+  isHeadshotOnly!: boolean;
+  isFirstPersonOnly!: boolean;
+  isNoBuildInPois!: boolean;
+  baseConstructionDamage!: number;
+  crowbarHitRewardChance!: number;
+  crowbarHitDamage!: number;
+  damageWeapons!: boolean;
+  disablePOIManager!: boolean;
+  disableMapBoundsCheck!: boolean;
+  /*                          */
+  navManager: NavManager;
+  staticBuildings: AddSimpleNpc[] = require("../../../data/2016/sampleData/staticbuildings.json");
+  worldSaveFailed: boolean = false;
+  challengeManager: ChallengeManager;
+  challengePositionCheckInterval?: NodeJS.Timeout;
+  randomEventsManager: RandomEventsManager;
+  gameMode: GameModes = GameModes.SURVIVAL;
+  maxPacketLoss: number = 5;
+  //tasksManager: TaskManager;
+  //clientRoutineRate!: number;
+
+  constructor(
+    serverPort: number,
+    gatewayKey: Uint8Array = Buffer.from(DEFAULT_CRYPTO_KEY),
+    mongoAddress = "",
+    worldId?: number,
+    internalServerPort?: number,
+    protocol: string = "ClientProtocol_1080",
+    devHttpPort?: number
+  ) {
+    super();
+    this._clientProtocol = protocol;
+    this._gatewayServer = new GatewayServer(serverPort, gatewayKey);
+    this._packetHandlers = new ZonePacketHandlers();
+    this._mongoAddress = mongoAddress;
+    this._worldId = worldId || 0;
+    this._devHttpPort =
+      typeof devHttpPort === "number" && devHttpPort > 0
+        ? devHttpPort
+        : process.env.DEV_HTTP_PORT
+          ? parseInt(process.env.DEV_HTTP_PORT, 10)
+          : 0;
+    this._protocol = new H1Z1Protocol(this._clientProtocol);
+    this.worldObjectManager = new WorldObjectManager();
+    this.voiceChatManager = new VoiceChatManager();
+    this.smeltingManager = new SmeltingManager();
+    this.decayManager = new DecayManager();
+    this.abilitiesManager = new AbilitiesManager();
+    this.weatherManager = new WeatherManager();
+    this.hookManager = new HookManager();
+    this.chatManager = new ChatManager();
+    this.rconManager = new RConManager();
+    this.groupManager = new GroupManager();
+    this.speedtreeManager = new SpeedTreeManager();
+    this.rewardManager = new RewardManager(this);
+    this.constructionManager = new ConstructionManager();
+    this.fairPlayManager = new FairPlayManager();
+    this.pluginManager = new PluginManager();
+    this.commandHandler = new CommandHandler();
+    this.playTimeManager = new PlayTimeManager();
+    this.aiManager = new AiManager(this);
+    this.airdropManager = new AirdropManager(this);
+    this.navManager = new NavManager();
+    this.challengeManager = new ChallengeManager(this);
+    this.randomEventsManager = new RandomEventsManager(this);
+    //this.tasksManager = new TaskManager();
+    /* CONFIG MANAGER MUST BE INSTANTIATED LAST ! */
+    this.configManager = new ConfigManager(this, process.env.CONFIG_PATH);
+    this.enableWorldSaves =
+      process.env.ENABLE_SAVES?.toLowerCase() == "false" ? false : true;
+
+    /* Managers events */
+    this.weatherManager.on("raining", () => {
+      this.smeltingManager.fillDewCollectors(this);
+    });
+    /** Determines what rulesets are used. */
+    const serverGameRules = [];
+    if (this.isSurvival()) {
+      serverGameRules.push(this.isPvE ? "PvE" : "PvP");
+      if (this.isFirstPersonOnly) serverGameRules.push("FirstPersonOnly");
+      if (this.isHeadshotOnly) serverGameRules.push("Headshots");
+      if (this.isNoBuildInPois) serverGameRules.push("NoBuildNearPois");
+    } else if (this.isBattleRoyale()) {
+      switch (this.gameMode) {
+        case GameModes.BATTLE_ROYALE:
+          serverGameRules.push("BattleRoyale");
+          break;
+        case GameModes.BATTLE_ROYALE_2:
+          serverGameRules.push("BattleRoyaleTwoPlayerTeams");
+          break;
+        case GameModes.BATTLE_ROYALE_5:
+          serverGameRules.push("BattleRoyaleFivePlayerTeams");
+          break;
+      }
+    }
+    this.serverGameRules = serverGameRules.join(",");
+
+    this._soloMode = false;
+
+    if (!this._mongoAddress) {
+      this._soloMode = true;
+      this.fairPlayManager.useFairPlay = false;
+      console.log("Server in solo mode !");
+    }
+
+    this.accountInventoriesManager = new AccountInventoryManager(this);
+    this.on("login", async (client) => {
+      if (!this._soloMode) {
+        this.sendZonePopulationUpdate();
+      }
+      await this.onZoneLoginEvent(client);
+    });
+
+    this._gatewayServer.on(
+      "login",
+      async (
+        soeClientId: string,
+        characterId: string,
+        guid: string,
+        clientProtocol: string
+      ) => {
+        debug(
+          `Client logged in from ${soeClientId} with character id: ${characterId}`
+        );
+        if (!this._soloMode) {
+          this._loginConnectionManager.sendData(
+            {
+              ...this._loginServerInfo,
+              serverId: this._worldId
+            } as any,
+            "ClientMessage",
+            {
+              guid,
+              message: `Connected to server with id: ${this._worldId}`,
+              showConsole: false,
+              clearOutput: true
+            }
+          );
+        }
+        const generatedTransient = this.getTransientId(characterId);
+        const sessionId =
+          this._gatewayServer.getSoeClientSessionId(soeClientId);
+        if (!sessionId) {
+          return;
+        }
+        const zoneClient = this.createClient(
+          sessionId,
+          soeClientId,
+          guid,
+          characterId,
+          generatedTransient
+        );
+        if (clientProtocol !== this._clientProtocol) {
+          debug(`${soeClientId} is using the wrong client protocol`);
+          debug(`Protocol ${clientProtocol}`);
+          this.sendData<LoginFailed>(zoneClient, "LoginFailed", {});
+          return;
+        }
+        if (!this._soloMode) {
+          const address =
+            this._gatewayServer.getSoeClientNetworkInfos(soeClientId)?.address;
+          if (!address) {
+            return;
+          }
+          if (
+            await this.isClientBanned(
+              zoneClient.loginSessionId,
+              address,
+              zoneClient
+            )
+          ) {
+            this.enforceBan(zoneClient);
+            return;
+          }
+          const adminData = (await this._db
+            ?.collection(DB_COLLECTIONS.ADMINS)
+            .findOne({
+              sessionId: zoneClient.loginSessionId
+            })) as WithId<{ permissionLevel: number }>;
+          if (adminData) {
+            zoneClient.isAdmin = true;
+            zoneClient.permissionLevel = adminData.permissionLevel ?? 3;
+          }
+        } else {
+          zoneClient.isAdmin = true;
+          zoneClient.permissionLevel = 3;
+        }
+
+        // If the client is already connected, we kick the old one
+        const oldClient = this.getClientByGuid(guid);
+        if (oldClient) {
+          this.sendData<LoginFailed>(oldClient, "LoginFailed", {});
+          await this.deleteClient(oldClient);
+        }
+        this._clients[sessionId] = zoneClient;
+        this._characters[characterId] = zoneClient.character;
+        this.emit("login", zoneClient);
+      }
+    );
+    this._gatewayServer.on("disconnect", (sessionId: number) => {
+      // this happen when the connection is close without a regular logout
+      const client = this._clients[sessionId];
+      if (client) {
+        if (client.properlyLogout) {
+          this.deleteClient(client);
+        } else {
+          setTimeout(() => {
+            // Double-check client still exists before deleting
+            if (this._clients[sessionId]) {
+              this.deleteClient(client);
+            }
+          }, 10_000);
+        }
+      }
+    });
+
+    this._gatewayServer.on(
+      "tunneldata",
+      async (soeClientSessionId: string, data: Buffer, flags: number) => {
+        if (!this._soloMode && this.enablePacketInputLogging) {
+          this._db.collection("packets").insertOne({
+            data,
+            flags,
+            loginSessionId: this._clients[soeClientSessionId].loginSessionId
+          });
+        }
+        // Idk if this is really efficient , we may lose too much time on context switching
+        // if (flags < GatewayChannels.UpdatePosition) {
+        //   // if the packet isn't a high priority one, we can wait for the next tick to process it
+        //   // If there is a lot of packet to process, it's better, if there is none then we only add like some µsec
+        //   await scheduler.yield();
+        // }
+        const packet = this._protocol.parse(data, flags);
+
+        // for reversing new packets
+        /*
+        if(
+          packet?.name == ""
+        ) {
+          let hexString = '';
+          for (let i = 0; i < data.length; i++) {
+              const byte = data[i].toString(16).padStart(2, '0');
+              hexString += byte + ' ';
+          }
+          console.log(`<Buffer ${hexString.trim()}>`);
+        }
+        */
+
+        if (packet) {
+          this.onZoneDataEvent(this._clients[soeClientSessionId], packet);
+        } else {
+          debug("zonefailed : ", data);
+        }
+      }
+    );
+
+    if (!this._soloMode) {
+      this.registerLoginConnectionListeners(internalServerPort);
+    }
+
+    const dynamicappearance = loadJson(
+      __dirname + "/../../../data/2016/sampleData/dynamicappearance.json"
+    );
+    this.dynamicappearance = dynamicappearance;
+    if (this._mongoAddress && this.rebootTime) {
+      console.log("Reboot time set to " + this.rebootTime + " hours");
+      this.rebootTimeTimer = setTimeout(
+        () => {
+          console.log("Rebooting server due to reboot time set");
+          this.shutdown(this.rebootWarnTime, "Server rebooting");
+        },
+        this.rebootTime * 60 * 60 * 1000
+      );
+    }
+    for (let i = 0; i < this.staticBuildings.length; i++) {
+      const v = this.staticBuildings[i];
+      v.characterId = this.generateGuid();
+      v.transientId = this.getTransientId(v.characterId);
+    }
+  }
+
+  /*get gameLoopUpdateRate() {
+    return 1000 / this.gameLoopTickRate;
+  }*/
+
+  async reloadCommandCache() {
+    delete require.cache[require.resolve("./handlers/commands/commandhandler")];
+    const CommandHandler = (
+      require("./handlers/commands/commandhandler") as any
+    ).CommandHandler;
+    this.commandHandler = new CommandHandler();
+    this.commandHandler.reloadCommands();
+  }
+  async registerLoginConnectionListeners(internalServerPort?: number) {
+    this._loginConnectionManager = new LoginConnectionManager(
+      this._worldId,
+      internalServerPort
+    ); // opens local socket to connect to loginserver
+
+    this._loginConnectionManager.on(
+      "session",
+      (err: string, client: LZConnectionClient) => {
+        if (err) {
+          debug(
+            `An error occured for LoginConnection with ${client.sessionId}`
+          );
+          console.error(err);
+        } else {
+          this.sendZonePopulationUpdate();
+          debug(`LoginConnection established for ${client.sessionId}`);
+        }
+      }
+    );
+
+    this._loginConnectionManager.on(
+      "sessionfailed",
+      (err: string, client: LZConnectionClient) => {
+        console.error(`h1emuServer sessionfailed for ${client.sessionId}`);
+        console.error(err);
+        process.exitCode = 11;
+      }
+    );
+
+    this._loginConnectionManager.on(
+      "disconnect",
+      (err: string, client: LZConnectionClient, reason: number) => {
+        debug(
+          `LoginConnection dropped: ${
+            reason ? "Connection Lost" : "Unknown Error"
+          }`
+        );
+      }
+    );
+
+    this._loginConnectionManager.on(
+      "data",
+      async (err: string, client: LZConnectionClient, packet: any) => {
+        if (err) {
+          console.error(err);
+        } else {
+          switch (packet.name) {
+            case "CharacterCreateRequest":
+              this.onCharacterCreateRequest(client, packet);
+              break;
+            case "ClientIsAdminRequest":
+              this.onClientIsAdminRequest(client, packet);
+              break;
+            case "CharacterAllowedRequest":
+              this.onClientAllowedRequest(client, packet);
+              break;
+            case "CharacterDeleteRequest": {
+              const { characterId, reqId } = packet.data;
+              try {
+                const collection = this._db.collection(
+                  DB_COLLECTIONS.CHARACTERS
+                );
+                const charactersArray = await collection
+                  .find({ characterId: characterId })
+                  .toArray();
+                if (charactersArray.length === 1) {
+                  await collection.updateOne(
+                    { characterId: characterId },
+                    {
+                      $set: {
+                        status: 0
+                      }
+                    }
+                  );
+                  this._loginConnectionManager.sendData(
+                    client,
+                    "CharacterDeleteReply",
+                    { status: 1, reqId: reqId }
+                  );
+                  const groupId = charactersArray[0]?.groupId;
+                  if (groupId) {
+                    this.groupManager.removeGroupMember(
+                      this,
+                      characterId,
+                      groupId
+                    );
+                    if (
+                      this.constructionManager.hasOwnedBases(this, characterId)
+                    ) {
+                      this.constructionManager.removeOwnerFromBases(
+                        this,
+                        characterId
+                      );
+                    }
+                  }
+                } else {
+                  this._loginConnectionManager.sendData(
+                    client,
+                    "CharacterDeleteReply",
+                    { status: 1, reqId: reqId }
+                  );
+                }
+              } catch (error) {
+                console.error(error);
+                this._loginConnectionManager.sendData(
+                  client,
+                  "CharacterDeleteReply",
+                  {
+                    status: 0,
+                    reqId: reqId
+                  }
+                );
+              }
+              break;
+            }
+            case "LoginKickRequest": {
+              const { guid, reason } = packet.data;
+
+              if (!this.enableLoginServerKickRequests) {
+                console.log(
+                  `LoginServer requested to kick client with guid ${guid} for reason: ${reason}! Ignored due to configuration setting.`
+                );
+                return;
+              }
+
+              let reasonString = "";
+
+              switch (reason) {
+                case LOGIN_KICK_REASON.UNDEFINED:
+                  reasonString = "UNDEFINED";
+                  break;
+                case LOGIN_KICK_REASON.GLOBAL_BAN:
+                  reasonString = "Global ban.";
+                  break;
+                default:
+                  reasonString = "INVALID";
+                  break;
+              }
+
+              const client = this.getClientByGuid(guid);
+
+              if (!client) {
+                console.log(
+                  `LoginServer requested to kick INVALID client with guid ${guid} for reason: ${reason}!`
+                );
+                return;
+              }
+
+              console.log(
+                `LoginServer kicking ${client.character.name} for reason: ${reasonString}`
+              );
+
+              this.kickPlayerWithReason(client, reasonString);
+              break;
+            }
+            case "OverrideAllowedFileHashes":
+              debug("Received OverrideAllowedFileHashes from loginserver");
+              const hashTypesList: FileHashTypeList = packet.data.types,
+                assetHashes = hashTypesList.find(
+                  (entry) => entry.type == "assets"
+                );
+              if (assetHashes) {
+                debug("Using defaultAssetHashes from loginserver");
+                this.fairPlayManager.defaultHashes = assetHashes.hashes;
+              }
+              break;
+            default:
+              debug(`Unhandled h1emu packet: ${packet.name}`);
+              break;
+          }
+        }
+      }
+    );
+  }
+
+  async stop() {
+    clearInterval(this.challengePositionCheckInterval);
+    this.worldDataManager.kill();
+    this.inGameTimeManager.stop();
+    this.smeltingManager.clearTimers();
+    this.decayManager.clearTimers();
+    this.randomEventsManager.stop();
+    clearTimeout(this.worldRoutineTimer);
+    clearTimeout(this.weatherManager.dynamicWorker);
+    clearTimeout(this.routinesLoopTimer);
+    clearTimeout(this.rebootTimeTimer);
+    if (this._loginConnectionManager) {
+      await this._loginConnectionManager.stop();
+    }
+    if (this._mongoClient) {
+      await this._mongoClient.close();
+    }
+    await this._gatewayServer.stop();
+    await this.rconManager.stop();
+    this._devHttpServer?.stop();
+  }
+
+  async shutdown(timeLeft: number, message: string) {
+    this.shutdownStarted = true;
+    if (this.abortShutdown) {
+      this.abortShutdown = false;
+      this.shutdownStarted = false;
+      this.sendAlertToAll(`Server shutdown aborted.`);
+      return;
+    }
+
+    if (this.shutdownStartedTime === 0) {
+      this.shutdownStartedTime = Date.now();
+    }
+
+    const timeLeftMs = timeLeft * 1000;
+    const currentTimeLeft =
+      timeLeftMs - (Date.now() - this.shutdownStartedTime);
+    if (currentTimeLeft < 0) {
+      this.sendAlertToAll(`Server will shutdown now`);
+      this.enableWorldSaves = false;
+      if (!this.worldSaveFailed) {
+        try {
+          await this.saveWorld();
+        } catch (e) {
+          console.error(e);
+          console.error("saving world failed on reboot");
+        }
+      }
+      Object.values(this._clients).forEach((client: Client) => {
+        this.sendData<CharacterSelectSessionResponse>(
+          client,
+          "CharacterSelectSessionResponse",
+          {
+            status: 0,
+            sessionId: client.loginSessionId
+          }
+        );
+      });
+      setTimeout(async () => {
+        await this.stop();
+        process.exit(0);
+      }, 30000);
+    } else {
+      this.sendAlertToAll(
+        `Server will shutdown in ${Math.ceil(
+          currentTimeLeft / 1000
+        )} seconds. Reason: ${message}`
+      );
+
+      if (currentTimeLeft / 1000 <= 60) {
+        // block client connections for last minute
+        this.isRebooting = true;
+      }
+
+      setTimeout(
+        () => this.shutdown(timeLeft, message),
+        currentTimeLeft <= 60 * 1000 ? timeLeftMs / 6 : timeLeftMs / 10
+      );
+    }
+  }
+
+  async onZoneLoginEvent(client: Client) {
+    debug("zone login");
+    try {
+      await this.sendInitData(client);
+    } catch (error) {
+      console.log(error);
+      this.sendData<LoginFailed>(client, "LoginFailed", {});
+      if (!this._soloMode) {
+        await this._db.collection(DB_COLLECTIONS.LOGIN_ERRORS).insertOne({
+          error,
+          guid: client.loginSessionId,
+          characterId: client.character.characterId
+        });
+      }
+    }
+    /*this.tasksManager.register(async () => {
+      debug("zone login");
+      try {
+        await this.sendInitData(client);
+      } catch (error) {
+        console.log(error);
+        this.sendData<LoginFailed>(client, "LoginFailed", {});
+        if (!this._soloMode) {
+          await this._db.collection(DB_COLLECTIONS.LOGIN_ERRORS).insertOne({
+            error,
+            guid: client.loginSessionId,
+            characterId: client.character.characterId
+          });
+        }
+      }
+    });*/
+  }
+
+  onZoneDataEvent(client: Client, packet: H1z1ProtocolReadingFormat) {
+    if (!client) {
+      return;
+    }
+    if (
+      packet.name != "Command.ExecuteCommand" &&
+      packet.name != "H1emu.RequestModules" &&
+      packet.name != "KeepAlive" &&
+      packet.name != "PlayerUpdatePosition" &&
+      packet.name != "PlayerUpdateManagedPosition" &&
+      packet.name != "ClientUpdate.MonitorTimeDrift"
+    ) {
+      debug(`Receive Data ${[packet.name]}`);
+    }
+    if (packet.flag === GatewayChannels.UpdatePosition &&
+        packet.data.flags && !packet.data.parseError) {
+      // Empty/invalid updates still reach the handler's clock diagnostics,
+      // but are never forwarded as character movement to other clients.
+      const movingCharacter = this._characters[client.character.characterId];
+      if (movingCharacter) {
+        this.sendRawToAllOthersWithSpawnedCharacter(
+          client,
+          movingCharacter.characterId,
+          this._protocol.createPositionBroadcast2016(
+            packet.data.raw,
+            movingCharacter.transientId
+          )
+        );
+      }
+      /*this.tasksManager.register(async () => {
+        if (!packet.data.flags) return;
+        const movingCharacter = this._characters[client.character.characterId];
+        if (movingCharacter) {
+          this.sendRawToAllOthersWithSpawnedCharacter(
+            client,
+            movingCharacter.characterId,
+            this._protocol.createPositionBroadcast2016(
+              packet.data.raw,
+              movingCharacter.transientId
+            )
+          );
+        }
+      }, true);*/
+    }
+
+    try {
+      this._packetHandlers.processPacket(
+        this,
+        client,
+        packet as ReceivedPacket<any>
+      );
+    } catch (error) {
+      console.error(error);
+      console.error(`An error occurred while processing a packet : `, packet);
+      logVersion();
+    }
+
+    /*this.tasksManager.register(async () => {
+      try {
+        this._packetHandlers.processPacket(
+          this,
+          client,
+          packet as ReceivedPacket<any>
+        );
+      } catch (error) {
+        console.error(error);
+        console.error(`An error occurred while processing a packet : `, packet);
+        logVersion();
+      }
+    });*/
+  }
+
+  async getIsAdmin(loginSessionId: string) {
+    return Boolean(
+      await this._db
+        ?.collection(DB_COLLECTIONS.ADMINS)
+        .findOne({ sessionId: loginSessionId, permissionLevel: { $ne: 0 } })
+    );
+  }
+
+  async onCharacterCreateRequest(client: LZConnectionClient, packet: any) {
+    const { characterObjStringify, reqId } = packet.data;
+    try {
+      const characterData = JSON.parse(characterObjStringify),
+        characterModelData = getCharacterModelData(characterData.payload);
+      let character: FullCharacterSaveData = require("../../../data/2016/sampleData/character.json");
+      character = {
+        ...character,
+        serverId: characterData.serverId,
+        creationDate: toHex(Date.now()),
+        lastLoginDate: toHex(Date.now()),
+        characterId: characterData.characterId,
+        ownerId: characterData.ownerId,
+        characterName: characterData.payload.characterName,
+        actorModelId: characterModelData.modelId,
+        headActor: characterModelData.headActor,
+        hairModel: characterModelData.hairModel,
+        gender: characterData.payload.gender,
+        status: 1,
+        playTime: 0,
+        worldSaveVersion: this.worldSaveVersion
+      };
+      const collection = this._db.collection(DB_COLLECTIONS.CHARACTERS);
+      const charactersArray = await collection.findOne({
+        characterId: character.characterId
+      });
+      if (!charactersArray) {
+        const result = await collection.insertOne(character);
+        if (!result.insertedId || !result.acknowledged) {
+          console.error(result);
+          throw new Error("Failed to insert character into database");
+        }
+      }
+      this._loginConnectionManager.sendData(client, "CharacterCreateReply", {
+        reqId: reqId,
+        status: 1
+      });
+    } catch (error) {
+      console.error(error);
+      this._loginConnectionManager.sendData(client, "CharacterCreateReply", {
+        reqId: reqId,
+        status: 0
+      });
+    }
+  }
+  async onClientIsAdminRequest(client: LZConnectionClient, packet: any) {
+    const { guid, reqId } = packet.data;
+    const isAdmin = await this.getIsAdmin(guid);
+    try {
+      this._loginConnectionManager.sendData(client, "ClientIsAdminReply", {
+        reqId: reqId,
+        status: isAdmin
+      });
+    } catch (error) {
+      console.error(error);
+      this._loginConnectionManager.sendData(client, "ClientIsAdminReply", {
+        reqId: reqId,
+        status: 0
+      });
+    }
+  }
+
+  sendCharacterAllowedReply(
+    client: LZConnectionClient,
+    reqId: number,
+    status: boolean,
+    rejectionFlag?: CONNECTION_REJECTION_FLAGS,
+    message = ""
+  ) {
+    this._loginConnectionManager.sendData(client, "CharacterAllowedReply", {
+      reqId,
+      status: status ? 1 : 0,
+      rejectionFlag,
+      message
+    });
+  }
+
+  async onClientAllowedRequest(client: LZConnectionClient, packet: any) {
+    const { characterId, loginSessionId, reqId } = packet.data;
+    if (this.isRebooting) {
+      console.log(
+        `Character (${characterId}) connection rejected due to reboot`
+      );
+      this.sendCharacterAllowedReply(
+        client,
+        reqId,
+        false,
+        CONNECTION_REJECTION_FLAGS.SERVER_REBOOT
+      );
+      return;
+    }
+
+    if (this.isLocked && !(await this.getIsAdmin(loginSessionId))) {
+      console.log(
+        `Character (${characterId}) connection rejected due to server lock`
+      );
+      this.sendCharacterAllowedReply(
+        client,
+        reqId,
+        false,
+        CONNECTION_REJECTION_FLAGS.SERVER_LOCKED
+      );
+      return;
+    }
+
+    const ban = await this.isClientBanned(loginSessionId, client.address);
+    if (ban) {
+      console.log(
+        `Character (${characterId}) connection rejected due to local ban`
+      );
+
+      const unbanTime = ban.expirationDate
+          ? getDateString(ban.expirationDate)
+          : 0,
+        reason = ban.banReason;
+
+      const reasonString = `You have been ${
+        unbanTime ? "" : "permanently "
+      }banned from the server${
+        unbanTime ? ` until ${unbanTime}` : ""
+      }. Reason: ${reason}.`;
+
+      this.sendCharacterAllowedReply(
+        client,
+        reqId,
+        false,
+        CONNECTION_REJECTION_FLAGS.LOCAL_BAN,
+        reasonString
+      );
+      return;
+    }
+
+    const rejectionFlags = packet.data.rejectionFlags ?? [];
+    try {
+      for (let i = 0; i < rejectionFlags.length; i++) {
+        const rejectionFlag: number = rejectionFlags[i].rejectionFlag;
+        if (
+          this.fairPlayManager.acceptedRejectionTypes.includes(rejectionFlag)
+        ) {
+          if (rejectionFlag === CONNECTION_REJECTION_FLAGS.VPN) {
+            const userIsAllowedToUseVPN = await this._db
+              .collection(DB_COLLECTIONS.VPN_WHITELIST)
+              .findOne({
+                zoneSessionId: loginSessionId
+              });
+            if (userIsAllowedToUseVPN) {
+              continue;
+            }
+          }
+          console.log(
+            `Character (${characterId}) connection rejected due to rejection type ${rejectionFlag}`
+          );
+          this.sendCharacterAllowedReply(client, reqId, false, rejectionFlag);
+          return;
+        }
+      }
+      const collection = this._db.collection(DB_COLLECTIONS.CHARACTERS);
+      const character = await collection.findOne({
+        characterId: characterId,
+        serverId: this._worldId,
+        status: 1
+      });
+      if (!character) {
+        this.sendCharacterAllowedReply(
+          client,
+          reqId,
+          false,
+          CONNECTION_REJECTION_FLAGS.CHARACTER_NOT_FOUND
+        );
+      }
+      this.sendCharacterAllowedReply(client, reqId, true);
+    } catch (error) {
+      console.log(error);
+      this.sendCharacterAllowedReply(
+        client,
+        reqId,
+        false,
+        CONNECTION_REJECTION_FLAGS.ERROR
+      );
+    }
+  }
+
+  getProximityItems(client: Client): ClientUpdateProximateItems {
+    const proximityItems: ClientUpdateProximateItems = { items: [] };
+    let foundation: ConstructionParentEntity | undefined =
+      this._constructionFoundations[client.character.insideBuilding] ??
+      this._constructionSimple[
+        client.character.insideBuilding
+      ]?.getParentFoundation(this);
+
+    for (const object of client.spawnedEntities) {
+      if (object instanceof Plant) continue; // Don't include plants (seeds and crops)
+      if (object instanceof ItemObject) {
+        let yDistance = 1;
+        if (
+          client.character.state.position[1] <
+          object.state.position[1] - 0.5
+        ) {
+          yDistance = 1.8;
+        }
+        if (
+          isPosInRadiusWithY(
+            this.proximityItemsDistance,
+            client.character.state.position,
+            object.state.position,
+            yDistance
+          )
+        ) {
+          if (
+            object.checkBuildingObstruct(
+              this,
+              client.character.state.position,
+              foundation
+            )
+          )
+            continue;
+          const proximityItem = {
+            itemDefinitionId: object.item.itemDefinitionId,
+            associatedCharacterGuid: object.characterId,
+            itemData: {
+              itemDefinitionId: object.item.itemDefinitionId,
+              tintId: 0,
+              guid: object.item.itemGuid,
+              count: object.item.stackCount,
+              itemSubData: {
+                hasSubData: false
+              },
+              unknownBoolean1: true,
+              ownerCharacterId: object.characterId,
+              unknownDword9: 1
+            }
+          };
+          (proximityItems.items as any[]).push(proximityItem);
+        }
+      }
+
+      if (object instanceof LootableConstructionEntity) {
+        // If player is underneath, allow further Y distance
+        let yDistance = 1;
+        if (
+          client.character.state.position[1] <
+          object.state.position[1] - 0.5
+        ) {
+          yDistance = 3;
+        }
+
+        if (
+          isPosInRadiusWithY(
+            2, // radius stays 2
+            client.character.state.position,
+            object.state.position,
+            yDistance // only Y-difference changes
+          ) ||
+          object.mountedCharacter == client.character.characterId
+        ) {
+          if (object.parentObjectCharacterId) {
+            const parent = object.getParent(this);
+            if (
+              parent &&
+              parent.isSecured &&
+              client.character.isHidden != parent.characterId
+            ) {
+              continue;
+            }
+          }
+          const container = object.getContainer();
+          if (container) {
+            Object.values(container.items).forEach((item: BaseItem) => {
+              const proximityItem = {
+                itemDefinitionId: item.itemDefinitionId,
+                associatedCharacterGuid: client.character.characterId,
+                itemData: object.pGetItemData(
+                  this,
+                  item,
+                  container.containerDefinitionId
+                )
+              };
+              (proximityItems.items as any[]).push(proximityItem);
+            });
+          }
+        }
+      }
+
+      if (object instanceof LootableProp) {
+        if (
+          isPosInRadiusWithY(
+            2,
+            client.character.state.position,
+            object.state.position,
+            1
+          ) &&
+          client.searchedProps.includes(object)
+        ) {
+          const container = object.getContainer();
+          if (container) {
+            Object.values(container.items).forEach((item: BaseItem) => {
+              const proximityItem = {
+                itemDefinitionId: item.itemDefinitionId,
+                associatedCharacterGuid: client.character.characterId,
+                itemData: object.pGetItemData(
+                  this,
+                  item,
+                  container.containerDefinitionId
+                )
+              };
+              (proximityItems.items as any[]).push(proximityItem);
+            });
+          }
+        }
+      }
+
+      if (object instanceof Lootbag) {
+        if (
+          isPosInRadiusWithY(
+            2,
+            client.character.state.position,
+            object.state.position,
+            1
+          )
+        ) {
+          const container = object.getContainer();
+          if (container) {
+            Object.values(container.items).forEach((item: BaseItem) => {
+              const proximityItem = {
+                itemDefinitionId: item.itemDefinitionId,
+                associatedCharacterGuid: client.character.characterId,
+                itemData: object.pGetItemData(
+                  this,
+                  item,
+                  container.containerDefinitionId
+                )
+              };
+              (proximityItems.items as any[]).push(proximityItem);
+            });
+          }
+        }
+      }
+    }
+
+    return proximityItems;
+  }
+
+  getCraftingProximityItems(client: Client): ClientUpdateProximateItems {
+    const proximityItems: ClientUpdateProximateItems = { items: [] };
+
+    for (const gridCell of this._grid) {
+      if (
+        !isPosInRadius(
+          client.chunkRenderDistance,
+          gridCell.position,
+          client.character.state.position
+        )
+      )
+        continue;
+
+      for (const object of gridCell.objects) {
+        if (object instanceof ItemObject) {
+          if (
+            isPosInRadiusWithY(
+              this.proximityItemsDistance,
+              client.character.state.position,
+              object.state.position,
+              1
+            )
+          ) {
+            const proximityItem = {
+              itemDefinitionId: object.item.itemDefinitionId,
+              associatedCharacterGuid: object.characterId,
+              itemData: {
+                itemDefinitionId: object.item.itemDefinitionId,
+                tintId: 0,
+                guid: object.item.itemGuid,
+                count: object.item.stackCount,
+                itemSubData: {
+                  hasSubData: false
+                },
+                unknownBoolean1: true,
+                ownerCharacterId: object.characterId,
+                unknownDword9: 1
+              }
+            };
+            (proximityItems.items as any[]).push(proximityItem);
+          }
+        }
+      }
+    }
+    return proximityItems;
+  }
+
+  async fetchCharacterData(client: Client) {
+    if (!this.hookManager.checkHook("OnSendCharacterData", client)) return;
+    if (!(await this.hookManager.checkAsyncHook("OnSendCharacterData", client)))
+      return;
+    let savedCharacter: FullCharacterSaveData;
+    try {
+      savedCharacter = await this.worldDataManager.fetchCharacterData(
+        client.character.characterId
+      );
+    } catch (e) {
+      console.log(e);
+      this.sendData<LoginFailed>(client, "LoginFailed", {});
+      return;
+    }
+    await this.loadCharacterData(
+      client,
+      savedCharacter as FullCharacterSaveData
+    );
+    client.startingPos = client.character.state.position;
+  }
+
+  sendCharacterData(client: Client, accountItems: AccountItem[]) {
+    this.sendData<SendSelfToClient>(
+      client,
+      "SendSelfToClient",
+      client.character.pGetSendSelf(this, client, accountItems)
+    );
+    client.character.initialized = true;
+    this.initializeContainerList(client);
+
+    this._characters[client.character.characterId] = client.character; // character will spawn on other player's screen(s) at this point
+    this.hookManager.checkHook("OnSentCharacterData", client);
+  }
+  /**
+   * Caches item definitons so they aren't packed every time a client logs in.
+   */
+  private packItemDefinitions() {
+    /*
+    this.itemDefinitionsCache = this._protocol.pack("Command.ItemDefinitions", {
+      data: {
+        itemDefinitions: Object.values(this._itemDefinitions).map(
+          (itemDef: any) => {
+            return {
+              ID: itemDef.ID,
+              definitionData: {
+                ...itemDef,
+                HUD_IMAGE_SET_ID: itemDef.IMAGE_SET_ID,
+                ITEM_TYPE_1: itemDef.ITEM_TYPE,
+                flags1: {
+                  ...itemDef,
+                },
+                flags2: {
+                  ...itemDef,
+                },
+                stats: [],
+              },
+            };
+          }
+        ),
+      },
+    });
+    */
+
+    // temp custom logic for items with custom itemDefintion data
+
+    const defs: Array<any> = [];
+    Object.values(this._itemDefinitions).forEach((itemDef: ItemDefinition) => {
+      switch (itemDef.ID) {
+        case Items.FANNY_PACK_DEV:
+        case Items.HEADLIGHTS_ATV:
+        case Items.HEADLIGHTS_OFFROADER:
+        case Items.HEADLIGHTS_PICKUP:
+        case Items.HEADLIGHTS_POLICE:
+        case Items.AIRDROP_CODE:
+          defs.push({
+            ID: itemDef.ID,
+            definitionData: {
+              ...itemDef,
+              HUD_IMAGE_SET_ID: itemDef.IMAGE_SET_ID,
+              ITEM_TYPE_1: itemDef.ITEM_TYPE,
+              flags1: {
+                ...itemDef
+              },
+              flags2: {
+                ...itemDef
+              },
+              stats: []
+            }
+          });
+      }
+      if (itemDef.ID >= 3941 && itemDef.ID < 3959) {
+        // new js base stuff for fun
+        defs.push({
+          ID: itemDef.ID,
+          definitionData: {
+            ...itemDef,
+            HUD_IMAGE_SET_ID: itemDef.IMAGE_SET_ID,
+            ITEM_TYPE_1: itemDef.ITEM_TYPE,
+            flags1: {
+              ...itemDef
+            },
+            flags2: {
+              ...itemDef
+            },
+            stats: []
+          }
+        });
+      }
+    });
+
+    const itemDefinitionsCache = this._protocol.pack(
+      "Command.ItemDefinitions",
+      {
+        data: {
+          itemDefinitions: defs
+        }
+      }
+    );
+    if (!itemDefinitionsCache) return;
+    this.itemDefinitionsCache = itemDefinitionsCache;
+  }
+
+  private packDynamicAppearance() {
+    const dynamicAppearanceCache = this._protocol.pack(
+      "ReferenceData.DynamicAppearance",
+      {
+        ITEM_APPEARANCE_DEFINITIONS:
+          this.dynamicappearance.ITEM_APPEARANCE_DEFINITIONS,
+        SHADER_SEMANTIC_DEFINITIONS:
+          this.dynamicappearance.SHADER_SEMANTIC_DEFINITIONS,
+        SHADER_PARAMETER_DEFINITIONS:
+          this.dynamicappearance.SHADER_PARAMETER_DEFINITIONS
+      }
+    );
+    if (!dynamicAppearanceCache) return;
+    this.dynamicAppearanceCache = dynamicAppearanceCache;
+  }
+  /**
+   * Caches weapon definitons so they aren't packed every time a client logs in.
+   */
+  private packWeaponDefinitions() {
+    const weaponDefinitionsCache = this._protocol.pack(
+      "ReferenceData.WeaponDefinitions",
+      {
+        data: {
+          definitionsData: {
+            WEAPON_DEFINITIONS: Object.values(
+              weaponDefinitions.WEAPON_DEFINITIONS
+            ),
+            FIRE_GROUP_DEFINITIONS: Object.values(
+              weaponDefinitions.FIRE_GROUP_DEFINITIONS
+            ),
+            FIRE_MODE_DEFINITIONS: Object.values(
+              weaponDefinitions.FIRE_MODE_DEFINITIONS
+            ),
+            PLAYER_STATE_GROUP_DEFINITIONS: Object.values(
+              weaponDefinitions.PLAYER_STATE_GROUP_DEFINITIONS
+            ),
+            FIRE_MODE_PROJECTILE_MAPPING_DATA: Object.values(
+              weaponDefinitions.FIRE_MODE_PROJECTILE_MAPPING_DATA
+            ),
+            AIM_ASSIST_DEFINITIONS: Object.values(
+              weaponDefinitions.AIM_ASSIST_DEFINITIONS
+            )
+          }
+        }
+      }
+    );
+    if (!weaponDefinitionsCache) return;
+    this.weaponDefinitionsCache = weaponDefinitionsCache;
+  }
+
+  /**
+   * Caches projectile definitons so they aren't packed every time a client logs in.
+   */
+  private packProjectileDefinitions() {
+    const projectileDefinitionsCache = this._protocol.pack(
+      "ReferenceData.ProjectileDefinitions",
+      {
+        definitionsData: projectileDefinitons
+      }
+    );
+
+    if (!projectileDefinitionsCache) return;
+    this.projectileDefinitionsCache = projectileDefinitionsCache;
+  }
+
+  /**
+   * Caches profile definitons so they aren't packed every time a client logs in.
+   */
+  private packProfileDefinitions() {
+    const profileDefinitionsCache = this._protocol.pack(
+      "ReferenceData.ProfileDefinitions",
+      profileDefinitions
+    );
+
+    if (!profileDefinitionsCache) return;
+    this.profileDefinitionsCache = profileDefinitionsCache;
+  }
+
+  /**
+   * Caches itemClass definitons so they aren't packed every time a client logs in.
+   */
+  private packitemClassDefinitions() {
+    const itemClassDefinitionsCache = this._protocol.pack(
+      "ReferenceData.ItemClassDefinitions",
+      {
+        ITEMCLASS_DEFINITIONS: Object.values(itemClassDefinitions).map(
+          (itemClassDefinition: any) => {
+            return {
+              ID: itemClassDefinition.ID,
+              ITEMCLASS_DATA: {
+                ...itemClassDefinition
+              }
+            };
+          }
+        )
+      }
+    );
+
+    if (!itemClassDefinitionsCache) return;
+    this.itemClassDefinitionsCache = itemClassDefinitionsCache;
+  }
+
+  private async initializeLoginServerConnection() {
+    debug("Starting H1emuZoneServer");
+    if (!this._loginServerInfo.address) {
+      await this.fetchLoginInfo();
+    }
+    this._loginConnectionManager.setLoginInfo(this._loginServerInfo, {
+      serverId: this._worldId,
+      h1emuVersion: process.env.H1Z1_SERVER_VERSION || "unknown",
+      gameMode: Number(this.gameMode),
+      serverRuleSets: this.serverGameRules
+    });
+    this._loginConnectionManager.start();
+    await this._db
+      ?.collection(DB_COLLECTIONS.SERVERS)
+      .findOneAndUpdate(
+        { serverId: this._worldId },
+        { $set: { populationNumber: 0, populationLevel: 0 } }
+      );
+  }
+
+  async loadCharacterData(
+    client: Client,
+    savedCharacter: FullCharacterSaveData
+  ) {
+    if (!this.hookManager.checkHook("OnLoadCharacterData", client)) return;
+    if (!(await this.hookManager.checkAsyncHook("OnLoadCharacterData", client)))
+      return;
+    if (savedCharacter.characterName == undefined) {
+      console.log(
+        `ERROR: Undefined character name found for client ${client.loginSessionId}`
+      );
+      savedCharacter.characterName =
+        "CharacterNameError" + savedCharacter.characterId.slice(-5);
+    }
+    client.guid = savedCharacter.ownerId;
+    client.character.name = savedCharacter.characterName;
+    client.character.actorModelId = savedCharacter.actorModelId;
+    client.character.headActor = savedCharacter.headActor;
+    client.character.isRespawning = savedCharacter.isRespawning;
+    client.character.gender = savedCharacter.gender;
+    client.character.creationDate = savedCharacter.creationDate;
+    client.character.lastLoginDate = savedCharacter.lastLoginDate;
+    client.character.hairModel = savedCharacter.hairModel || "";
+    client.character.spawnGridData = savedCharacter.spawnGridData;
+    client.character.mutedCharacters = savedCharacter.mutedCharacters || [];
+    client.character.metrics = savedCharacter.metrics || {};
+    client.character.groupId =
+      (await this.groupManager.getGroupId(this, client)) ?? 0;
+    client.character.playTime = savedCharacter.playTime || 0;
+    client.character.lastDropPlaytime = savedCharacter.lastDropPlayTime || 0;
+
+    let newCharacter = false;
+    if (_.isEqual(savedCharacter.position, [0, 0, 0, 1])) {
+      // if position hasn't changed
+      newCharacter = true;
+    }
+    // https://github.com/QuentinGruber/h1z1-server/issues/2117
+    if (savedCharacter.position.length < 4) {
+      newCharacter = true;
+      setTimeout(() => {
+        this.sendAlert(
+          client,
+          "You've been respawned due to lost position data"
+        );
+      }, 30000);
+    }
+
+    if (
+      newCharacter ||
+      client.character.isRespawning ||
+      !this.enableWorldSaves
+    ) {
+      client.character.isRespawning = true;
+      const pos = this.calculatePosFromSpawnCell(
+        this._spawnGrid[randomIntFromInterval(0, 99)]
+      );
+      this.respawnPlayer(client, pos, false);
+    } else {
+      client.character.state.position = new Float32Array(
+        savedCharacter.position
+      );
+      client.character.state.rotation = new Float32Array(
+        savedCharacter.rotation
+      );
+      constructLoadout(savedCharacter._loadout, client.character._loadout);
+      constructContainers(
+        savedCharacter._containers,
+        client.character._containers
+      );
+      client.character._resources =
+        savedCharacter._resources || client.character._resources;
+      client.character.generateEquipmentFromLoadout(this);
+    }
+
+    this.hookManager.checkHook("OnLoadedCharacterData", client);
+  }
+
+  private async setupServer() {
+    if (process.env.DISABLE_NAV) {
+      console.log("[Nav] DISABLE_NAV=1：不加载 navmesh，仅直线追人+发包测试，避免 recast 导致卡死");
+    } else {
+      try {
+        await this.navManager.loadNav();
+      } catch (e) {
+        console.error(
+          "[Nav] 官方级僵尸寻路需要 z1.bin。请将 data/2016/navData/z1.bin 放置到位（参见 data/2016/navData/README.md 或使用 scripts/build-z1-nav 生成）。当前错误:",
+          (e as Error).message
+        );
+        // 无 z1.bin 时僵尸仍会移动（直线追击），但行为与有 nav 时不一致，需 z1.bin 才能按导航复现
+      }
+    }
+    this.weatherManager.init();
+    this.playTimeManager.init(this);
+    this.initModelsDataSource();
+    this.worldDataManager = (await spawn(
+      new Worker("./managers/worlddatamanagerthread")
+    )) as unknown as WorldDataManagerThreaded;
+    await this.worldDataManager.initialize(this._worldId, this._mongoAddress);
+    if (!this._soloMode) {
+      [this._db, this._mongoClient] = await WorldDataManager.getDatabase(
+        this._mongoAddress
+      );
+    }
+    let isANewWorld: boolean = true;
+    if (this.enableWorldSaves) {
+      const loadedWorld = await this.worldDataManager.getServerData(
+        this._worldId
+      );
+      if (loadedWorld != null) {
+        isANewWorld = false;
+        if (loadedWorld.lastItemGuid) {
+          this.lastItemGuid = BigInt(loadedWorld.lastItemGuid);
+        }
+        if (loadedWorld.worldSaveVersion !== this.worldSaveVersion) {
+          console.log(
+            `World save version mismatch, deleting world data. Current: ${this.worldSaveVersion} Old: ${loadedWorld.worldSaveVersion}`
+          );
+          await this.worldDataManager.deleteWorld();
+          await this.worldDataManager.insertWorld(
+            BigInt(loadedWorld.lastItemGuid)
+          );
+        }
+      } else {
+        await this.worldDataManager.insertWorld(this.lastItemGuid);
+      }
+      console.time("fetch world data");
+      const fetchedWorldData =
+        (await this.worldDataManager.fetchWorldData()) as FetchedWorldData;
+      WorldDataManager.loadConstructionParentEntities(
+        fetchedWorldData.constructionParents,
+        this
+      );
+      fetchedWorldData.freeplace.forEach((entityData) => {
+        WorldDataManager.loadLootableConstructionEntity(this, entityData, true);
+      });
+      fetchedWorldData.crops.forEach((entityData) => {
+        WorldDataManager.loadPlantingDiameter(this, entityData);
+      });
+      fetchedWorldData.traps.forEach((entityData) => {
+        WorldDataManager.loadTraps(this, entityData);
+      });
+      fetchedWorldData.vehicles.forEach((entityData) => {
+        WorldDataManager.loadVehicles(this, entityData);
+      });
+      console.timeEnd("fetch world data");
+    }
+
+    if (isANewWorld) {
+      // Looks like there's no player spawned objects on the map, so we can assume an object can be spawned
+      const stash = this.constructionManager.placeStashEntity(
+        this,
+        1697,
+        9248,
+        new Float32Array([481.47, 109.86, 2848.61, 1]),
+        new Float32Array([0, 2.49, 0, 0]),
+        new Float32Array([1, 1, 1, 1]),
+        ""
+      );
+      stash.lootItem(this, this.generateItem(Items.WEAPON_AR15, 1, true)); // A gift from Legends
+      stash.lootItem(this, this.generateItem(Items.CANDLE, 1, true)); // A gift from Jason - We've discussed the Crossbow so many times, but with storage limits its not possible to put here so I'll burn a candle for you, for sure.
+      stash.lootItem(this, this.generateItem(Items.WATER_PURE, 1, true)); // A gift from TaxMax
+      stash.lootItem(this, this.generateItem(Items.WEAPON_308, 1, true)); // A gift from Ghost
+      stash.lootItem(this, this.generateItem(Items.WEAPON_AK47, 1, true)); // A gift from Doggo
+      stash.lootItem(this, this.generateItem(Items.GROUND_TILLER, 1, true)); // A gift from Meme - He found out that people were using ground tillers to float decks in the air, we discussed this issue in DMs. RIP, friend.
+    }
+
+    if (!this._soloMode) {
+      await this.initializeLoginServerConnection();
+    }
+
+    // !!ANYTHING THAT USES / GENERATES ITEMS MUST BE CALLED AFTER WORLD DATA IS LOADED!!
+
+    //this.packItemDefinitions(); // No longer necessary, we'll see if only sending the required items will impact server performance
+    this.packWeaponDefinitions();
+    this.packProjectileDefinitions();
+    this.packProfileDefinitions();
+    this.packitemClassDefinitions();
+    this.packDynamicAppearance();
+    this.worldObjectManager.createDoors(this);
+    this.worldObjectManager.createProps(this);
+
+    await this.pluginManager.initializePlugins(this);
+
+    this.customizeStaticDTOs();
+
+    /*this.tasksManager.register_schedule(
+      this.worldRoutine.bind(this),
+      this.worldRoutineRate
+    );
+
+    this.tasksManager.register_schedule(
+      this.clientRoutineLoop.bind(this),
+      this.clientRoutineRate
+    );*/
+
+    this._ready = true;
+    console.log(
+      `Server saving ${this.enableWorldSaves ? "enabled" : "disabled"}.`
+    );
+    debug("Server ready");
+  }
+
+  async saveWorld() {
+    if (this._isSaving) {
+      this.sendChatTextToAdmins("A save is already in progress.");
+      return;
+    }
+    this.sendChatTextToAdmins("World save started.");
+    this._isSaving = true;
+    console.time("ZONE: processing");
+    try {
+      const characters = WorldDataManager.convertCharactersToSaveData(
+        Object.values(this._characters),
+        this._worldId
+      );
+      const vehicles = WorldDataManager.convertVehiclesToSaveData(
+        Object.values(this._vehicles),
+        this._worldId
+      );
+      const worldConstructions: LootableConstructionSaveData[] = [];
+      Object.values(this._worldLootableConstruction).forEach((entity) => {
+        if (
+          entity.parentObjectCharacterId == this._serverGuid ||
+          entity instanceof WaterSource ||
+          (entity instanceof TrapEntity && entity?.worldOwned)
+        )
+          return; // Don't save world spawned campfires / barbeques
+        const lootableConstructionSaveData =
+          WorldDataManager.getLootableConstructionSaveData(
+            entity,
+            this._worldId
+          );
+        removeUntransferableFields(lootableConstructionSaveData);
+        worldConstructions.push(lootableConstructionSaveData);
+      });
+      const constructions: ConstructionParentSaveData[] = [];
+
+      Object.values(this._constructionFoundations).forEach((entity) => {
+        if (entity.itemDefinitionId != Items.FOUNDATION_EXPANSION) {
+          const construction = WorldDataManager.getConstructionParentSaveData(
+            entity,
+            this._worldId
+          );
+          // isTransferable(construction) too complex will run on max recursive call error
+          constructions.push(construction);
+        }
+      });
+      const crops: PlantingDiameterSaveData[] = [];
+      Object.values(this._temporaryObjects).forEach((entity) => {
+        if (entity instanceof PlantingDiameter) {
+          crops.push(
+            WorldDataManager.getPlantingDiameterSaveData(entity, this._worldId)
+          );
+        }
+      });
+      const traps: TrapSaveData[] = [];
+      Object.values(this._traps).forEach((entity) => {
+        if (entity instanceof TrapEntity && !entity.worldOwned) {
+          traps.push(WorldDataManager.getTrapSaveData(entity, this._worldId));
+        }
+      });
+      Object.values(this._explosives).forEach((entity) => {
+        if (entity instanceof ExplosiveEntity && entity.isLandmine()) {
+          traps.push(WorldDataManager.getTrapSaveData(entity, this._worldId));
+        }
+      });
+
+      console.timeEnd("ZONE: processing");
+
+      await this.worldDataManager.saveWorld({
+        lastGuidItem: this.lastItemGuid,
+        characters,
+        worldConstructions,
+        crops,
+        traps,
+        constructions,
+        vehicles
+      });
+      setTimeout(() => {
+        this._isSaving = false;
+      }, 10000);
+      this.sendChatTextToAdmins("World saved!");
+      this.nextSaveTime = Date.now() + this.saveTimeInterval;
+      debug("World saved!");
+    } catch (e) {
+      console.error(e);
+      this.worldSaveFailed = true;
+      this.sendAlertToAll("World save failed!");
+      this.shutdown(20, "World saving failed, rollback");
+    }
+  }
+
+  executeRconCommand(ws: WebSocket, payload: string) {
+    payload = payload.replaceAll("/", "");
+    const splitMessage = payload.split(" ");
+    const commandName = splitMessage[0];
+    console.log(`[RCON]Execute command "${commandName}"`);
+    const commandHash: number = flhash(commandName.toUpperCase());
+    const args: string = payload.replace(commandName, "").trim();
+    // TODO: add loginSessionId from the user
+    const fakeClient = this.createClient(0, "", "", "", 0);
+    // Admin rights for the Rcon client but we should add that as an option in the config
+    // TODO: permissionLevel should be the same as the user who use the rcon
+    fakeClient.permissionLevel = 2;
+    this.commandHandler.executeCommand(this, fakeClient, {
+      name: "Command.ExecuteCommand",
+      data: { commandHash, arguments: args }
+    });
+  }
+
+  handleRconMessage(ws: WebSocket, message: RconMessage) {
+    try {
+      this.rconManager.broadcastLog(
+        `Rcon message type ${message.type} payload: ${message.payload} `
+      );
+      switch (message.type) {
+        case RconMessageType.ExecCommand:
+          if (typeof message.payload === "string") {
+            this.executeRconCommand(ws, message.payload);
+            ws.send(
+              this.rconManager.createMessage(
+                RconMessageType.DisplayUserMessage,
+                "Command executed successfully!"
+              )
+            );
+          }
+      }
+    } catch (e) {
+      console.error(`Rcon message failed for ${ws.url}`);
+      console.error(e);
+    }
+  }
+
+  startH1emuAi() {
+    setInterval(() => {
+      try {
+        if (process.env.ENABLE_AI_TIME_LOGS) {
+          const start = performance.now();
+          this.aiManager.run();
+          const end = performance.now();
+          const duration = end - start;
+          if (duration >= 1) {
+            console.log(
+              `H1emu-ai took ${duration}ms with ${this.aiManager.getEntitiesTotalNumber()} entities`
+            );
+          }
+          console.log(this.aiManager.getEntitiesStats());
+        } else {
+          this.aiManager.run();
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }, 100);
+  }
+
+  async start(): Promise<void> {
+    debug("Starting server");
+    debug(`Protocol used : ${this._protocol.protocolName}`);
+    if (this._devHttpPort > 0 && !this._devHttpServer) {
+      this._devHttpServer = new DevHttpServer(this, this._devHttpPort);
+      this._devHttpServer.start();
+    }
+    if (!this.hookManager.checkHook("OnServerInit")) return;
+    if (!(await this.hookManager.checkAsyncHook("OnServerInit"))) return;
+
+    await this.setupServer();
+    if (this.isPvE) {
+      console.log("Server in PvE mode");
+    }
+    this.fairPlayManager.decryptFairPlayValues();
+    this._spawnGrid = this.divideMapIntoSpawnGrid(7448, 7448, 744);
+    if (this.isSurvival()) {
+      this.speedtreeManager.initiateList();
+    }
+    this.startRoutinesLoop();
+    if (this.isSurvival()) {
+      this.smeltingManager.checkSmeltables(this);
+      this.smeltingManager.checkCollectors(this);
+      this.decayManager.run(this);
+    }
+    this._serverStartTime = getCurrentServerTimeWrapper();
+    this.weatherManager.startWeatherWorker(this);
+    this.inGameTimeManager.start();
+    if (this.isSurvival()) {
+      this.randomEventsManager.start();
+    }
+    if (!this._soloMode) {
+      this.accountInventoriesManager.init(
+        this._db.collection(DB_COLLECTIONS.ACCOUNT_ITEMS)
+      );
+      this.challengeManager.init(
+        this._db.collection(DB_COLLECTIONS.CHALLENGES)
+      );
+    }
+    this._gatewayServer.start();
+    this.worldRoutineTimer = setTimeout(
+      () => this.worldRoutine.bind(this)(),
+      this.worldRoutineRate
+    );
+    this.initHudIndicatorDataSource();
+    this.initScreenEffectDataSource();
+    this.initClientEffectsDataSource();
+    this.initUseOptionsDataSource();
+    this.rconManager.start();
+    this.rconManager.on("message", this.handleRconMessage.bind(this));
+    if (this.isSurvival()) {
+      this.rewardManager.start();
+    }
+    this.hookManager.checkHook("OnServerReady");
+    if (!process.env.DISABLE_AI) {
+      this.startH1emuAi();
+    }
+    // 心跳：每 5s 打一次；若僵尸/AI 代码阻塞主线程，心跳会停，可证实「服务器卡死」
+    setInterval(() => {
+      console.log("[zone-heartbeat]", new Date().toISOString());
+    }, 5000);
+    this.challengePositionCheckInterval = setInterval(
+      () => this.checkPlayersPositionsChallenges(),
+      30_000
+    );
+  }
+
+  async sendInitData(client: Client) {
+    // Load character before sending sendSelf, as we need to send item definitions for the inventory to the client first. This is the same behaviour as Z1BR
+    await this.fetchCharacterData(client);
+
+    // This packet is only necessary for transitioning between different zones.
+    // KOTK / Z1BR handle it this way because the main menu is also considered a zone, which is not the case in JS.
+    /*this.sendData<ClientBeginZoning>(client, "ClientBeginZoning", {
+      position: client.character.state.position,
+      rotation: client.character.state.rotation,
+      skyData: this.weatherManager.weather
+    });*/
+
+    const { environment, sku } = this.isBattleRoyale()
+      ? { environment: "LIVE_KOTK", sku: "SKU_Is_KotK" }
+      : { environment: "LIVE", sku: "SKU_Is_JustSurvive" };
+
+    this.sendData<InitializationParameters>(
+      client,
+      "InitializationParameters",
+      {
+        ENVIRONMENT: environment, // LOCAL, MAIN, QA, TEST, STAGE, LIVE, //THE_NINE, INNOVA
+        unknownString1: sku, //JS.Environment
+        rulesetDefinitions: Object.values(gameRulesSource).map(
+          (gameRule: any) => {
+            return {
+              RULESET_ID: gameRule.ID,
+              RULESET_ID_: gameRule.ID,
+              ruleset: gameRule.RULESET,
+              rulesets: Object.values(gameRule?.RULESETS || []).map(
+                (ruleSet: any) => {
+                  return {
+                    ID: ruleSet.ID,
+                    DATA: {
+                      ...ruleSet
+                    }
+                  };
+                }
+              )
+            };
+          }
+        )
+      }
+    );
+
+    this.sendData<SendZoneDetails>(client, "SendZoneDetails", {
+      zoneName: "Z1",
+      zoneType: 4,
+      unknownBoolean1: false,
+      skyData: this.weatherManager.weather,
+      zoneId1: 5,
+      geometryId: 5,
+      nameId: 7699,
+      unknownBoolean2: true,
+      lighting: "Lighting_JustSurvive.txt",
+      isInvitational: false
+    });
+
+    this.sendData<ClientGameSettings>(client, "ClientGameSettings", {
+      interactionCheckRadius: 16, // need it high for tampers
+      unknownBoolean1: true,
+      timescale: 1.0,
+      enableWeapons: 1, // no longer seems to do anything, used to disable weapons from working
+      Unknown5: 1,
+      unknownFloat1: 0.0,
+      fallDamageVelocityThreshold: 15,
+      fallDamageVelocityMultiplier: 11
+    });
+
+    // Item definitions are only required if custom icons for items or entirely custom items are needed.
+    // This could be an interesting feature to implement in a plugin.
+    /*const inventoryItemIds = client.character
+      .pGetInventoryItems(this)
+      .map((it) => it.itemDefinitionId);
+    if (inventoryItemIds) {
+      this.sendData(client, "Command.ItemDefinitions", {
+        data: {
+          itemDefinitions: Object.values(this._itemDefinitions)
+            .filter(
+              (item) =>
+                inventoryItemIds.includes(item.ID) &&
+                !["Foundation", "ConstructionSocketBound"].includes(
+                  item.CODE_FACTORY_NAME
+                )
+            ) // Filter out construction items that aren't freeplace, because they will be handled as freeplace objects if you do. My guess is that this packet structure isn't 100% correct yet. - Jason
+            .map((itemDef) => {
+              return {
+                ID: itemDef.ID,
+                definitionData: {
+                  ...itemDef,
+                  HUD_IMAGE_SET_ID: itemDef.IMAGE_SET_ID,
+                  ITEM_TYPE_1: itemDef.ITEM_TYPE,
+                  flags1: {
+                    ...itemDef
+                  },
+                  flags2: {
+                    ...itemDef
+                  },
+                  stats: []
+                }
+              };
+            })
+        }
+      });
+    }*/
+    if (!this.weaponDefinitionsCache) {
+      this.packWeaponDefinitions();
+    }
+    if (this.weaponDefinitionsCache) {
+      this.sendRawDataReliable(client, this.weaponDefinitionsCache);
+    }
+
+    // Initially, send only the skin tones to ensure the character displays the correct skin tone.
+    this.sendData(client, "ReferenceData.DynamicAppearance", {
+      ITEM_APPEARANCE_DEFINITIONS: [],
+      SHADER_SEMANTIC_DEFINITIONS: [],
+      SHADER_PARAMETER_DEFINITIONS:
+        this.dynamicappearance.SHADER_PARAMETER_DEFINITIONS.filter((def) =>
+          [125, 129, 122].includes(def?.ID)
+        )
+    });
+
+    const accountItems = await this.accountInventoriesManager.getAccountItems(
+      client.loginSessionId
+    );
+
+    this.sendCharacterData(client, accountItems);
+
+    // Now we can send all the rest of the data while the player is at the loading screen.
+    // This ensures the player doesn't have to wait on the loading screen after clicking 'join', as this packet is large.
+    // Z1BR resolved this issue by using LZ4 to compress this block. We can easily add this in the patch, but we'll implement it if users start experiencing network issues.
+    // FYI: This was tested with 40 players on my server without any issues. - Jason
+    if (!this.dynamicAppearanceCache) {
+      this.packDynamicAppearance();
+    }
+    if (this.dynamicAppearanceCache) {
+      this.sendRawDataReliable(client, this.dynamicAppearanceCache);
+    }
+  }
+
+  private divideMapIntoSpawnGrid(
+    mapWidth: number,
+    mapHeight: number,
+    gridCellSize: number
+  ) {
+    const grid = [];
+    for (
+      let i = -mapWidth / 2 + gridCellSize / 2;
+      i < mapWidth / 2;
+      i += gridCellSize
+    ) {
+      for (
+        let j = mapHeight / 2 - gridCellSize / 2;
+        j > -mapHeight / 2;
+        j -= gridCellSize
+      ) {
+        const cell = new SpawnCell(i, j, gridCellSize, gridCellSize);
+        spawnLocations2.forEach((location: number[]) => {
+          if (!location) return;
+          if (
+            location[0] >= cell.position[0] - cell.width / 2 &&
+            location[0] <= cell.position[0] + cell.width / 2 &&
+            location[2] >= cell.position[2] - cell.height / 2 &&
+            location[2] <= cell.position[2] + cell.height / 2
+          ) {
+            cell.spawnPoints.push(new Float32Array(location));
+          }
+        });
+        grid.push(cell);
+      }
+    }
+    return grid.reverse();
+  }
+
+  private divideMapIntoGrid(
+    mapWidth: number,
+    mapHeight: number,
+    gridCellSize: number
+  ) {
+    const grid = [];
+    for (let i = -mapWidth / 2; i < mapWidth / 2; i += gridCellSize) {
+      for (let j = -mapHeight / 2; j < mapHeight / 2; j += gridCellSize) {
+        const cell = new GridCell(i, j, gridCellSize, gridCellSize);
+        grid.push(cell);
+      }
+    }
+    return grid;
+  }
+
+  divideLargeCells(threshold: number) {
+    const grid = this._grid;
+    for (let i = 0; i < grid.length; i++) {
+      const gridCell: GridCell = grid[i];
+      if (gridCell.height < 250) continue;
+      if (gridCell.objects.length > threshold) {
+        const newGridCellWidth = gridCell.width / 2;
+        const newGridCellHeight = gridCell.height / 2;
+        // 4 cells made of 1
+        const newGridCell1 = new GridCell(
+          gridCell.position[0],
+          gridCell.position[2],
+          newGridCellWidth,
+          newGridCellHeight
+        );
+        const newGridCell2 = new GridCell(
+          gridCell.position[0] + newGridCellWidth,
+          gridCell.position[2],
+          newGridCellWidth,
+          newGridCellHeight
+        );
+        const newGridCell3 = new GridCell(
+          gridCell.position[0],
+          gridCell.position[2] + newGridCellHeight,
+          newGridCellWidth,
+          newGridCellHeight
+        );
+        const newGridCell4 = new GridCell(
+          gridCell.position[0] + newGridCellWidth,
+          gridCell.position[2] + newGridCellHeight,
+          newGridCellWidth,
+          newGridCellHeight
+        );
+        // remove old grid cell
+        const objects = this._grid[i].objects;
+        this._grid.splice(i, 1);
+        i--;
+
+        this._grid.push(newGridCell1);
+        this._grid.push(newGridCell2);
+        this._grid.push(newGridCell3);
+        this._grid.push(newGridCell4);
+        objects.forEach((object: BaseEntity) => {
+          this.pushToGridCell(object);
+        });
+      }
+    }
+  }
+
+  pushToGridCell(obj: BaseEntity) {
+    if (this._grid.length == 0)
+      this._grid = this.divideMapIntoGrid(8196, 8196, 250);
+    if (
+      obj instanceof Vehicle ||
+      obj instanceof Character ||
+      obj instanceof ProjectileEntity //||
+      //(obj instanceof ConstructionChildEntity && !obj.getParent(this)) ||
+      //(obj instanceof LootableConstructionEntity && !obj.getParent(this))
+    ) {
+      // dont push objects that can change its position
+      return;
+    }
+    for (let i = 0; i < this._grid.length; i++) {
+      const gridCell = this._grid[i];
+      if (
+        obj.state.position[0] >= gridCell.position[0] &&
+        obj.state.position[0] <= gridCell.position[0] + gridCell.width &&
+        obj.state.position[2] >= gridCell.position[2] &&
+        obj.state.position[2] <= gridCell.position[2] + gridCell.height
+      ) {
+        if (gridCell.objects.includes(obj)) {
+          return;
+        }
+        gridCell.objects.push(obj);
+      }
+    }
+  }
+
+  assignChunkRenderDistance(client: Client) {
+    let lowerRenderDistance = false;
+    const character = client.character;
+    for (let i = 0; i < this._grid.length; i++) {
+      const gridCell: GridCell = this._grid[i];
+
+      if (
+        character.state.position[0] >= gridCell.position[0] &&
+        character.state.position[0] <= gridCell.position[0] + gridCell.width &&
+        character.state.position[2] >= gridCell.position[2] &&
+        character.state.position[2] <= gridCell.position[2] + gridCell.height &&
+        gridCell.height < 250
+      ) {
+        lowerRenderDistance = true;
+      }
+    }
+    client.chunkRenderDistance = lowerRenderDistance ? 600 : 700;
+  }
+
+  private async worldRoutine() {
+    if (!this.hookManager.checkHook("OnWorldRoutine")) return;
+    else {
+      if (this._ready) {
+        this.constructionManager.plantManager(this);
+        await scheduler.yield();
+        this.worldObjectManager.run(this);
+        await scheduler.yield();
+        this.checkVehiclesInMapBounds();
+        await scheduler.yield();
+        this.updateSyncTeleport();
+        await scheduler.yield();
+        this.setTickRate();
+        await scheduler.yield();
+        this.updateSpectatorMap();
+        if (
+          this.enableWorldSaves &&
+          !this.isSaving &&
+          this.nextSaveTime - Date.now() < 0
+        ) {
+          this.saveWorld();
+        }
+      }
+    }
+    this.worldRoutineTimer.refresh();
+  }
+
+  setTickRate() {
+    const size = _.size(this._clients);
+    if (size <= 0) {
+      this.tickRate = 3000;
+      return;
+    }
+    this.tickRate = 3000 / size;
+  }
+
+  async deleteClient(client: Client) {
+    this.hookManager.checkHook("OnPlayerDisconnected", client);
+    if (!client) {
+      this.setTickRate();
+      return;
+    }
+    const testZombieId = (this as any)._testZombieBySessionId?.[client.sessionId];
+    if (testZombieId && this._npcs[testZombieId]) {
+      const testZombie = this._npcs[testZombieId];
+      if (this.navManager?.crowd && testZombie.navAgent) {
+        try {
+          this.navManager.crowd.removeAgent(testZombie.navAgent);
+        } catch (e) {
+          console.error("[deleteClient] 移除测试僵尸 navAgent 失败:", e);
+        }
+      }
+      this.deleteEntity(testZombieId, this._npcs);
+      delete (this as any)._testZombieBySessionId[client.sessionId];
+    }
+    const speciesProbeId = this._testSpeciesProbeNpcCharacterId;
+    if (speciesProbeId && this._npcs[speciesProbeId]) {
+      this.stopTestSpeciesProbeMovement();
+      this.deleteEntity(speciesProbeId, this._npcs);
+      this._testSpeciesProbeNpcCharacterId = null;
+    }
+    if (client.afkTimer) {
+      clearInterval(client.afkTimer);
+    }
+
+    if (client.assetIntegrityKickTimer) {
+      clearTimeout(client.assetIntegrityKickTimer);
+    }
+
+    if (client.character) {
+      client.isLoading = true; // stop anything from acting on character
+      this.aiManager.removeEntity(client.character);
+      // "shift" time played prior to logging out
+      client.character.metrics.startedSurvivingTP +=
+        Date.now() - Number(client.character.lastLoginDate);
+
+      clearTimeout(client.character?.resourcesUpdater);
+      try {
+        const characterSave = WorldDataManager.convertToCharacterSaveData(
+          client.character,
+          this._worldId
+        );
+        if (this.enableWorldSaves) {
+          if (this._soloMode) {
+            await this.saveWorld();
+          } else {
+            await this.worldDataManager.saveCharacterData(
+              characterSave,
+              this.lastItemGuid
+            );
+          }
+        }
+      } catch (e) {
+        console.error("Failed to save a character");
+        console.error(e);
+      }
+      this.dismountVehicle(client);
+      client.managedObjects?.forEach((characterId: string) => {
+        this.dropVehicleManager(client, characterId);
+      });
+      this.deleteEntity(client.character.characterId, this._characters);
+
+      if (!this._soloMode) {
+        this.groupManager.handlePlayerDisconnect(this, client);
+      }
+    }
+    delete this._clients[client.sessionId];
+    this._gatewayServer.deleteSoeClient(client.soeClientId);
+    if (!this._soloMode) {
+      this.sendZonePopulationUpdate();
+    }
+    this.setTickRate();
+    this.airdropManager.sendDeliveryStatus();
+  }
+
+  async generateDamageRecord(
+    targetCharacterId: string,
+    damageInfo: DamageInfo,
+    oldHealth: number
+  ): Promise<DamageRecord> {
+    const targetEntity = this.getEntity(targetCharacterId),
+      sourceEntity = this.getEntity(damageInfo.entity),
+      targetClient = this.getClientByCharId(targetCharacterId),
+      sourceClient = this.getClientByCharId(damageInfo.entity);
+
+    let sourceName = damageInfo.entity,
+      sourcePing = 0,
+      targetName = "Generic",
+      targetPing = 0;
+    if (sourceClient && !targetClient) {
+      sourceName = sourceClient.character.name || "Unknown";
+      const sourceSOEClientAvgPing = this._gatewayServer.getSoeClientAvgPing(
+        sourceClient.soeClientId
+      );
+      sourcePing = sourceSOEClientAvgPing ?? 0;
+    } else if (!sourceClient && targetClient) {
+      targetName = targetClient.character.name || "Unknown";
+      const targetSOEClientAvgPing = this._gatewayServer.getSoeClientAvgPing(
+        targetClient.soeClientId
+      );
+      targetPing = targetSOEClientAvgPing ?? 0;
+    } else if (sourceClient && targetClient) {
+      const sourceSOEClientAvgPing = this._gatewayServer.getSoeClientAvgPing(
+        sourceClient.soeClientId
+      );
+      const targetSOEClientAvgPing = this._gatewayServer.getSoeClientAvgPing(
+        targetClient.soeClientId
+      );
+      sourcePing = sourceSOEClientAvgPing ?? 0;
+      sourceName = sourceClient.character.name || "Unknown";
+      targetName = targetClient.character.name || "Unknown";
+      targetPing = targetSOEClientAvgPing ?? 0;
+    }
+    return {
+      source: {
+        name: sourceName,
+        ping: sourcePing
+      },
+      target: {
+        name: targetName,
+        ping: targetPing
+      },
+      hitInfo: {
+        timestamp: Date.now(),
+        weapon: damageInfo.weapon,
+        distance:
+          sourceEntity && targetEntity
+            ? getDistance(
+                sourceEntity.state.position,
+                targetEntity.state.position
+              ).toFixed(1)
+            : "0",
+        hitLocation: damageInfo.hitReport?.hitLocation || "Unknown",
+        hitPosition:
+          damageInfo.hitReport?.position || new Float32Array([0, 0, 0, 0]),
+        oldHP: oldHealth,
+        newHP:
+          oldHealth - damageInfo.damage < 0 ? 0 : oldHealth - damageInfo.damage,
+        message: damageInfo.message || ""
+      }
+    };
+  }
+
+  sendDeathMetrics(client: Client) {
+    const damageRecord = Object.values(client.character.getCombatLog()).at(-1);
+    this.sendData<ClientUpdateDeathMetrics>(
+      client,
+      "ClientUpdate.DeathMetrics",
+      {
+        recipesDiscovered: client.character.metrics.recipesDiscovered,
+        zombiesKilled: client.character.metrics.zombiesKilled,
+        minutesSurvived: Math.ceil(
+          (Date.now() - client.character.metrics.startedSurvivingTP) / 60000
+        ),
+        wildlifeKilled: client.character.metrics.wildlifeKilled,
+        vehiclesDestroyed: client.character.metrics.vehiclesDestroyed,
+        playersKilled: client.character.metrics.playersKilled,
+        lastDamageAmount:
+          damageRecord?.hitInfo.oldHP && damageRecord?.hitInfo.newHP
+            ? Math.max(
+                0,
+                damageRecord.hitInfo.oldHP - damageRecord.hitInfo.newHP
+              )
+            : 0,
+        killedByHeadshot: ["HEAD", "GLASSES", "NECK"].includes(
+          damageRecord?.hitInfo.hitLocation ?? ""
+        )
+      }
+    );
+  }
+
+  logPlayerDeath(client: Client, damageInfo: DamageInfo) {
+    debug(client.character.name + " has died");
+    let sourceClient = this.getClientByCharId(damageInfo.entity);
+    if (!sourceClient) {
+      const sourceEntity = this.getEntity(damageInfo.entity);
+      if (sourceEntity instanceof ProjectileEntity) {
+        sourceClient = this.getClientByCharId(sourceEntity.managerCharacterId);
+      } else {
+        return;
+      }
+    }
+
+    if (!sourceClient) return;
+
+    if (
+      !this._soloMode &&
+      client.character.name !== sourceClient.character.name
+    ) {
+      logClientActionToMongo(
+        this._db.collection(DB_COLLECTIONS.KILLS),
+        sourceClient,
+        this._worldId,
+        {
+          type: KILL_TYPE.PLAYER,
+          playerKilled: client.character.name,
+          playerKilledLoginSessionId: client.loginSessionId
+        }
+      );
+    }
+    client.lastDeathReport = {
+      position: client.character.state.position,
+      attackerPosition: sourceClient.character.state.position,
+      distance: Number(
+        getDistance(
+          client.character.state.position,
+          sourceClient.character.state.position
+        ).toFixed(2)
+      ),
+      attacker: sourceClient
+    };
+    //this.sendConsoleTextToAdmins()
+  }
+
+  killCharacter(client: Client, damageInfo: DamageInfo) {
+    if (!client.character.isAlive) return;
+    if (!this.hookManager.checkHook("OnPlayerDeath", client, damageInfo))
+      return;
+
+    const killerClient = this.getClientByCharId(damageInfo.entity);
+    if (killerClient) {
+      const weapon = damageInfo.weapon;
+      if (weapon && weapon === Items.WEAPON_GUITAR) {
+        this.challengeManager.registerChallengeProgression(
+          killerClient,
+          ChallengeType.ROCKSTAR,
+          1
+        );
+      } else if (weapon && weapon === Items.WEAPON_FISTS) {
+        this.challengeManager.registerChallengeProgression(
+          killerClient,
+          ChallengeType.ROCKY,
+          1
+        );
+      }
+    }
+
+    for (const a in client.character._characterEffects) {
+      const characterEffect = client.character._characterEffects[a];
+      if (characterEffect.endCallback)
+        characterEffect.endCallback(this, client.character);
+    }
+    const weapon = client.character.getEquippedWeapon();
+    if (weapon && weapon.weapon) {
+      this.sendRemoteWeaponUpdateDataToAllOthers(
+        client,
+        client.character.transientId,
+        weapon.itemGuid,
+        "Update.FireState",
+        {
+          state: {
+            firestate: 0,
+            transientId: client.character.transientId,
+            position: client.character.state.position
+          }
+        }
+      );
+    }
+    const pos = client.character.state.position;
+    if (client.character.spawnGridData.length < 100) {
+      // attemt to fix broken spawn grid after unban
+      client.character.spawnGridData = Array.from<number>({ length: 100 }).fill(
+        0
+      );
+    }
+    this._spawnGrid.forEach((spawnCell: SpawnCell) => {
+      // find current grid and add it to blocked ones
+      if (
+        pos[0] >= spawnCell.position[0] - spawnCell.width / 2 &&
+        pos[0] <= spawnCell.position[0] + spawnCell.width / 2 &&
+        pos[2] >= spawnCell.position[2] - spawnCell.height / 2 &&
+        pos[2] <= spawnCell.position[2] + spawnCell.height / 2
+      ) {
+        client.character.spawnGridData[this._spawnGrid.indexOf(spawnCell)] =
+          new Date().getTime() + 300000;
+        // find neighboring grids and add to blocked ones
+        this._spawnGrid.forEach((cell: SpawnCell) => {
+          if (isPosInRadius(1100, cell.position, spawnCell.position)) {
+            client.character.spawnGridData[this._spawnGrid.indexOf(cell)] =
+              new Date().getTime() + 300000;
+          }
+        });
+      }
+    });
+    const character = client.character,
+      gridArr: any[] = [];
+    character.spawnGridData.forEach((number: number) => {
+      if (number <= new Date().getTime()) number = 0;
+      gridArr.push({
+        unk: number ? Math.floor((number - new Date().getTime()) / 1000) : 0
+      });
+    });
+
+    this.sendData<ClientUpdateUpdateLockoutTimes>(
+      client,
+      "ClientUpdate.UpdateLockoutTimes",
+      {
+        unk: gridArr,
+        bool: true
+      }
+    );
+    client.character._characterEffects = {};
+    client.character.isRespawning = true;
+    this.sendDeathMetrics(client);
+    this.logPlayerDeath(client, damageInfo);
+
+    client.character.isRunning = false;
+    character.isAlive = false;
+    client.character.characterStates.revivable = true;
+    client.character.characterStates.beingRevived = true;
+    this.updateCharacterState(
+      client,
+      client.character.characterId,
+      client.character.characterStates,
+      false
+    );
+    if (!client.isLoading) {
+      this.sendData<CharacterStartMultiStateDeath>(
+        client,
+        "Character.StartMultiStateDeath",
+        {
+          data: {
+            characterId: client.character.characterId,
+            flag: 128,
+            managerCharacterId: client.character.characterId
+          }
+        }
+      );
+      for (const a in this._clients) {
+        const iteratedClient = this._clients[a];
+        if (iteratedClient.spawnedEntities.has(client.character)) {
+          this.sendData<CharacterStartMultiStateDeath>(
+            iteratedClient,
+            "Character.StartMultiStateDeath",
+            {
+              data: {
+                characterId: client.character.characterId,
+                flag: 128,
+                managerCharacterId: iteratedClient.character.characterId
+              }
+            }
+          );
+          this.sendData(iteratedClient, "Character.ManagedObject", {
+            objectCharacterId: client.character.characterId,
+            characterId: iteratedClient.character.characterId
+          });
+        }
+      }
+    } else {
+      this.sendDataToAllOthersWithSpawnedEntity<CharacterStartMultiStateDeath>(
+        this._characters,
+        client,
+        client.character.characterId,
+        "Character.StartMultiStateDeath",
+        {
+          data: { characterId: client.character.characterId }
+        }
+      );
+    }
+    this.clearMovementModifiers(client);
+
+    client.character.dismountContainer(this);
+
+    if (client.vehicle.mountedVehicle) {
+      const vehicle = this._vehicles[client.vehicle.mountedVehicle];
+      if (vehicle) {
+        const container = vehicle?.getContainer();
+
+        if (vehicle && container) {
+          container.items = {
+            ...container.items,
+            ...client.character.getDeathItems(this)
+          };
+        }
+        // Wait untill killCharacter is finished for dismountVehicle (if not, there will be no option for the dead occupant to respawn)
+        this.once("killCharacterComplete", (client) => {
+          this.dismountVehicle(client);
+        });
+      }
+    } else {
+      Object.values(client.character._loadout).forEach((slot: LoadoutItem) => {
+        // need to find a better way later, if out of bulk ammo will be outside of lootbag
+        if (slot.weapon) {
+          const ammo = this.generateItem(
+            this.getWeaponAmmoId(slot.itemDefinitionId),
+            slot.weapon.ammoCount
+          );
+          if (
+            ammo &&
+            slot.weapon.ammoCount > 0 &&
+            slot.weapon.itemDefinitionId != Items.WEAPON_REMOVER
+          ) {
+            client.character.lootContainerItem(
+              this,
+              ammo,
+              ammo.stackCount,
+              true
+            );
+          }
+          slot.weapon.ammoCount = 0;
+        }
+      });
+      this.worldObjectManager.createLootbag(this, character);
+    }
+    this.clearInventory(client, false);
+    this.sendKillFeed(client, damageInfo);
+    this.hookManager.checkHook("OnPlayerDied", client, damageInfo);
+    this.emit("killCharacterComplete", client); // Throw emit for dismounting character from vehicle
+  }
+
+  sendKillFeed(client: Client, damageInfo: DamageInfo) {
+    if (client.character.characterId === damageInfo.entity) return;
+    const killerEntity = this.getEntity(damageInfo.entity);
+    let killerClient;
+
+    if (killerEntity instanceof ProjectileEntity) {
+      killerClient = this.getClientByCharId(killerEntity.managerCharacterId);
+    } else {
+      killerClient = this.getClientByCharId(damageInfo.entity);
+    }
+    let isInGodMode = false;
+    if (killerClient) {
+      isInGodMode = killerClient.character.isGodMode();
+      this.sendDataToAllWithSpawnedEntity<CharacterKilledBy>(
+        this._characters,
+        client.character.characterId,
+        "Character.KilledBy",
+
+        {
+          killer: killerClient?.character.characterId,
+          killed: client.character.characterId,
+          isCheater: isInGodMode
+        }
+      );
+    }
+  }
+
+  applyCharacterEffect(
+    character: Character,
+    effect: number,
+    damage: number,
+    time: number
+  ) {
+    character._characterEffects[effect] = {
+      id: effect,
+      duration: Date.now() + time,
+      callback: function (server: ZoneServer2016, character: Character) {
+        if (damage) {
+          character.damage(server, {
+            entity: "Character.CharacterEffect",
+            damage: damage
+          });
+        }
+
+        server.sendDataToAllWithSpawnedEntity(
+          server._characters,
+          character.characterId,
+          "Command.PlayDialogEffect",
+          {
+            characterId: character.characterId,
+            effectId: effect
+          }
+        );
+      }
+    };
+    this.sendDataToAllWithSpawnedEntity(
+      this._characters,
+      character.characterId,
+      "Command.PlayDialogEffect",
+      {
+        characterId: character.characterId,
+        effectId: effect
+      }
+    );
+  }
+
+  sendAnimationToAllWithSpawnedEntity(
+    character: Character,
+    animationId: number
+  ) {
+    this.sendDataToAllWithSpawnedEntity(
+      this._characters,
+      character.characterId,
+      "Character.PlayAnimation",
+      {
+        characterId: character.characterId,
+        animationName: "Action",
+        animationType: "ActionType",
+        unm4: 0,
+        unknownDword1: 0,
+        unknownByte1: 0,
+        unknownDword2: 0,
+        unknownByte1xda: 0,
+        unknownDword3: animationId
+      }
+    );
+  }
+
+  async explosionDamage(
+    sourceEntity: BaseEntity | ProjectileEntity,
+    client?: Client
+  ) {
+    const position = sourceEntity.state.position;
+
+    if (!sourceEntity) return;
+
+    const sourceIsProjectile = sourceEntity instanceof ProjectileEntity;
+
+    if (sourceIsProjectile) {
+      if (sourceEntity.itemDefinitionId == Items.WEAPON_MOLOTOV) {
+        for (const characterId in this._characters) {
+          if (this.isPvE) {
+            break;
+          }
+          const character = this._characters[characterId];
+          if (
+            getDistance(
+              character.state.position,
+              sourceEntity.state.position
+            ) <= 5 &&
+            !character.characterStates.inWater
+          ) {
+            this.applyCharacterEffect(
+              character,
+              Effects.PFX_Fire_Person_loop,
+              700,
+              10000
+            );
+          }
+        }
+        return;
+      }
+      if (sourceEntity.itemDefinitionId == Items.GRENADE_FLASH) {
+        for (const a in this._clients) {
+          if (this.isPvE) {
+            break;
+          }
+          const c = this._clients[a];
+          const character = c.character;
+          if (
+            getDistance(
+              character.state.position,
+              sourceEntity.state.position
+            ) <= 12
+          ) {
+            this.addScreenEffect(c, this._screenEffects["FLASH"]);
+
+            this.sendAnimationToAllWithSpawnedEntity(c.character, 9);
+          }
+        }
+        return;
+      }
+    }
+
+    // render distance is max client.chunkRenderDistance, could probably be lowered a lot
+    // - meme
+
+    for (const gridCell of this._grid) {
+      if (!isPosInRadius(400, gridCell.position, position)) {
+        continue;
+      }
+      for (const object of gridCell.objects) {
+        object.OnExplosiveHit(this, sourceEntity, client);
+      }
+    }
+
+    if (this.isPvE) return;
+
+    // these entities do not use the grid system
+
+    for (const characterId in this._characters) {
+      const character = this._characters[characterId];
+      if (
+        !isPosInRadiusWithY(
+          5,
+          character.state.position,
+          sourceEntity.state.position,
+          3
+        )
+      )
+        continue;
+      character.OnExplosiveHit(this, sourceEntity);
+    }
+    for (const vehicleKey in this._vehicles) {
+      const vehicle = this._vehicles[vehicleKey];
+      if (
+        !isPosInRadius(5, vehicle.state.position, sourceEntity.state.position)
+      )
+        continue;
+      await vehicle.OnExplosiveHit(this, sourceEntity);
+    }
+  }
+  createProjectileNpc(client: Client, data: any) {
+    const fireHint = client.fireHints[data.projectileId];
+    if (!fireHint) return;
+    const weaponItem = fireHint.weaponItem;
+    if (!weaponItem) return;
+    const itemDefId = weaponItem.itemDefinitionId,
+      itemDef = this.getItemDefinition(itemDefId);
+    if (!itemDef) return;
+    const weaponDefId = itemDef.PARAM1;
+
+    switch (weaponDefId) {
+      case WeaponDefinitionIds.WEAPON_BOW_MAKESHIFT:
+      case WeaponDefinitionIds.WEAPON_BOW_RECURVE:
+      case WeaponDefinitionIds.WEAPON_CROSSBOW:
+      case WeaponDefinitionIds.WEAPON_BOW_WOOD:
+        delete client.fireHints[data.projectileId];
+        this.worldObjectManager.createLootEntity(
+          this,
+          this.generateItem(Items.AMMO_ARROW),
+          data.position,
+          data.rotation
+        );
+        break;
+    }
+  }
+
+  calculatePosFromSpawnCell(cell: SpawnCell): Float32Array {
+    const randomSpawnIndex = Math.floor(
+      Math.random() * cell.spawnPoints.length
+    );
+
+    return new Float32Array([
+      cell.spawnPoints[randomSpawnIndex][0],
+      cell.spawnPoints[randomSpawnIndex][1] + 1,
+      cell.spawnPoints[randomSpawnIndex][2],
+      1
+    ]);
+  }
+
+  respawnPlayer(
+    client: Client,
+    position: Float32Array,
+    clearEquipment: boolean = true
+  ) {
+    if (!this.hookManager.checkHook("OnPlayerRespawn", client, position))
+      return;
+
+    if (!client.character.isRespawning) return;
+
+    if (client.vehicle.mountedVehicle) {
+      this.dismountVehicle(client);
+    }
+
+    this.dropAllManagedObjects(client);
+
+    client.isLoading = true;
+    client.characterReleased = false;
+    client.blockedPositionUpdates = 0;
+    client.character.lastLoginDate = toHex(Date.now());
+    client.character.resetMetrics();
+    client.character.isAlive = true;
+    client.character.isRunning = false;
+    client.character.isRespawning = false;
+    client.character.characterStates.knockedOut = false;
+    client.character.characterStates.revivable = false;
+    client.character.characterStates.beingRevived = false;
+    client.isInAir = false;
+
+    this.sendDataToAllWithSpawnedEntity<CommandPlayDialogEffect>(
+      this._characters,
+      client.character.characterId,
+      "Command.PlayDialogEffect",
+      {
+        characterId: client.character.characterId,
+        effectId: 0
+      }
+    );
+
+    if (client.character.initialized) {
+      client.managedObjects?.forEach((characterId) => {
+        this.dropVehicleManager(client, characterId);
+      });
+
+      this.sendData<CharacterRespawnReply>(client, "Character.RespawnReply", {
+        characterId: client.character.characterId,
+        status: true
+      });
+      this.updateCharacterState(
+        client,
+        client.character.characterId,
+        client.character.characterStates,
+        true
+      );
+      this.sendData<ClientUpdateUpdateLocation>(
+        client,
+        "ClientUpdate.UpdateLocation",
+        {
+          position: position,
+          unknownBoolean1: false
+        }
+      );
+      client.character.awaitingTeleportLocation = position;
+      client.oldPos.position = position;
+      /*const damageInfo: DamageInfo = {
+        entity: "Server.Respawn",
+        damage: 99999
+      };
+      if (this.fairPlayManager.fairPlayValues && !client.isAdmin) {
+        for (
+          let x = 1;
+          x < this.fairPlayManager.fairPlayValues.respawnCheckIterations;
+          x++
+        ) {
+          setTimeout(() => {
+            if (
+              isPosInRadius(
+                this.fairPlayManager.fairPlayValues?.respawnCheckRange || 100,
+                tempPos,
+                client.character.state.position
+              ) ||
+              !isPosInRadius(
+                this.fairPlayManager.fairPlayValues?.respawnCheckRange || 300,
+                tempPos2,
+                client.character.state.position
+              )
+            )
+              this.killCharacter(client, damageInfo);
+          }, x * this.fairPlayManager.fairPlayValues.respawnCheckTime);
+        }
+      }*/
+    }
+    if (clearEquipment) {
+      Object.values(client.character._equipment).forEach((equipmentSlot) => {
+        this.clearEquipmentSlot(client.character, equipmentSlot.slotId, false);
+      });
+      client.character.updateEquipment(this);
+    }
+    client.character.equipLoadout(this);
+    client.character.state.position = position;
+    client.character.resetResources(this);
+    client.character.updateEquipment(this);
+    client.character.updateFootwearAudio(this);
+    this.hookManager.checkHook("OnPlayerRespawned", client);
+  }
+
+  requestModules(client: Client) {
+    if (!client.isLoading && client.characterReleased && client.isSynced) {
+      this.sendData(client, "H1emu.RequestModules", {});
+    }
+  }
+
+  updateResource(
+    client: Client,
+    entityId: string,
+    value: number,
+    resourceId: ResourceIds,
+    resourceType?: number // most resources have the same id and type
+  ) {
+    this.sendData<ResourceEvent>(client, "ResourceEvent", {
+      eventData: {
+        type: 3,
+        value: {
+          characterId: entityId,
+          resourceId: resourceId,
+          resourceType: resourceType ? resourceType : resourceId,
+          initialValue: value >= 0 ? value : 0
+        }
+      }
+    });
+  }
+
+  updateResourceToAllWithSpawnedEntity(
+    entityId: string,
+    value: number,
+    resourceId: number,
+    resourceType: number,
+    dictionary: EntityDictionary<BaseEntity>
+  ) {
+    this.sendDataToAllWithSpawnedEntity<ResourceEvent>(
+      dictionary,
+      entityId,
+      "ResourceEvent",
+      {
+        eventData: {
+          type: 3,
+          value: {
+            characterId: entityId,
+            resourceId: resourceId,
+            resourceType: resourceType,
+            initialValue: value >= 0 ? value : 0
+          }
+        }
+      }
+    );
+  }
+
+  getLootableEntity(
+    entityKey: string
+  ): BaseLootableEntity | Vehicle2016 | undefined {
+    return (
+      this._lootbags[entityKey] ||
+      this._vehicles[entityKey] ||
+      this._lootableConstruction[entityKey] ||
+      this._worldLootableConstruction[entityKey] ||
+      this._lootableProps[entityKey] ||
+      undefined
+    );
+  }
+
+  getConstructionEntity(entityKey: string): ConstructionEntity | undefined {
+    return (
+      this._constructionFoundations[entityKey] ||
+      this._constructionSimple[entityKey] ||
+      this._lootableConstruction[entityKey] ||
+      this._constructionDoors[entityKey] ||
+      this._worldLootableConstruction[entityKey] ||
+      undefined
+    );
+  }
+
+  getConstructionDictionary(entityKey: string): any | undefined {
+    switch (true) {
+      case !!this._constructionFoundations[entityKey]:
+        return this._constructionFoundations;
+      case !!this._constructionSimple[entityKey]:
+        return this._constructionSimple;
+      case !!this._lootableConstruction[entityKey]:
+        return this._lootableConstruction;
+      case !!this._constructionDoors[entityKey]:
+        return this._constructionDoors;
+      case !!this._worldLootableConstruction[entityKey]:
+        return this._worldLootableConstruction;
+      case !!this._worldSimpleConstruction[entityKey]:
+        return this._worldSimpleConstruction;
+      default:
+        return;
+    }
+  }
+
+  getEntity(entityKey: string = ""): BaseEntity | undefined {
+    return (
+      this._npcs[entityKey] ||
+      this._vehicles[entityKey] ||
+      this._characters[entityKey] ||
+      this._spawnedItems[entityKey] ||
+      this._doors[entityKey] ||
+      this._explosives[entityKey] ||
+      this._constructionFoundations[entityKey] ||
+      this._constructionDoors[entityKey] ||
+      this._constructionSimple[entityKey] ||
+      this._lootbags[entityKey] ||
+      this._lootableConstruction[entityKey] ||
+      this._lootableProps[entityKey] ||
+      this._worldLootableConstruction[entityKey] ||
+      this._worldSimpleConstruction[entityKey] ||
+      this._plants[entityKey] ||
+      this._taskProps[entityKey] ||
+      this._crates[entityKey] ||
+      this._destroyables[entityKey] ||
+      this._temporaryObjects[entityKey] ||
+      this._traps[entityKey] ||
+      this._throwableProjectiles[entityKey] ||
+      undefined
+    );
+  }
+
+  getEntityDictionary(
+    entityKey: string
+  ): EntityDictionary<BaseEntity> | undefined {
+    switch (true) {
+      case !!this._npcs[entityKey]:
+        return this._npcs;
+      case !!this._vehicles[entityKey]:
+        return this._vehicles;
+      case !!this._characters[entityKey]:
+        return this._characters;
+      case !!this._spawnedItems[entityKey]:
+        return this._spawnedItems;
+      case !!this._doors[entityKey]:
+        return this._doors;
+      case !!this._explosives[entityKey]:
+        return this._explosives;
+      case !!this._constructionFoundations[entityKey]:
+        return this._constructionFoundations;
+      case !!this._constructionDoors[entityKey]:
+        return this._constructionDoors;
+      case !!this._constructionSimple[entityKey]:
+        return this._constructionSimple;
+      case !!this._lootbags[entityKey]:
+        return this._lootbags;
+      case !!this._lootableConstruction[entityKey]:
+        return this._lootableConstruction;
+      case !!this._lootableProps[entityKey]:
+        return this._lootableProps;
+      case !!this._worldLootableConstruction[entityKey]:
+        return this._worldLootableConstruction;
+      case !!this._worldSimpleConstruction[entityKey]:
+        return this._worldSimpleConstruction;
+      case !!this._plants[entityKey]:
+        return this._plants;
+      case !!this._taskProps[entityKey]:
+        return this._taskProps;
+      case !!this._crates[entityKey]:
+        return this._crates;
+      case !!this._destroyables[entityKey]:
+        return this._destroyables;
+      case !!this._temporaryObjects[entityKey]:
+      default:
+        return;
+    }
+  }
+
+  damageItem(
+    character: BaseFullCharacter,
+    item: LoadoutItem | BaseItem,
+    damage: number
+  ) {
+    if (item.itemDefinitionId == Items.WEAPON_FISTS) return;
+
+    // break armor if it goes below 100 health, this helps in shotgun fights
+    // so 1 pump fully breaks an armor if most pellets are hit
+    if (
+      this.isArmor(item.itemDefinitionId) &&
+      item.currentDurability - damage <= 100
+    ) {
+      damage = item.currentDurability;
+    }
+
+    item.currentDurability -= damage;
+    if (item.currentDurability <= 0) {
+      this.removeInventoryItem(character, item);
+      if (
+        this.isWeapon(item.itemDefinitionId) &&
+        item.itemDefinitionId != Items.WEAPON_BRANCH
+      ) {
+        character.lootContainerItem(
+          this,
+          this.generateItem(Items.BROKEN_METAL_ITEM)
+        );
+      }
+      return;
+    }
+
+    const client = this.getClientByCharId(character.characterId);
+    if (client) this.updateItem(client, item);
+  }
+
+  getDurabilityDamage(itemDefinitionId: number) {
+    if (!itemDefinitionId) return 0;
+
+    switch (itemDefinitionId) {
+      case Items.WEAPON_CROWBAR:
+      case Items.WEAPON_HATCHET_MAKESHIFT:
+      case Items.WEAPON_HATCHET:
+        return 8;
+      default:
+        return 6;
+    }
+  }
+
+  getClientByCharId(characterId: string) {
+    for (const a in this._clients) {
+      const c: Client = this._clients[a];
+      if (c.character.characterId === characterId) {
+        return c;
+      }
+    }
+  }
+
+  getClientByGuid(guid: string) {
+    for (const a in this._clients) {
+      const c: Client = this._clients[a];
+      if (c.guid === guid) {
+        return c;
+      }
+    }
+  }
+
+  getClientByName(name: string) {
+    let similar: string = "";
+    const targetClient: Client | undefined = Object.values(this._clients).find(
+      (c) => {
+        const clientName = c.character.name?.toLowerCase().replaceAll(" ", "_");
+        if (!clientName) return;
+        if (clientName == name.toLowerCase()) {
+          return c;
+        } else if (
+          getDifference(name.toLowerCase(), clientName) <= 3 &&
+          getDifference(name.toLowerCase(), clientName) != 0
+        )
+          similar = clientName;
+      }
+    );
+    return targetClient ? targetClient : similar ? similar : undefined;
+  }
+
+  getClientByLoginSessionId(loginSessionId: string) {
+    const targetClient: Client | undefined = Object.values(this._clients).find(
+      (c) => {
+        if (c.loginSessionId == loginSessionId) return c;
+      }
+    );
+    return targetClient;
+  }
+
+  getClientByNameOrLoginSession(name: string): Client | string | undefined {
+    let similar: string = "";
+    const targetClient: Client | undefined = Object.values(this._clients).find(
+      (c) => {
+        const clientName = c.character.name?.toLowerCase().replaceAll(" ", "_");
+        if (!clientName) return;
+        if (clientName == name.toLowerCase() || c.loginSessionId == name) {
+          return c;
+        } else if (
+          getDifference(name.toLowerCase(), clientName) <= 3 &&
+          getDifference(name.toLowerCase(), clientName) != 0
+        )
+          similar = clientName;
+      }
+    );
+    return targetClient ? targetClient : similar ? similar : undefined;
+  }
+
+  async getOfflineClientByName(
+    name: string
+  ): Promise<string | Client | undefined> {
+    const c = await this._db.collection(DB_COLLECTIONS.CHARACTERS).findOne({
+      characterName: { $regex: `.*${name}.*`, $options: "i" },
+      status: 1,
+      serverId: this._worldId
+    });
+    if (!c) {
+      return;
+    }
+
+    const clientName = c.characterName?.toLowerCase().replaceAll(" ", "_");
+    if (!clientName) return;
+    if (clientName == name.toLowerCase()) {
+      const client = this.createClient(
+        -1,
+        "",
+        clientName,
+        c.characterId,
+        this.getTransientId(c.characterId)
+      );
+      client.character.name = c.characterName;
+      client.character.mutedCharacters = c.mutedCharacters;
+      return client;
+    } else if (
+      getDifference(name.toLowerCase(), clientName) <= 3 &&
+      getDifference(name.toLowerCase(), clientName) != 0
+    )
+      return c.characterName;
+
+    return;
+  }
+
+  async getOfflineClientByCharId(
+    characterId: string
+  ): Promise<Client | undefined> {
+    const c = await this._db.collection(DB_COLLECTIONS.CHARACTERS).findOne({
+      // status: 1,
+      serverId: this._worldId,
+      characterId: characterId
+    });
+    if (!c) {
+      return;
+    }
+
+    if (!c) return;
+    const client = this.createClient(
+      -1,
+      "",
+      characterId,
+      c.characterId,
+      this.getTransientId(c.characterId)
+    );
+    // TODO: make a method from the mapping in worlddatamanger
+    client.character.state.position = c.position;
+    client.character.state.rotation = c.rotation;
+    client.character.isAlive = false;
+    client.character.name = c.characterName;
+    return client;
+  }
+
+  applyHelmetDamageReduction(
+    character: BaseFullCharacter,
+    damage: number,
+    weaponDmgModifier = 1
+  ): number {
+    // prevent helmet damage in godmode / temp godmode
+    if (character instanceof Character && character.isGodMode()) {
+      return damage;
+    }
+
+    if (!character.hasHelmet(this)) {
+      return damage;
+    }
+
+    const helmetDmgModifier = 0.25;
+
+    damage *= helmetDmgModifier;
+    this.damageItem(
+      character,
+      character._loadout[LoadoutSlots.HEAD],
+      damage / weaponDmgModifier
+    );
+    return damage;
+  }
+
+  applyArmorDamageReduction(
+    character: BaseFullCharacter,
+    damage: number,
+    weaponDmgModifier = 4
+  ): number {
+    // prevent armor damage in godmode / temp godmode
+    if (character instanceof Character && character.isGodMode()) {
+      return damage;
+    }
+
+    // hasArmor is not used since itemDef is needed later in this function
+    const slot = character._loadout[LoadoutSlots.ARMOR],
+      itemDef = this.getItemDefinition(slot?.itemDefinitionId);
+    if (!slot || !slot.itemDefinitionId || !itemDef) {
+      return damage;
+    }
+
+    // these should be configurable
+    const makeshiftDamageModifier = 0.7, // was 0.9
+      kevlarDamageModifier = 0.5; // was 0.8
+
+    // checking for plated or wooden armor, these don't have custom skins
+    if (itemDef.DESCRIPTION_ID == 11151 || itemDef.DESCRIPTION_ID == 11153) {
+      damage *= makeshiftDamageModifier;
+      this.damageItem(character, slot, damage / (weaponDmgModifier / 2));
+      return damage;
+    }
+
+    // all other kevlar armors
+    damage *= kevlarDamageModifier;
+    this.damageItem(character, slot, damage / (weaponDmgModifier / 2));
+
+    return damage / weaponDmgModifier;
+  }
+
+  sendHitmarker(
+    client: Client,
+    hitLocation: string = "",
+    hasHelmet: boolean,
+    hasArmor: boolean,
+    hasHelmetBefore: boolean,
+    hasArmorBefore: boolean
+  ) {
+    let isHeadshot = 0;
+    switch (hitLocation) {
+      case "HEAD":
+      case "GLASSES":
+      case "NECK":
+        isHeadshot = 1;
+        break;
+    }
+    this.sendData<UiConfirmHit>(client, "Ui.ConfirmHit", {
+      hitType: {
+        isAlly: 0,
+        isHeadshot: isHeadshot,
+        damagedArmor:
+          (isHeadshot && hasHelmetBefore && hasHelmet) ||
+          (!isHeadshot && hasArmorBefore && hasArmor)
+            ? 1
+            : 0,
+        crackedArmor:
+          isHeadshot && hasHelmetBefore && !hasHelmet
+            ? 1
+            : !isHeadshot && hasArmorBefore && !hasArmor
+              ? 1
+              : 0
+      }
+    });
+  }
+
+  getWeaponHitEffect(itemDefinitionId?: Items) {
+    const itemDefinition = this.getItemDefinition(itemDefinitionId);
+    if (!itemDefinition) return;
+    const weaponDefinitionId = itemDefinition.PARAM1;
+
+    switch (weaponDefinitionId) {
+      case WeaponDefinitionIds.WEAPON_SHOTGUN:
+        return 1302;
+      case WeaponDefinitionIds.WEAPON_308:
+        return 5414;
+      default:
+        return 1165;
+    }
+  }
+
+  getProjectileDamage(
+    itemDefinitionId: Items,
+    sourcePos: Float32Array,
+    targetPos: Float32Array
+  ) {
+    const itemDefinition = this.getItemDefinition(itemDefinitionId);
+    if (!itemDefinition) return 1000;
+    const weaponDefinitionId = itemDefinition.PARAM1;
+
+    switch (weaponDefinitionId) {
+      case WeaponDefinitionIds.WEAPON_AR15:
+      case WeaponDefinitionIds.WEAPON_1911:
+      case WeaponDefinitionIds.WEAPON_BLAZE:
+        return 2500;
+      case WeaponDefinitionIds.WEAPON_M9:
+        return 1800;
+      case WeaponDefinitionIds.WEAPON_R380:
+        return 1500;
+      case WeaponDefinitionIds.WEAPON_SHOTGUN:
+        return calculate_falloff(
+          getDistance(sourcePos, targetPos),
+          200,
+          1400, //1667,
+          1,
+          12
+        );
+      case WeaponDefinitionIds.WEAPON_NAGAFENS_RAGE:
+        return calculate_falloff(
+          getDistance(sourcePos, targetPos),
+          200,
+          2000, //1667,
+          3,
+          20
+        );
+      case WeaponDefinitionIds.WEAPON_AK47:
+      case WeaponDefinitionIds.WEAPON_FROSTBITE:
+        return 2900;
+      case WeaponDefinitionIds.WEAPON_308:
+        return 6700;
+      case WeaponDefinitionIds.WEAPON_REAPER:
+        return 14000;
+      case WeaponDefinitionIds.WEAPON_MAGNUM:
+        return 3000;
+      case WeaponDefinitionIds.WEAPON_BOW_MAKESHIFT:
+        return 2500;
+      case WeaponDefinitionIds.WEAPON_BOW_RECURVE:
+        return 2500;
+      case WeaponDefinitionIds.WEAPON_BOW_WOOD:
+        return 2500;
+      case WeaponDefinitionIds.WEAPON_CROSSBOW:
+        return 2500;
+      default:
+        return 1000;
+    }
+  }
+
+  validateHit(client: Client, entity: BaseEntity) {
+    const ret = {
+      isValid: true,
+      message: ""
+    };
+    if (
+      !isPosInRadius(
+        entity.npcRenderDistance || this.charactersRenderDistance,
+        client.character.state.position,
+        entity.state.position
+      )
+    ) {
+      return {
+        isValid: false,
+        message: "ProjectileDistance"
+      };
+    }
+    if (!client.spawnedEntities.has(entity)) {
+      return {
+        isValid: false,
+        message: "InvalidTarget"
+      };
+    }
+
+    const target = this.getClientByCharId(entity.characterId);
+    if (target) {
+      if (!target.spawnedEntities.has(client.character)) {
+        return {
+          isValid: false,
+          message: "InvalidTarget"
+        };
+      }
+    }
+    /*if (client.isFairPlayFlagged) {
+      this.sendChatTextToAdmins(
+        `FairPlay: blocked projectile of flagged client: ${client.character.name}`,
+        false
+      );
+      return {
+        isValid: false,
+        message: "InvalidFlag"
+      };
+    }*/
+    return ret;
+  }
+
+  registerHit(client: Client, packet: any, gameTime: number) {
+    //if (!client.character.isAlive) return;
+    // Should be able to trade while in combat
+
+    if (client.isWeaponLock) {
+      this.sendChatText(
+        client,
+        "FairPlay: Your projectile was blocked due to low network quality"
+      );
+      this.sendChatTextToAdmins(
+        `FairPlay: ${client.character.name} shot has been blocked due to low network quality`,
+        false
+      );
+      return;
+    }
+
+    const { hitReport } = packet;
+    if (!hitReport) return; // should never trigger
+
+    for (const a in this._decoys) {
+      const decoy = this._decoys[a];
+      if (decoy.characterId === hitReport.characterId) {
+        this.sendChatTextToAdmins(
+          `FairPlay: ${
+            client.character.name
+          } hit a decoy entity at: [${decoy.position[0].toFixed(
+            2
+          )} ${decoy.position[1].toFixed(2)} ${decoy.position[2].toFixed(2)}]`,
+          false
+        );
+      }
+    }
+    const message = `FairPlay: blocked incoming projectile from ${client.character.name}`;
+    const fireHint = client.fireHints[hitReport.sessionProjectileCount];
+    if (!fireHint) return;
+    const weaponItem = fireHint.weaponItem;
+    if (!weaponItem) return;
+    const entity = this.getEntity(hitReport.characterId);
+    if (weaponItem.itemDefinitionId == Items.WEAPON_BOW_RECURVE) {
+      for (const a in this._throwableProjectiles) {
+        const projectile = this._throwableProjectiles[a] as ProjectileEntity;
+        if (projectile.projectileUniqueId == fireHint.projectileUniqueId) {
+          projectile.applyPostion(packet.hitReport.position);
+          projectile.onTrigger(this);
+        }
+      }
+      return;
+    }
+    if (!entity) return;
+    // Don't allow hits registering over 350 as this is the render distance for NPC's
+    if (
+      getDistance2d(entity.state.position, client.character.state.position) >
+      350
+    )
+      return;
+    const targetClient = this.getClientByCharId(entity.characterId);
+    if (!fireHint) {
+      if (targetClient) {
+        this.sendChatText(targetClient, message, false);
+        this.sendChatTextToAdmins(
+          `FairPlay: ${client.character.name} has hit ${targetClient.character.name} with non existing projectile`,
+          false
+        );
+      }
+      return;
+    }
+    if (fireHint.hitNumber > 0) {
+      if (targetClient) {
+        this.sendChatTextToAdmins(
+          `FairPlay: ${client.character.name} shot has been blocked due to desync / double usage`,
+          false
+        );
+        this.sendChatText(targetClient, message, false);
+      }
+      return;
+    }
+    if (
+      this.fairPlayManager.fairPlayValues &&
+      !this.fairPlayManager.validateProjectileHit(
+        this,
+        client,
+        entity,
+        fireHint,
+        weaponItem,
+        hitReport,
+        gameTime
+      )
+    ) {
+      const itemDef = this.getItemDefinition(weaponItem.itemDefinitionId);
+      if (!itemDef) return;
+      const weaponDefinitionId = itemDef.PARAM1;
+
+      switch (weaponDefinitionId) {
+        case WeaponDefinitionIds.WEAPON_SHOTGUN:
+        case WeaponDefinitionIds.WEAPON_NAGAFENS_RAGE:
+          break;
+        default:
+          client.flaggedShots++;
+          if (
+            client.flaggedShots >=
+            this.fairPlayManager.fairPlayValues.maxFlaggedShots
+          ) {
+            client.isFairPlayFlagged = true;
+          }
+      }
+      return;
+    } else {
+      client.flaggedShots = 0;
+    }
+    const hitValidation = this.validateHit(client, entity);
+
+    entity.OnProjectileHit(this, {
+      entity: client.character.characterId,
+      weapon: weaponItem.itemDefinitionId,
+      damage: hitValidation.isValid
+        ? this.getProjectileDamage(
+            weaponItem.itemDefinitionId,
+            client.character.state.position,
+            entity.state.position
+          )
+        : 0,
+      hitReport: packet.hitReport,
+      message: hitValidation.message
+    });
+  }
+
+  setGodMode(client: Client, godMode: boolean) {
+    client.character.godMode = godMode;
+    this.updateCharacterState(
+      client,
+      client.character.characterId,
+      client.character.characterStates,
+      false
+    );
+  }
+
+  setTempGodMode(client: Client, godMode: boolean) {
+    client.character.tempGodMode = godMode;
+    this.updateCharacterState(
+      client,
+      client.character.characterId,
+      client.character.characterStates,
+      false
+    );
+  }
+
+  /*toggleHiddenMode(client: Client) {
+    client.character.isHidden = !client.character.isHidden;
+    client.character.characterStates.gmHidden = client.character.isHidden;
+    this.updateCharacterState(
+      client,
+      client.character.characterId,
+      client.character.characterStates,
+      false
+    );
+  }*/
+
+  tempGodMode(client: Client, durationMs: number) {
+    this.setTempGodMode(client, true);
+    setTimeout(() => {
+      this.setTempGodMode(client, false);
+    }, durationMs);
+  }
+
+  updateCharacterState(
+    client: Client,
+    characterId: string,
+    object: any,
+    sendToAll: boolean
+  ) {
+    const updateCharacterStateBody = {
+      characterId: characterId,
+      states1: object,
+      states2: object,
+      states3: object,
+      states4: object,
+      states5: object,
+      states6: object,
+      states7: object
+    };
+
+    if (!sendToAll) {
+      this.sendData<CharacterUpdateCharacterState>(
+        client,
+        "Character.UpdateCharacterState",
+        updateCharacterStateBody
+      );
+    } else {
+      this.sendDataToAllOthersWithSpawnedEntity<CharacterUpdateCharacterState>(
+        this._characters,
+        client,
+        client.character.characterId,
+        "Character.UpdateCharacterState",
+        updateCharacterStateBody
+      );
+    }
+  }
+
+  /**
+   * 实验：对 NPC 广播 Character.UpdateCharacterState（与 `sendStandardFullNpcInit` 内同源包名）。
+   * 使用 `sendDataToAllWithSpawnedEntity(this._npcs, …)`：仅当某客户端的 `spawnedEntities` 含有
+   * **同一 Npc 对象引用**（即 `dictionary[npcCharacterId]`）时才会收到；测试僵尸在
+   * `test-zombie-in-front.ts` 里已对刷怪客户端 `spawnedEntities.add(zombie)`。
+   * 多玩家时其他客户端若未 add 同引用则收不到，与物品/NPC 进视野时批量 add 的路径不同。
+   *
+   * 客户端是否把该包按 NPC 走 `FUN_1404f1080` case9/MRN：与玩家共用 character 包泵，
+   * 逆向上针对的是「实体 characterId」；是否对 proxied NPC 全量生效仍以实机为准。
+   */
+  sendNpcUpdateCharacterStateBroadcast(
+    npcCharacterId: string,
+    statesObject: Record<string, unknown> = {}
+  ): boolean {
+    const o = statesObject;
+    return this.sendNpcCharacterStateBroadcast(npcCharacterId, {
+      states1: o,
+      states2: o,
+      states3: o,
+      states4: o,
+      states5: o,
+      states6: o,
+      states7: o
+    });
+  }
+
+  /**
+   * Send one complete NPC state packet with independently controlled state
+   * banks. The native 2016 client reads the accepted 22B case9 packet into
+   * these banks; duplicating one object into every bank hides which bit actually
+   * drives the locomotion graph and can accidentally set combat/posture flags.
+   */
+  sendNpcCharacterStateBroadcast(
+    npcCharacterId: string,
+    banks: Partial<{
+      states1: Record<string, unknown>;
+      states2: Record<string, unknown>;
+      states3: Record<string, unknown>;
+      states4: Record<string, unknown>;
+      states5: Record<string, unknown>;
+      states6: Record<string, unknown>;
+      states7: Record<string, unknown>;
+    }> = {}
+  ): boolean {
+    const npc = this._npcs[npcCharacterId];
+    if (!npc) return false;
+    const body = {
+      characterId: npc.characterId,
+      states1: banks.states1 ?? {},
+      states2: banks.states2 ?? {},
+      states3: banks.states3 ?? {},
+      states4: banks.states4 ?? {},
+      states5: banks.states5 ?? {},
+      states6: banks.states6 ?? {},
+      states7: banks.states7 ?? {},
+      placeholder: 0,
+      gameTime: getCurrentServerTimeWrapper().getTruncatedU32()
+    };
+    // This is deliberately limited to the active /ztest NPC. A successful
+    // call to `pack()` only proves that the server built a buffer; the
+    // animation investigation also needs to prove the wire size and that a
+    // spawned client was actually selected for reliable delivery.
+    if (this._lastSpawnedNpcCharacterId === npc.characterId) {
+      const statePacket = body as typeof body & {
+        states1?: Record<string, unknown>;
+        states2?: Record<string, unknown>;
+        states6?: Record<string, unknown>;
+      };
+      console.log(
+        `[test-zombie] UpdateCharacterState prepare: id=${npc.characterId}, ` +
+        `visible=${statePacket.states1?.visible ?? 0}, ` +
+        `inCombat=${statePacket.states2?.inCombat ?? 0}, ` +
+        `hidesHeat=${statePacket.states6?.hidesHeat ?? 0}, ` +
+        `gameTime=${statePacket.gameTime}`
+      );
+    }
+    this.sendDataToAllWithSpawnedEntity<CharacterUpdateCharacterState>(
+      this._npcs,
+      npc.characterId,
+      "Character.UpdateCharacterState",
+      body as CharacterUpdateCharacterState
+    );
+    return true;
+  }
+
+  /**
+   * Dev：对指定客户端单播 Character.UpdateCharacterState，wire 与
+   * `sendNpcUpdateCharacterStateBroadcast` 一致（states1–7、placeholder、gameTime），
+   * `characterId` 为该客户端角色；玩家不在 `_npcs`，不能走 NPC 广播路径。
+   */
+  sendDevPlayerUpdateCharacterStateReliable(
+    client: Client,
+    statesObject: Record<string, unknown> = {}
+  ): void {
+    const o = statesObject;
+    const body = {
+      characterId: client.character.characterId,
+      states1: o,
+      states2: o,
+      states3: o,
+      states4: o,
+      states5: o,
+      states6: o,
+      states7: o,
+      placeholder: 0,
+      gameTime: getCurrentServerTimeWrapper().getTruncatedU32()
+    };
+    this.sendData<CharacterUpdateCharacterState>(
+      client,
+      "Character.UpdateCharacterState",
+      body as CharacterUpdateCharacterState
+    );
+  }
+
+  customizeStaticDTOs() {
+    // caches DTOs that should always be removed
+
+    for (const object in this._lootableProps) {
+      const prop = this._lootableProps[object];
+      const propInstance = {
+        objectId: prop.spawnerId,
+        replacementModel: "Weapon_Empty.adr"
+      };
+      this.staticDTOs.push(propInstance);
+    }
+
+    for (const object in this._taskProps) {
+      const prop = this._taskProps[object];
+      const propInstance = {
+        objectId: prop.spawnerId,
+        replacementModel: "Weapon_Empty.adr"
+      };
+      this.staticDTOs.push(propInstance);
+    }
+    for (const object in this._crates) {
+      const prop = this._crates[object];
+      const propInstance = {
+        objectId: prop.spawnerId,
+        replacementModel: "Weapon_Empty.adr"
+      };
+      this.staticDTOs.push(propInstance);
+    }
+    for (let x = 0; x < this._destroyableDTOlist.length; x++) {
+      const propInstance = {
+        objectId: this._destroyableDTOlist[x],
+        replacementModel: "Weapon_Empty.adr"
+      };
+      this.staticDTOs.push(propInstance);
+    }
+    deprecatedDoors.forEach((door: number) => {
+      const DTOinstance = {
+        objectId: door,
+        replacementModel: "Weapon_Empty.adr"
+      };
+      this.staticDTOs.push(DTOinstance);
+    });
+    const cache = this._protocol.pack("DtoObjectInitialData", {
+      unknownDword1: 1,
+      unknownArray1: this.staticDTOs,
+      unknownArray2: [{}]
+    });
+    if (cache) {
+      this.initialDataStaticDtoCache = cache;
+    }
+  }
+
+  customizeDTO(client: Client) {
+    const speedtreeDTOs: Array<PropInstance> = [];
+    this.speedtreeManager.customize(speedtreeDTOs);
+    this.sendData<DtoObjectInitialData>(client, "DtoObjectInitialData", {
+      unknownDword1: 1,
+      unknownArray1: speedtreeDTOs,
+      unknownArray2: [{}]
+    });
+    if (this.initialDataStaticDtoCache) {
+      this.sendRawDataReliable(client, this.initialDataStaticDtoCache);
+    }
+  }
+
+  private shouldRemoveEntity(client: Client, entity: BaseEntity): boolean {
+    return (
+      entity && // in case if entity is undefined somehow
+      //!(entity instanceof ConstructionParentEntity) &&
+      !(entity instanceof Vehicle2016) &&
+      (this.filterOutOfDistance(entity, client.character.state.position) ||
+        this.constructionManager.shouldHideEntity(this, client, entity))
+    );
+  }
+
+  private removeOutOfDistanceEntities(client: Client) {
+    // does not include vehicles
+    for (const entity of client.spawnedEntities) {
+      if (this.shouldRemoveEntity(client, entity)) {
+        this.sendData<CharacterRemovePlayer>(client, "Character.RemovePlayer", {
+          characterId: entity.characterId
+        });
+        client.spawnedEntities.delete(entity);
+      }
+    }
+  }
+
+  despawnEntity(characterId: string) {
+    this.sendDataToAll<CharacterRemovePlayer>("Character.RemovePlayer", {
+      characterId: characterId
+    });
+  }
+
+  deleteEntity(
+    characterId: string,
+    dictionary: EntityDictionary<BaseEntity>,
+    effectId?: number,
+    timeToDisappear?: number
+  ): boolean {
+    if (!dictionary[characterId]) return false;
+    this.sendDataToAllWithSpawnedEntity<CharacterRemovePlayer>(
+      dictionary,
+      characterId,
+      "Character.RemovePlayer",
+      {
+        characterId: characterId,
+        unknownWord1: effectId ? 1 : 0,
+        effectId: effectId ? effectId : 0,
+        timeToDisappear: timeToDisappear ? timeToDisappear : 0,
+        effectDelay: timeToDisappear ? timeToDisappear : 0
+      }
+    );
+    this._grid.forEach((cell: GridCell) => {
+      if (cell.objects.includes(dictionary[characterId])) {
+        cell.objects.splice(cell.objects.indexOf(dictionary[characterId]), 1);
+      }
+    });
+
+    // remove deleted entity from spawned entities (correct me if we do it somewhere else)
+
+    for (const a in this._clients) {
+      const client = this._clients[a];
+      if (client.spawnedEntities.delete(dictionary[characterId])) {
+        this.sendData<ClientUpdateProximateItems>(
+          client,
+          "ClientUpdate.ProximateItems",
+          this.getProximityItems(client)
+        );
+      }
+      this.aiManager.removeEntity(dictionary[characterId]);
+    }
+    delete dictionary[characterId];
+    delete this._transientIds[this._characterIds[characterId]];
+    delete this._characterIds[characterId];
+    return true;
+  }
+
+  /** 删除当前测试僵尸（仅一只），刷新测试僵尸前调用以保证全局只有一只 */
+  removeTestZombie(): void {
+    const id = this._lastSpawnedNpcCharacterId;
+    if (!id || !this._npcs[id]) return;
+    const npc = this._npcs[id];
+    if (this.navManager?.crowd && npc.navAgent) {
+      try {
+        this.navManager.crowd.removeAgent(npc.navAgent);
+      } catch (e) {
+        console.error("[removeTestZombie] 移除 navAgent 失败:", e);
+      }
+    }
+    this.deleteEntity(id, this._npcs);
+    this._lastSpawnedNpcCharacterId = null;
+    this._testZombieWalkToCharacterId = null;
+    this._testZombieChaseAttackCharacterId = null;
+    const bySession = (this as unknown as { _testZombieBySessionId?: Record<string, string> })
+      ._testZombieBySessionId;
+    if (bySession) {
+      for (const sid of Object.keys(bySession)) {
+        if (bySession[sid] === id) delete bySession[sid];
+      }
+    }
+  }
+
+  /** 删除开发物种可见性探针；不会触碰当前 /ztest 僵尸。 */
+  removeTestSpeciesProbe(): void {
+    this.stopTestSpeciesProbeMovement();
+    const id = this._testSpeciesProbeNpcCharacterId;
+    if (!id) return;
+    if (this._npcs[id]) this.deleteEntity(id, this._npcs);
+    this._testSpeciesProbeNpcCharacterId = null;
+  }
+
+  /** 停止物种探针的有限位置流并回到零速；不会发送攻击或接管 AI。 */
+  stopTestSpeciesProbeMovement(): void {
+    if (this._testSpeciesProbeTimer) clearInterval(this._testSpeciesProbeTimer);
+    this._testSpeciesProbeTimer = null;
+    const id = this._testSpeciesProbeNpcCharacterId;
+    const npc = id ? this._npcs[id] : undefined;
+    if (!npc) return;
+    npc.behaviorState = 0;
+    try { npc.sendIdleStance(); } catch (error) {
+      console.error("[spawnnpcvisible] failed to send probe idle", error);
+    }
+  }
+
+  sendManagedObjectResponseControlPacket(
+    client: Client,
+    obj: ClientUpdateManagedObjectResponseControl
+  ) {
+    this.sendData<ClientUpdateManagedObjectResponseControl>(
+      client,
+      "ClientUpdate.ManagedObjectResponseControl",
+      obj
+    );
+  }
+
+  addLightweightNpc(
+    client: Client,
+    entity: BaseLightweightCharacter,
+    nameId = 0
+  ) {
+    this.sendData<AddLightweightNpc>(client, "AddLightweightNpc", {
+      ...entity.pGetLightweight(),
+      nameId
+    });
+    this.sendReplicationData(client, entity);
+  }
+
+  sendStandardFullNpcInit(client: Client, npc: Npc, memberStatus = 0): void {
+    this.sendData(client, "LightweightToFullNpc", npc.pGetFull(this));
+    this.sendData(
+      client,
+      "Character.UpdateCharacterState" as never,
+      {
+        characterId: npc.characterId,
+        states1: { visible: 1 },
+        states2: {},
+        states3: {},
+        states4: {},
+        states5: {},
+        states6: {},
+        states7: {}
+      } as never
+    );
+    this.sendData(client, "Character.SetCollidable", {
+      characterId: npc.characterId,
+      unknownByte1: 1
+    });
+    this.sendData(client, "Character.ExpectedSpeed", {
+      characterId: npc.characterId,
+      speed: 2.5
+    });
+    this.sendData(client, "Character.MemberStatus", {
+      characterId: npc.characterId,
+      unknownByte1: memberStatus
+    });
+    this.sendData<ClientUpdateNpcRelevance>(client, "ClientUpdate.NpcRelevance", {
+      unknownByte1: 1,
+      npcs: [
+        {
+          characterId: npc.characterId,
+          unknownBoolean1: true,
+          unknownByte1: 255,
+          unknownBoolean2: false
+        }
+      ]
+    });
+    npc.updateEquipment(this);
+  }
+  /** 当前包序与字段为实验性；NPC/僵尸正确刷怪方式应以客户端 Ghidra 逆向为准。见 TODOS.md */
+  addSimpleNpc(client: Client, entity: BaseSimpleNpc) {
+    this.sendData<AddSimpleNpc>(client, "AddSimpleNpc", entity.pGetSimpleNpc());
+    this.sendReplicationData(client, entity);
+  }
+
+  spawnSimpleNpcForAllInRange(entity: BaseSimpleNpc) {
+    this.executeFuncForAllReadyClientsInRange((client) => {
+      if (!client.spawnedEntities.has(entity)) {
+        this.addSimpleNpc(client, entity);
+        client.spawnedEntities.add(entity);
+      }
+    }, entity);
+  }
+
+  spawnContainerAccessNpc(client: Client) {
+    /*
+      Since all containers are now handled as SimpleNpcs instead of FullNpcs for 
+      performance reasons, this npc is needed to act as a conduit between the 
+      character and the simpleNpc's inventory so that the client thinks the target
+      container is a FullNpc.
+    */
+    this.sendData<AddLightweightNpc>(client, "AddLightweightNpc", {
+      characterId: EXTERNAL_CONTAINER_GUID,
+      transientId: 0,
+      actorModelId: 2,
+      position: new Float32Array([0, 0, 0, 0]),
+      rotation: new Float32Array([0, 0, 0, 0]),
+      scale: new Float32Array([0.001, 0.001, 0.001, 0.001]),
+      positionUpdateType: 0,
+      profileId: 0,
+      isLightweight: false,
+      flags: {
+        flags1: {},
+        flags2: {},
+        flags3: {}
+      },
+      headActor: "",
+      attachedObject: {}
+    });
+  }
+
+  spawnStaticBuildings(client: Client) {
+    this.staticBuildings.forEach((v) => {
+      this.sendData(client, "AddSimpleNpc", v);
+    });
+  }
+
+  spawnCharacters(client: Client) {
+    for (const c in this._clients) {
+      const characterObj: Character = this._clients[c].character;
+      if (
+        client.character.characterId != characterObj.characterId &&
+        characterObj.isReady &&
+        isPosInRadius(
+          characterObj.npcRenderDistance || this.charactersRenderDistance,
+          client.character.state.position,
+          characterObj.state.position
+        ) &&
+        !client.spawnedEntities.has(characterObj) &&
+        characterObj.isAlive &&
+        !characterObj.isSpectator &&
+        !characterObj.isVanished &&
+        (characterObj.isHidden == client.character.isHidden ||
+          client.character.isSpectator) /* &&
+        client.banType != "hiddenplayers"*/
+      ) {
+        this.sendData<AddLightweightPc>(
+          client,
+          "AddLightweightPc",
+          characterObj.pGetLightweightPC(this, this._clients[c])
+        );
+        client.spawnedEntities.add(this._characters[characterObj.characterId]);
+      }
+    }
+  }
+
+  spawnCharacterToOtherClients(character: Character) {
+    const client = this.getClientByCharId(character.characterId);
+    if (!client) return;
+    for (const a in this._clients) {
+      const c = this._clients[a];
+      if (
+        isPosInRadius(
+          character.npcRenderDistance || this.charactersRenderDistance,
+          character.state.position,
+          c.character.state.position
+        ) &&
+        !c.spawnedEntities.has(character) &&
+        character != c.character
+      ) {
+        this.sendData<AddLightweightPc>(
+          c,
+          "AddLightweightPc",
+          character.pGetLightweightPC(this, client)
+        );
+        c.spawnedEntities.add(character);
+      }
+    }
+  }
+
+  private checkVehiclesInMapBounds() {
+    if (this.isBattleRoyale()) return;
+    for (const a in this._vehicles) {
+      const vehicle = this._vehicles[a];
+      let inMapBounds: boolean = false;
+      this._spawnGrid.forEach((cell: SpawnCell) => {
+        const position = vehicle.state.position;
+        if (
+          position[0] >= cell.position[0] - cell.width / 2 &&
+          position[0] <= cell.position[0] + cell.width / 2 &&
+          position[2] >= cell.position[2] - cell.height / 2 &&
+          position[2] <= cell.position[2] + cell.height / 2
+        ) {
+          inMapBounds = true;
+        }
+      });
+
+      if (!inMapBounds || vehicle.state.position[1] < -50) {
+        vehicle.destroy(this, true);
+      }
+    }
+  }
+
+  private spawnGridObjects(client: Client) {
+    const position = client.character.state.position;
+    for (const gridCell of this._grid) {
+      if (
+        !isPosInRadius(client.chunkRenderDistance, gridCell.position, position)
+      )
+        continue;
+
+      for (const object of gridCell.objects) {
+        if (
+          client.spawnedEntities.has(object) ||
+          !isPosInRadius(
+            (object.npcRenderDistance as number) ||
+              this.charactersRenderDistance,
+            position,
+            object.state.position
+          )
+        ) {
+          continue;
+        }
+
+        if (object instanceof ConstructionParentEntity) {
+          this.constructionManager.spawnConstructionParent(
+            this,
+            client,
+            object
+          );
+          continue;
+        }
+
+        if (object instanceof ConstructionChildEntity) {
+          if (this.constructionManager.shouldHideEntity(this, client, object))
+            continue;
+          this.constructionManager.spawnSimpleConstruction(
+            this,
+            client,
+            object
+          );
+          continue;
+        }
+
+        if (object instanceof LootableConstructionEntity) {
+          if (this.constructionManager.shouldHideEntity(this, client, object))
+            continue;
+          this.constructionManager.spawnLootableConstruction(
+            this,
+            client,
+            object
+          );
+          continue;
+        }
+
+        if (object instanceof BaseSimpleNpc) {
+          if (object instanceof Crate) {
+            if (object.spawnTimestamp > Date.now()) {
+              continue;
+            }
+            if (object.destroyed) {
+              object.destroyed = false;
+            }
+          }
+          client.spawnedEntities.add(object);
+          this.addSimpleNpc(client, object);
+          continue;
+        }
+
+        client.spawnedEntities.add(object);
+        if (object instanceof BaseLightweightCharacter) {
+          if (object.useSimpleStruct) {
+            this.addSimpleNpc(client, object);
+            continue;
+          } else {
+            this.addLightweightNpc(client, object);
+            if (object instanceof DoorEntity) {
+              if (object.isOpen) {
+                this.sendData<PlayerUpdatePosition>(
+                  client,
+                  "PlayerUpdatePosition",
+                  {
+                    transientId: object.transientId,
+                    positionUpdate: {
+                      sequenceTime: 0,
+                      unknown3_int8: 0,
+                      position: object.state.position,
+                      orientation: object.openAngle
+                    }
+                  }
+                );
+              }
+              continue;
+            }
+            if (object instanceof Npc) {
+              this.sendStandardFullNpcInit(client, object);
+              continue;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private spawnLoadingGridObjects(client: Client) {
+    const position = client.character.state.position;
+    for (const gridCell of this._grid) {
+      if (
+        !isPosInRadius(client.chunkRenderDistance, gridCell.position, position)
+      ) {
+        continue;
+      }
+      for (const object of gridCell.objects) {
+        if (
+          !isPosInRadius(
+            (object.npcRenderDistance as number) ||
+              this.charactersRenderDistance,
+            position,
+            object.state.position
+          )
+        ) {
+          continue;
+        }
+
+        if (client.spawnedEntities.has(object)) continue;
+
+        if (object instanceof BaseSimpleNpc) {
+          if (object instanceof Crate) {
+            if (object.spawnTimestamp > Date.now()) {
+              continue;
+            }
+            if (object.destroyed) {
+              object.destroyed = false;
+            }
+          }
+          client.spawnedEntities.add(object);
+          this.addSimpleNpc(client, object);
+          continue;
+        }
+
+        if (
+          object instanceof BaseLightweightCharacter &&
+          object.useSimpleStruct
+        ) {
+          client.spawnedEntities.add(object);
+          this.addSimpleNpc(client, object);
+        }
+      }
+    }
+  }
+
+  private checkPlayersPositionsChallenges() {
+    for (const key in this._characters) {
+      const character = this._characters[key];
+      if (character.currentChallenge === ChallengeType.PV_PD_SURVIVAL) {
+        const client = this.getClientByCharId(character.characterId);
+        if (client) {
+          const pv_pd_pos = new Float32Array([-233.5, 25.44, -1153.43]);
+          if (isPosInRadius(25, character.state.position, pv_pd_pos)) {
+            this.challengeManager.registerChallengeProgression(
+              client,
+              ChallengeType.PV_PD_SURVIVAL,
+              1
+            );
+          }
+        }
+      }
+    }
+  }
+
+  private POIManager(client: Client) {
+    // sends POIChangeMessage or clears it based on player location
+    let inPOI = false;
+    Z1_POIs.forEach((point: any) => {
+      if (
+        isPosInRadius(
+          point.range,
+          client.character.state.position,
+          point.position
+        )
+      ) {
+        inPOI = true;
+        if (client.currentPOI != point.stringId) {
+          // checks if player already was sent POIChangeMessage
+          this.sendData<POIChangeMessage>(client, "POIChangeMessage", {
+            messageStringId: point.stringId,
+            id: point.POIid
+          });
+          client.currentPOI = point.stringId;
+          if (point.POIid === 13) {
+            this.challengeManager.registerChallengeProgression(
+              client,
+              ChallengeType.RANCHITO,
+              1
+            );
+          }
+        }
+      }
+    });
+    if (!inPOI && client.currentPOI != 0) {
+      // checks if POIChangeMessage was already cleared
+      this.sendData<POIChangeMessage>(client, "POIChangeMessage", {
+        messageStringId: 0,
+        id: 115
+      });
+      client.currentPOI = 0;
+    }
+  }
+
+  private _sendData<ZonePacket>(
+    client: Client,
+    packetName: h1z1PacketsType2016,
+    obj: ZonePacket,
+    channel: SOEOutputChannels
+  ) {
+    if (packetName === "ClientUpdate.UpdateLocation" || packetName === "Character.Knockback") {
+      try { this._devHttpServer?.observeTestPlayerMotionSend(client, packetName, obj); }
+      catch { /* Observation never changes packing/sending or its exceptions. */ }
+    }
+    switch (packetName) {
+      case "H1emu.RequestModules":
+      case "Command.ExecuteCommand":
+      case "KeepAlive":
+      case "PlayerUpdatePosition":
+      case "GameTimeSync":
+      case "Synchronization":
+      case "Vehicle.StateData":
+        break;
+      default:
+        debug("send data", packetName);
+    }
+    const data = this._protocol.pack(packetName, obj);
+    if (data) {
+      this._gatewayServer.sendTunnelData(client.soeClientId, data, channel);
+    }
+    /*this.tasksManager.register(() => {
+      switch (packetName) {
+        case "H1emu.RequestModules":
+        case "Command.ExecuteCommand":
+        case "KeepAlive":
+        case "PlayerUpdatePosition":
+        case "GameTimeSync":
+        case "Synchronization":
+        case "Vehicle.StateData":
+          break;
+        default:
+          debug("send data", packetName);
+      }
+      const data = this._protocol.pack(packetName, obj);
+      if (data) {
+        this._gatewayServer.sendTunnelData(client.soeClientId, data, channel);
+      }
+    });*/
+  }
+
+  sendUnbufferedData(
+    client: Client,
+    packetName: h1z1PacketsType2016,
+    obj: zone2016packets
+  ) {
+    this._sendData(client, packetName, obj, SOEOutputChannels.Reliable);
+  }
+
+  sendOrderedData<ZonePacket>(
+    client: Client,
+    packetName: h1z1PacketsType2016,
+    obj: ZonePacket
+  ) {
+    this._sendData<ZonePacket>(
+      client,
+      packetName,
+      obj,
+      SOEOutputChannels.Ordered
+    );
+  }
+
+  sendData<ZonePacket>(
+    client: Client,
+    packetName: h1z1PacketsType2016,
+    obj: ZonePacket
+  ) {
+    this._sendData<ZonePacket>(
+      client,
+      packetName,
+      obj,
+      SOEOutputChannels.Reliable
+    );
+  }
+
+  sendReplicationData(client: Client, entity: BaseEntity) {
+    if (
+      entity instanceof Crate ||
+      entity instanceof Destroyable ||
+      entity instanceof Character ||
+      (entity instanceof ConstructionChildEntity &&
+        entity.itemDefinitionId == Items.WORKBENCH)
+    )
+      return;
+
+    let nameId = 0;
+    if (entity instanceof BaseLightweightCharacter) {
+      nameId = entity.nameId;
+    }
+
+    this.sendData<ReplicationCreateRepData>(
+      client,
+      "Replication.CreateRepData",
+      {
+        transientId: entity.transientId,
+        sequenceNumber: client.sentInteractionCounter++,
+        propertyHash: ReplicationPropertyHash.ISWORLDITEM
+      }
+    );
+    this.sendData<ReplicationCreateComponent>(
+      client,
+      "Replication.CreateComponent",
+      {
+        transientId: entity.transientId,
+        sequenceNumber: client.sentInteractionCounter++,
+        componentName: "ClientNpcComponent",
+        propertyHash: ReplicationPropertyHash.ISWORLDITEM,
+        payload: {
+          bufferData: {
+            nameId: nameId,
+            componentName: "ClientNpcComponent"
+          }
+        }
+      }
+    );
+
+    this.sendData<ReplicationCreateComponent>(
+      client,
+      "Replication.CreateComponent",
+      {
+        transientId: entity.transientId,
+        componentName: "ClientInteractComponent",
+        sequenceNumber: client.sentInteractionCounter++,
+        propertyHash: ReplicationPropertyHash.UNKNOWN1,
+        payload: {
+          bufferData: {
+            componentName: "ClientInteractComponent",
+            distance: entity instanceof ConstructionParentEntity ? 15 : 3
+          }
+        }
+      }
+    );
+  }
+
+  /*addLightWeightNpcQueue(
+    client: Client,
+    packetName: h1z1PacketsType2016,
+    obj: zone2016packets
+  ) {
+    client.lightWeightNpcQueue.push({ packetName: packetName, data: obj });
+  }*/
+
+  sendWeaponData(
+    client: Client,
+    packetName: weaponPacketsType,
+    obj: zone2016packets
+  ) {
+    this.sendData<WeaponWeapon>(client, "Weapon.Weapon", {
+      weaponPacket: {
+        packetName: packetName,
+        gameTime: getCurrentServerTimeWrapper().getTruncatedU32(),
+        packet: obj
+      }
+    });
+  }
+
+  sendRemoteWeaponData(
+    client: Client,
+    transientId: number,
+    packetName: remoteWeaponPacketsType,
+    obj: zone2016packets
+  ) {
+    this.sendData<WeaponWeapon>(client, "Weapon.Weapon", {
+      weaponPacket: {
+        packetName: "Weapon.RemoteWeapon",
+        gameTime: getCurrentServerTimeWrapper().getTruncatedU32(),
+        remoteWeaponPacket: {
+          packetName: packetName,
+          transientId: transientId,
+          packet: obj
+        }
+      }
+    });
+  }
+
+  sendRemoteWeaponDataToAllOthers(
+    client: Client,
+    transientId: number,
+    packetName: remoteWeaponPacketsType,
+    obj: any
+  ) {
+    this.sendDataToAllOthersWithSpawnedEntity<WeaponWeapon>(
+      this._characters,
+      client,
+      client.character.characterId,
+      "Weapon.Weapon",
+      {
+        weaponPacket: {
+          packetName: "Weapon.RemoteWeapon",
+          gameTime: getCurrentServerTimeWrapper().getTruncatedU32(),
+          remoteWeaponPacket: {
+            packetName: packetName,
+            transientId: transientId,
+            packet: obj
+          }
+        }
+      }
+    );
+  }
+
+  sendRemoteWeaponUpdateData(
+    client: Client,
+    transientId: number,
+    weaponGuid: string,
+    packetName: remoteWeaponUpdatePacketsType,
+    obj: zone2016packets
+  ) {
+    this.sendData<WeaponWeapon>(client, "Weapon.Weapon", {
+      weaponPacket: {
+        packetName: "Weapon.RemoteWeapon",
+        gameTime: getCurrentServerTimeWrapper().getTruncatedU32(),
+        remoteWeaponPacket: {
+          packetName: "RemoteWeapon.Update",
+          transientId: transientId,
+          remoteWeaponUpdatePacket: {
+            packetName: packetName,
+            weaponGuid: weaponGuid,
+            packet: obj
+          }
+        }
+      }
+    });
+  }
+
+  sendRemoteWeaponUpdateDataToAllOthers(
+    client: Client,
+    transientId: number,
+    weaponGuid: string,
+    packetName: remoteWeaponUpdatePacketsType,
+    obj: any
+  ) {
+    this.sendDataToAllOthersWithSpawnedEntity<WeaponWeapon>(
+      this._characters,
+      client,
+      client.character.characterId,
+      "Weapon.Weapon",
+      {
+        weaponPacket: {
+          packetName: "Weapon.RemoteWeapon",
+          gameTime: getCurrentServerTimeWrapper().getTruncatedU32(),
+          remoteWeaponPacket: {
+            packetName: "RemoteWeapon.Update",
+            transientId: transientId,
+            remoteWeaponUpdatePacket: {
+              packetName: packetName,
+              weaponGuid: weaponGuid,
+              packet: obj
+            }
+          }
+        }
+      }
+    );
+  }
+
+  sendAlert(client: Client, message: string) {
+    this._sendData(
+      client,
+      "ClientUpdate.TextAlert",
+      {
+        message: message
+      },
+      SOEOutputChannels.Reliable
+    );
+  }
+  sendAlertToAll(message: string, playerName: string = "") {
+    this._sendDataToAll("Broadcast.Zone", {
+      identity: {
+        characterFirstName: playerName
+      },
+      message: message
+    });
+  }
+
+  createClient(
+    sessionId: number,
+    soeClientId: string,
+    loginSessionId: string,
+    characterId: string,
+    generatedTransient: number
+  ) {
+    const client = new Client(
+      sessionId,
+      soeClientId,
+      loginSessionId,
+      characterId,
+      generatedTransient,
+      this
+    );
+    return client;
+  }
+
+  isBanExpired(ban?: ClientBan) {
+    if (!ban || !ban.expirationDate) return false;
+    if (ban.expirationDate < Date.now()) return true;
+    return false;
+  }
+
+  async isClientBanned(
+    loginSessionId: string,
+    address: string,
+    client?: Client
+  ): Promise<ClientBan | false> {
+    const addressBan: WithId<ClientBan> = (await this._db
+      ?.collection(DB_COLLECTIONS.BANNED)
+      .findOne({
+        IP: address,
+        active: true
+      })) as any;
+    const idBan: WithId<ClientBan> = (await this._db
+      ?.collection(DB_COLLECTIONS.BANNED)
+      .findOne({
+        loginSessionId,
+        active: true
+      })) as any;
+    if (addressBan || idBan) {
+      if (this.isBanExpired(addressBan)) {
+        await this._db?.collection(DB_COLLECTIONS.BANNED).updateOne(
+          { IP: address, active: true },
+          {
+            $set: {
+              active: false // Set active to false to indicate that it has expired
+            }
+          }
+        );
+        return false;
+      }
+      if (this.isBanExpired(idBan)) {
+        await this._db?.collection(DB_COLLECTIONS.BANNED).updateOne(
+          { loginSessionId, active: true },
+          {
+            $set: {
+              active: false // Set active to false to indicate that it has expired
+            }
+          }
+        );
+        return false;
+      }
+
+      if (client) {
+        client.banType = addressBan ? addressBan.banType : idBan?.banType;
+      }
+      return addressBan || idBan;
+    }
+    return false;
+  }
+
+  async unbanClient(
+    client: Client,
+    name: string
+  ): Promise<ClientBan | undefined> {
+    const unBannedClient = (await this._db
+      ?.collection(DB_COLLECTIONS.BANNED)
+      .findOneAndUpdate(
+        { name, active: true },
+        { $set: { active: false, unBanAdminName: client.character.name } }
+      )) as unknown as ClientBan | undefined;
+    return unBannedClient;
+  }
+
+  async unbanClientId(
+    client: Client,
+    loginSessionId: string
+  ): Promise<ClientBan | undefined> {
+    const unBannedClient = (
+      await this._db
+        ?.collection(DB_COLLECTIONS.BANNED)
+        .findOneAndUpdate(
+          { loginSessionId, active: true },
+          { $set: { active: false, unBanAdminName: client.character.name } }
+        )
+    )?.value as unknown as ClientBan | undefined;
+    return unBannedClient;
+  }
+
+  async banClient(
+    loginSessionId: string,
+    characterName: string,
+    reason: string,
+    adminId: string,
+    timestamp: number,
+    isSilent: boolean
+  ) {
+    let client: Client | string | undefined =
+      this.getClientByLoginSessionId(loginSessionId);
+
+    if (!client) client = this.getClientByName(characterName);
+
+    if (typeof client == "string") client = undefined;
+
+    const object: ClientBan = {
+      name: characterName,
+      banType: "normal",
+      banReason: reason ? reason : "no reason",
+      loginSessionId: loginSessionId,
+      IP:
+        this._gatewayServer.getSoeClientNetworkInfos(client?.soeClientId ?? "")
+          ?.address ?? "",
+      adminId: adminId ? adminId : "",
+      expirationDate: timestamp,
+      active: true,
+      unBanAdminName: ""
+    };
+    this._db?.collection(DB_COLLECTIONS.BANNED).insertOne(object);
+    if (timestamp && !isSilent) {
+      if (client) {
+        this.sendAlert(
+          client,
+          reason
+            ? `YOU HAVE BEEN BANNED FROM THE SERVER UNTIL ${getDateString(
+                timestamp
+              )}. REASON: ${reason}`
+            : `YOU HAVE BEEN BANNED FROM THE SERVER UNTIL: ${getDateString(
+                timestamp
+              )}`
+        );
+      }
+      this.sendAlertToAll(
+        reason
+          ? `${characterName} HAS BEEN BANNED FROM THE SERVER UNTIL ${getDateString(
+              timestamp
+            )}. REASON: ${reason}`
+          : `${characterName} HAS BEEN BANNED FROM THE SERVER UNTIL: ${getDateString(
+              timestamp
+            )}`
+      );
+    } else if (!isSilent) {
+      if (client) {
+        this.sendAlert(
+          client,
+          reason
+            ? `YOU HAVE BEEN PERMANENTLY BANNED FROM THE SERVER REASON: ${reason}`
+            : "YOU HAVE BEEN BANNED FROM THE SERVER."
+        );
+      }
+
+      this.sendAlertToAll(
+        reason
+          ? `${characterName} HAS BEEN BANNED FROM THE SERVER! REASON: ${reason}`
+          : `${characterName} HAS BEEN BANNED FROM THE SERVER!`
+      );
+    }
+    setTimeout(() => {
+      if (!(client instanceof Client)) return;
+      this.kickPlayer(client);
+    }, 3000);
+  }
+
+  enforceBan(client: Client) {
+    switch (client.banType) {
+      case "normal":
+        this.kickPlayer(client);
+        return;
+      case "rick":
+        this.sendData<ClientExitLaunchUrl>(client, "ClientExitLaunchUrl", {
+          url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        });
+        this.sendData<LoginFailed>(client, "LoginFailed", {});
+        this.deleteClient(client);
+        setTimeout(() => {
+          if (!client) return;
+          this.deleteClient(client);
+        }, 1000);
+        break;
+    }
+  }
+
+  kickPlayerWithReason(client: Client, reason: string, sendGlobal = false) {
+    if (!client || client.isAdmin) return;
+    for (let i = 0; i < 5; i++) {
+      this.sendAlert(
+        client,
+        `You are being kicked from the server. Reason: ${reason}`
+      );
+    }
+
+    if (!client) {
+      return;
+    }
+    if (sendGlobal) {
+      this.sendGlobalChatText(
+        `${client.character.name} has been kicked from the server!`
+      );
+    }
+    this.kickPlayer(client);
+  }
+
+  kickPlayer(client: Client) {
+    if (!client || client.isAdmin) return;
+    this.sendData<CharacterSelectSessionResponse>(
+      client,
+      "CharacterSelectSessionResponse",
+      {
+        status: 0,
+        sessionId: client.loginSessionId
+      }
+    );
+    this.deleteClient(client);
+  }
+
+  sendGameTimeSync(client: Client) {
+    debug("GameTimeSync");
+    this.sendData<GameTimeSync>(client, "GameTimeSync", {
+      time: Int64String(this.inGameTimeManager.time),
+      cycleSpeed: this.inGameTimeManager.getCycleSpeed(),
+      unknownBoolean1: false
+    });
+  }
+
+  sendRawToAllOthersWithSpawnedCharacter(
+    client: Client,
+    entityCharacterId: string = "",
+    data: Buffer
+  ) {
+    for (const a in this._clients) {
+      if (
+        client != this._clients[a] &&
+        this._clients[a].spawnedEntities.has(
+          this._characters[entityCharacterId]
+        )
+      ) {
+        this.sendRawDataReliable(this._clients[a], data);
+      }
+    }
+  }
+
+  sendRawToAllOthersWithSpawnedEntity(
+    client: Client,
+    dictionary: any,
+    entityCharacterId: string = "",
+    data: Buffer
+  ) {
+    for (const a in this._clients) {
+      if (
+        client != this._clients[a] &&
+        this._clients[a].spawnedEntities.has(dictionary[entityCharacterId])
+      ) {
+        this.sendRawDataReliable(this._clients[a], data);
+      }
+    }
+  }
+
+  //#region ********************VEHICLE********************
+
+  vehicleManager(client: Client) {
+    for (const key in this._vehicles) {
+      const vehicle = this._vehicles[key];
+      if (
+        // vehicle spawning / managed object assignment logic
+        isPosInRadius(
+          vehicle.npcRenderDistance || this.charactersRenderDistance,
+          client.character.state.position,
+          vehicle.state.position
+        )
+      ) {
+        if (!client.spawnedEntities.has(vehicle)) {
+          this.sendData<AddLightweightVehicle>(
+            client,
+            "AddLightweightVehicle",
+            {
+              ...vehicle.pGetLightweightVehicle(),
+              unknownGuid1: this.generateGuid()
+            }
+          );
+          vehicle.effectTags.forEach((effectTag: number) => {
+            this.sendData<CharacterAddEffectTagCompositeEffect>(
+              client,
+              "Character.AddEffectTagCompositeEffect",
+              {
+                characterId: vehicle.characterId,
+                effectId: effectTag,
+                unknownDword1: effectTag,
+                unknownDword2: effectTag
+              }
+            );
+          });
+          /*
+          if (vehicle.engineOn) {
+            this.sendData<>(client, "Vehicle.Engine", {
+              vehicleCharacterId: vehicle.characterId,
+              engineOn: true,
+            });
+          }
+          */
+          /*this.sendData<>(client, "Vehicle.OwnerPassengerList", {
+            characterId: client.character.characterId,
+            passengers: vehicle.pGetPassengers(this),
+          });*/
+          client.spawnedEntities.add(vehicle);
+        }
+        // disable managing vehicles with routine, leaving only managed when entering it
+        /*if (!vehicle.isManaged) {
+          // assigns management to first client within radius
+          this.assignManagedObject(client, vehicle);
+        }*/
+      } else if (
+        !isPosInRadius(
+          this.charactersRenderDistance,
+          client.character.state.position,
+          vehicle.state.position
+        )
+      ) {
+        // vehicle despawning / managed object drop logic
+
+        const vehicleExist = client.spawnedEntities.has(vehicle);
+        if (vehicleExist) {
+          if (vehicle.isManaged) {
+            this.dropManagedObject(client, vehicle);
+          }
+          this.sendData<CharacterRemovePlayer>(
+            client,
+            "Character.RemovePlayer",
+            {
+              characterId: vehicle.characterId
+            }
+          );
+          client.spawnedEntities.delete(vehicle);
+        }
+      }
+    }
+  }
+
+  assignManagedObject(client: Client, vehicle: Vehicle) {
+    // todo: vehicle seat swap managed object assignment logic
+    debug("\n\n\n\n\n\n\n\n\n\n assign managed object");
+
+    this.sendData<CharacterManagedObject>(client, "Character.ManagedObject", {
+      objectCharacterId: vehicle.characterId,
+      characterId: client.character.characterId
+    });
+    this.sendData<ClientUpdateManagedObjectResponseControl>(
+      client,
+      "ClientUpdate.ManagedObjectResponseControl",
+      {
+        control: true,
+        objectCharacterId: vehicle.characterId
+      }
+    );
+    client.managedObjects.push(vehicle.characterId);
+    vehicle.isManaged = true;
+  }
+
+  dropManagedObject(
+    client: Client,
+    vehicle: Vehicle,
+    keepManaged: boolean = false
+  ) {
+    const index = client.managedObjects.indexOf(vehicle.characterId);
+    if (index > -1) {
+      // todo: vehicle seat swap managed object drop logic
+      debug("\n\n\n\n\n\n\n\n\n\n drop managed object");
+      this.sendData(client, "ClientUpdate.ManagedObjectResponseControl", {
+        control: false,
+        objectCharacterId: vehicle.characterId
+      });
+      client.managedObjects.splice(index, 1);
+      // blocks vehicleManager from taking over management during a takeover
+      if (!keepManaged) vehicle.isManaged = false;
+    }
+  }
+
+  takeoverManagedObject(newClient: Client, vehicle: Vehicle) {
+    const index = newClient.managedObjects.indexOf(vehicle.characterId);
+    if (index === -1) {
+      // if object is already managed by client, do nothing
+      debug("\n\n\n\n\n\n\n\n\n\n takeover managed object");
+      for (const characterId in this._clients) {
+        const oldClient = this._clients[characterId];
+        const idx = oldClient.managedObjects.indexOf(vehicle.characterId);
+        if (idx > -1) {
+          this.dropManagedObject(oldClient, vehicle, true);
+          break;
+        }
+      }
+      this.assignManagedObject(newClient, vehicle);
+    }
+  }
+
+  dropAllManagedObjects(client: Client) {
+    client.managedObjects.forEach((characterId: string) => {
+      this.sendManagedObjectResponseControlPacket(client, {
+        control: false,
+        objectCharacterId: characterId
+      });
+      client.managedObjects.splice(
+        client.managedObjects.findIndex((e: string) => e === characterId),
+        1
+      );
+    });
+  }
+
+  sendCompositeEffectToAllWithSpawnedEntity(
+    dictionary: EntityDictionary<BaseEntity>,
+    object: BaseEntity,
+    effectId: number
+  ) {
+    this.sendDataToAllWithSpawnedEntity<CharacterPlayWorldCompositeEffect>(
+      dictionary,
+      object.characterId,
+      "Character.PlayWorldCompositeEffect",
+      {
+        characterId: object.characterId,
+        effectId: effectId,
+        position: object.state.position
+      }
+    );
+  }
+
+  sendCompositeEffectToAllInRange(
+    range: number,
+    characterId: string,
+    position: Float32Array,
+    effectId: Effects
+  ) {
+    this.sendDataToAllInRange<CharacterPlayWorldCompositeEffect>(
+      range,
+      position,
+      "Character.PlayWorldCompositeEffect",
+      {
+        characterId: characterId,
+        effectId: effectId,
+        position: position
+      }
+    );
+  }
+  sendDialogEffectToAllInRange(
+    range: number,
+    characterId: string,
+    position: Float32Array,
+    effectId: Effects
+  ) {
+    this.sendDataToAllInRange<CommandPlayDialogEffect>(
+      range,
+      position,
+      "Command.PlayDialogEffect",
+      {
+        characterId: characterId,
+        effectId: effectId
+      }
+    );
+  }
+
+  /**
+   * Cancels the currently playing emote for a character
+   * @param client - The client whose emote should be cancelled
+   */
+  cancelEmote(client: Client) {
+    if (client.character.currentEmote === 0) return; // no emote playing
+
+    // Send effect ID 0 to cancel the emote
+    this.sendDataToAllWithSpawnedEntity<CommandPlayDialogEffect>(
+      this._characters,
+      client.character.characterId,
+      "Command.PlayDialogEffect",
+      {
+        characterId: client.character.characterId,
+        effectId: 0
+      }
+    );
+
+    client.character.currentEmote = 0;
+  }
+
+  /*sendEffectToAllWithSpawnedEntity( idk whats wrong with it, sometimes works and sometimes doesnt
+    characterId: string,
+    effectId: number,
+    dictionary: any,
+  ) {
+      this.sendDataToAllWithSpawnedEntity(
+          dictionary,
+          characterId,
+          "Command.PlayDialogEffect",
+          {
+              characterId: characterId,
+              effectId: effectId,
+          }
+      );
+    
+  }*/
+  debugSendData(packetName: h1z1PacketsType2016) {
+    switch (packetName) {
+      case "KeepAlive":
+      case "PlayerUpdatePosition":
+      case "GameTimeSync":
+      case "Synchronization":
+      case "Vehicle.StateData":
+        break;
+      default:
+        debug("send data", packetName);
+    }
+  }
+
+  sendDataToAllWithSpawnedEntity<ZonePacket>(
+    dictionary: EntityDictionary<BaseEntity>,
+    entityCharacterId: string = "",
+    packetName: h1z1PacketsType2016,
+    obj: ZonePacket
+  ) {
+    if (!entityCharacterId) return;
+    const data = this._protocol.pack(packetName, obj);
+    if (!data) return;
+    this.debugSendData(packetName);
+    const traceSpeciesMotion =
+      packetName === "PlayerUpdatePosition" &&
+      entityCharacterId === this._testSpeciesProbeNpcCharacterId;
+    const traceNpcState =
+      packetName === "Character.UpdateCharacterState" &&
+      entityCharacterId === this._lastSpawnedNpcCharacterId;
+    let recipients = 0;
+    const traceObj = obj as unknown as Record<string, unknown>;
+    for (const a in this._clients) {
+      if (
+        this._clients[a].spawnedEntities.has(dictionary[entityCharacterId]) ||
+        this._clients[a].character.characterId == entityCharacterId
+      ) {
+        recipients++;
+        this.sendRawDataReliable(this._clients[a], data);
+      }
+    }
+    if (traceSpeciesMotion) {
+      const update = traceObj.positionUpdate as Record<string, unknown> | undefined;
+      console.log(
+        `[movetestnpcvisible] packet ${JSON.stringify({
+          id: entityCharacterId,
+          transientId: traceObj.transientId,
+          sequenceTime: update?.sequenceTime,
+          flags: update?.flags,
+          stance: update?.stance,
+          horizontalSpeed: update?.horizontalSpeed,
+          position: update?.position,
+          orientation: update?.orientation,
+          wireBytes: data.length,
+          recipients,
+          recipientIds: Object.values(this._clients)
+            .filter((c) => c.spawnedEntities.has(dictionary[entityCharacterId]))
+            .map((c) => c.sessionId)
+        })}`
+      );
+    }
+    if (traceNpcState) {
+      console.log(
+        `[test-zombie] UpdateCharacterState dispatch: id=${entityCharacterId}, ` +
+        `wireBytes=${data.length}, recipients=${recipients}`
+      );
+    }
+  }
+
+  sendDataToAllInRange<ZonePacket>(
+    range: number,
+    position: Float32Array,
+    packetName: h1z1PacketsType2016,
+    obj: ZonePacket
+  ) {
+    const data = this._protocol.pack(packetName, obj);
+    if (!data) return;
+    this.debugSendData(packetName);
+    for (const a in this._clients) {
+      if (
+        isPosInRadius(
+          range,
+          this._clients[a].character.state.position,
+          position
+        )
+      ) {
+        this.sendRawDataReliable(this._clients[a], data);
+      }
+    }
+  }
+
+  sendDataToAllOthersWithSpawnedEntity<ZonePacket>(
+    dictionary: EntityDictionary<BaseEntity>,
+    client: Client,
+    entityCharacterId: string = "",
+    packetName: h1z1PacketsType2016,
+    obj: ZonePacket
+  ) {
+    if (!entityCharacterId) return;
+    const data = this._protocol.pack(packetName, obj);
+    if (!data) return;
+    this.debugSendData(packetName);
+    for (const a in this._clients) {
+      if (
+        client != this._clients[a] &&
+        this._clients[a].spawnedEntities.has(dictionary[entityCharacterId])
+      ) {
+        this.sendRawDataReliable(this._clients[a], data);
+      }
+    }
+  }
+
+  sendDataToAllAdmins(packetName: h1z1PacketsType2016, obj: any): void {
+    const data = this._protocol.pack(packetName, obj);
+    if (data) {
+      for (const a in this._clients) {
+        if (this._clients[a].isAdmin) {
+          this.sendRawDataReliable(this._clients[a], data);
+        }
+      }
+    }
+  }
+
+  getClientsInRange(range: number, position: Float32Array): Client[] {
+    const clients: Client[] = [];
+    for (const a in this._clients) {
+      const client = this._clients[a];
+      if (isPosInRadius(range, client.character.state.position, position))
+        clients.push(client);
+    }
+    return clients;
+  }
+
+  mountVehicle(client: Client, vehicleGuid: string) {
+    const vehicle = this._vehicles[vehicleGuid];
+    if (!vehicle || !vehicle.isMountable) return;
+
+    if (vehicle.isLocked) {
+      this.sendChatText(client, "Vehicle is locked.");
+      return;
+    }
+    for (const a in this._constructionFoundations) {
+      const foundation = this._constructionFoundations[a];
+      if (
+        foundation.isSecured &&
+        foundation.isInside(vehicle.state.position) &&
+        !foundation.getHasPermission(
+          this,
+          client.character.characterId,
+          ConstructionPermissionIds.VISIT
+        ) &&
+        (!client.isAdmin || !client.isDebugMode)
+      )
+        return;
+    }
+    if (client.hudTimer != null) {
+      clearTimeout(client.hudTimer);
+      client.hudTimer = null;
+    }
+    client.character.isRunning = false; // maybe some async stuff make this useless need to test that
+    const seatId = vehicle.getNextSeatId(this),
+      seat = vehicle.seats[seatId],
+      passenger = this._characters[seat];
+    if (Number(seatId) < 0) return; // no available seats in vehicle
+    client.vehicle.mountedVehicle = vehicle.characterId;
+    client.isInAir = false;
+    if (passenger) {
+      // dismount the driver
+      const client = this.getClientByCharId(passenger.characterId);
+      if (client) {
+        this.dismountVehicle(client);
+      }
+    }
+    vehicle.seats[seatId] = client.character.characterId;
+    if (seatId == 0) {
+      this.takeoverManagedObject(client, vehicle);
+      this.abilitiesManager.sendVehicleAbilities(this, client, vehicle);
+      //vehicle.checkEngineRequirements(this);
+      this.sendData<VehicleOwner>(client, "Vehicle.Owner", {
+        guid: vehicle.characterId,
+        characterId: client.character.characterId,
+        unknownDword1: 0,
+        vehicleId: vehicle.vehicleId,
+        passengers: [
+          {
+            characterId: client.character.characterId,
+            identity: {
+              characterName: client.character.name
+            },
+            unknownString1: "",
+            unknownByte1: 1
+          }
+        ]
+      });
+    }
+
+    // Mount container on all players in the vehicle
+    if (vehicle.getContainer()) {
+      client.character.mountContainer(this, vehicle);
+    }
+
+    this.sendDataToAllWithSpawnedEntity<MountMountResponse>(
+      this._vehicles,
+      vehicleGuid,
+      "Mount.MountResponse",
+      {
+        characterId: client.character.characterId,
+        vehicleGuid: vehicle.characterId,
+        seatId: Number(seatId),
+        isDriver: seatId == 0 ? 1 : 0,
+        identity: {}
+      }
+    );
+
+    this.sendData<VehicleOccupy>(client, "Vehicle.Occupy", {
+      guid: vehicle.characterId,
+      characterId: client.character.characterId,
+      vehicleId: vehicle.vehicleId,
+      clearLoadout: 0,
+      unknownArray1: [
+        {
+          unknownDword1: 0,
+          unknownBoolean1: 0
+        }
+      ],
+      passengers: [
+        {
+          characterId: client.character.characterId,
+          identity: {
+            characterName: client.character.name
+          }
+        }
+      ],
+      unknownArray2: [{}],
+      unknownBytes1: { itemData: {} },
+      unknownBytes2: { itemData: {} }
+    });
+
+    // Workaround for fifth player vehicle bug. Ensure the camera position updates correctly while maintaining normal client functionality. TODO: Fix this properly (GitHub issue #2304)
+    if (seatId == 4) {
+      this.sendData<MountSeatChangeResponse>(
+        client,
+        "Mount.SeatChangeResponse",
+        {
+          characterId: client.character.characterId,
+          vehicleGuid: vehicle.characterId,
+          identity: {},
+          seatId: seatId,
+          unknownDword2: 0 // if set to 1 the selected character will have drive access
+        }
+      );
+    }
+  }
+
+  dismountVehicle(client: Client) {
+    if (!client.vehicle.mountedVehicle) return;
+    client.enableChecks = false;
+    setTimeout(() => {
+      client.enableChecks = true;
+    }, 5000);
+    const vehicle = this._vehicles[client.vehicle.mountedVehicle];
+    if (!vehicle) {
+      // return if vehicle doesnt exist
+      console.log(
+        `Error: ${client.character.name} exited non existing vehicle`
+      );
+      this.sendData<MountDismountResponse>(client, "Mount.DismountResponse", {
+        characterId: client.character.characterId
+      });
+      return;
+    }
+    vehicle.removeHotwireEffect(this);
+    const seatId = vehicle.getCharacterSeat(client.character.characterId);
+    client.character.vehicleExitDate = new Date().getTime();
+    if (seatId == -1) {
+      console.log(
+        `Error: ${client.character.name} exited vehicle with no seatId set`
+      );
+      return;
+    }
+    if (vehicle.vehicleId == VehicleIds.SPECTATE) {
+      this.sendData<MountDismountResponse>(client, "Mount.DismountResponse", {
+        characterId: client.character.characterId
+      });
+      this.deleteEntity(vehicle.characterId, this._vehicles);
+      return;
+    }
+    vehicle.seats[seatId] = "";
+    this.sendDataToAllWithSpawnedEntity<MountDismountResponse>(
+      this._characters,
+      client.character.characterId,
+      "Mount.DismountResponse",
+      {
+        characterId: client.character.characterId
+      }
+    );
+    client.isInAir = false;
+
+    // Check if there are no more passengers in the vehicle
+    if (vehicle.getPassengerList().length === 0) {
+      // Turn off the engine
+      if (vehicle.engineOn) vehicle.stopEngine(this);
+      // Unlock the vehicle
+      vehicle.isLocked = false;
+    }
+
+    client.vehicle.mountedVehicle = "";
+    this.sendData<VehicleOccupy>(client, "Vehicle.Occupy", {
+      guid: "",
+      characterId: client.character.characterId,
+      vehicleId: 0,
+      clearLoadout: 1,
+      unknownArray1: [
+        {
+          unknownDword1: 0,
+          unknownBoolean1: 0
+        }
+      ],
+      passengers: [],
+      unknownArray2: [],
+      unknownBytes1: { itemData: {} },
+      unknownBytes2: { itemData: {} }
+    });
+    this.sendDataToAllWithSpawnedEntity<VehicleOwner>(
+      this._vehicles,
+      vehicle.characterId,
+      "Vehicle.Owner",
+      {
+        guid: vehicle.characterId,
+        characterId: "",
+        unknownDword1: 0,
+        vehicleId: 0,
+        passengers: []
+      }
+    );
+    client.character.dismountContainer(this);
+  }
+
+  changeSeat(client: Client, packet: ReceivedPacket<MountSeatChangeRequest>) {
+    if (!client.vehicle.mountedVehicle) return;
+    const vehicle = this._vehicles[client.vehicle.mountedVehicle];
+    if (!vehicle) return;
+    const seatCount = vehicle.getSeatCount(),
+      oldSeatId = vehicle.getCharacterSeat(client.character.characterId);
+    const seatId = packet.data.seatId ?? 0,
+      seat = vehicle.seats[seatId],
+      passenger = this._characters[seat];
+    if (
+      seatId < seatCount &&
+      (!vehicle.seats[seatId] || !passenger?.isAlive) &&
+      oldSeatId != -1
+    ) {
+      if (seatId === 2) {
+        if (!!vehicle.seats[5]) return;
+      }
+      if (seatId === 3) {
+        if (!!vehicle.seats[6]) return;
+      }
+      if (passenger && !passenger?.isAlive) {
+        const client = this.getClientByCharId(passenger.characterId);
+        if (client) {
+          this.dismountVehicle(client);
+        }
+      }
+      this.sendDataToAllWithSpawnedEntity<MountSeatChangeResponse>(
+        this._vehicles,
+        client.vehicle.mountedVehicle,
+        "Mount.SeatChangeResponse",
+        {
+          characterId: client.character.characterId,
+          vehicleGuid: vehicle.characterId,
+          identity: {},
+          seatId: packet.data.seatId,
+          unknownDword2: packet.data.seatId === 0 ? 1 : 0 // if set to 1 the select character will have drive access
+        }
+      );
+      vehicle.seats[oldSeatId] = "";
+      vehicle.seats[seatId] = client.character.characterId;
+      if (!oldSeatId && vehicle.engineOn) {
+        vehicle.stopEngine(this);
+        client.character.dismountContainer(this);
+      }
+      if (seatId === 0) {
+        this.takeoverManagedObject(client, vehicle);
+        if (vehicle.hasRequiredComponents(this) && !vehicle.engineOn) {
+          vehicle.startEngine(this);
+        }
+        if (vehicle.getContainer()) {
+          client.character.mountContainer(this, vehicle);
+        }
+      }
+    }
+  }
+  //#endregion
+
+  startTimer(client: Client, stringId: number, time: number) {
+    this.sendData<ClientUpdateStartTimer>(client, "ClientUpdate.StartTimer", {
+      stringId: stringId,
+      time: time
+    });
+  }
+
+  startInteractionTimer(
+    client: Client,
+    stringId: number,
+    time: number,
+    animationId: number
+  ) {
+    this.sendDataToAllWithSpawnedEntity(
+      this._characters,
+      client.character.characterId,
+      "CharacterState.InteractionStart",
+      {
+        characterId: client.character.characterId,
+        timeData: {
+          duration: time
+        },
+        animationId: animationId,
+        stringId: stringId
+      }
+    );
+  }
+
+  reloadInterrupt(client: Client, weaponItem: LoadoutItem) {
+    if (!weaponItem || !weaponItem.weapon || !weaponItem.weapon.reloadTimer)
+      return;
+    client.character.clearReloadTimeout();
+    this.sendWeaponData(client, "Weapon.Reload", {
+      weaponGuid: weaponItem.itemGuid,
+      unknownDword1: weaponItem.weapon.ammoCount,
+      ammoCount: weaponItem.weapon.ammoCount,
+      unknownDword3: weaponItem.weapon.ammoCount,
+      currentReloadCount: toHex(++weaponItem.weapon.currentReloadCount)
+    });
+    this.sendRemoteWeaponUpdateDataToAllOthers(
+      client,
+      client.character.transientId,
+      weaponItem.itemGuid,
+      "Update.ReloadInterrupt",
+      {}
+    );
+  }
+
+  combatLog(client: Client) {
+    if (client.character.isAlive) {
+      this.sendChatText(client, "You must be dead to use combatlog");
+      return;
+    }
+    if (!client.character.getCombatLog().length) {
+      this.sendChatText(client, "No combatlog info available");
+      return;
+    }
+    const combatlog = client.character.getCombatLog();
+    this.sendChatText(
+      client,
+      "---------------------------------COMBATLOG:--------------------------------"
+    );
+    this.sendChatText(
+      client,
+      `TIME | SOURCE | TARGET | WEAPON | DISTANCE | HITLOCATION | HITPOSITION | OLD HP | NEW HP | PING | ENEMY PING | MESSAGE`
+    );
+    combatlog.forEach((e) => {
+      const time = `${((Date.now() - e.hitInfo.timestamp) / 1000).toFixed(1)}s`,
+        source =
+          e.source.name == client.character.name
+            ? "YOU"
+            : e.source.name || "undefined",
+        target =
+          e.target.name == client.character.name
+            ? "YOU"
+            : e.target.name || "undefined",
+        hitPosition = `[${e.hitInfo.hitPosition[0].toFixed(
+          0
+        )}, ${e.hitInfo.hitPosition[1].toFixed(
+          0
+        )}, ${e.hitInfo.hitPosition[2].toFixed(0)}]`,
+        oldHp = (e.hitInfo.oldHP / 100).toFixed(1),
+        newHp = (e.hitInfo.newHP / 100).toFixed(1),
+        ping = `${
+          e.source.name == client.character.name ? e.source.ping : e.target.ping
+        }ms`,
+        enemyPing = `${
+          e.source.name == client.character.name ? e.target.ping : e.source.ping
+        }ms`;
+      this.sendChatText(
+        client,
+        `${time} ${source} ${target} ${
+          this.getItemDefinition(e.hitInfo.weapon || 0)?.MODEL_NAME || "N/A"
+        } ${e.hitInfo.distance}m ${
+          e.hitInfo.hitLocation
+        } ${hitPosition} ${oldHp} ${newHp} ${ping} ${enemyPing} ${
+          e.hitInfo.message
+        }`
+      );
+    });
+    this.sendChatText(
+      client,
+      "---------------------------------------------------------------------------------"
+    );
+  }
+
+  //#region ********************INVENTORY********************   } }
+
+  /**
+   * Adds an item to a character's inventory.
+   *
+   * @param client - The client adding the item.
+   * @param item - The item to add.
+   * @param containerDefinitionId - The id of the container definition.
+   * @param character [character=client.character] - The character to add the item to.
+   */
+  addItem(
+    client: Client,
+    item: BaseItem,
+    containerDefinitionId: number,
+    character: BaseFullCharacter = client.character
+  ) {
+    const characterIds = new Set<string>();
+
+    const vehicle = this._vehicles[character.characterId];
+    if (vehicle) {
+      vehicle.getPassengerList().forEach((characterId) => {
+        characterIds.add(characterId);
+      });
+    } else {
+      if (character instanceof BaseLootableEntity) {
+        characterIds.add(character.mountedCharacter || "");
+      } else {
+        characterIds.add(character.characterId);
+      }
+    }
+
+    characterIds.forEach((characterId) => {
+      const client = this.getClientByCharId(characterId);
+      if (!client || !client.character?.initialized) return;
+      this.sendData<ClientUpdateItemAdd>(client, "ClientUpdate.ItemAdd", {
+        characterId:
+          character instanceof Character || character instanceof Vehicle2016
+            ? character.characterId
+            : EXTERNAL_CONTAINER_GUID,
+        data: character.pGetItemData(this, item, containerDefinitionId)
+      });
+    });
+  }
+
+  /**
+   * Generates random equipment for the specified entity and slots (Zombies only).
+   * To be deprecated soon
+   *
+   * @param entity - The entity to generate equipment for.
+   * @param slots - The slots to generate equipment for.
+   * @param excludedModels [excludedModels=[]] - The excluded equipment models.
+   */
+  generateRandomEquipmentsFromAnEntity(
+    entity: BaseFullCharacter,
+    slots: number[],
+    excludedModels: string[] = []
+  ) {
+    slots.forEach((slot) => {
+      entity._equipment[slot] = this.generateRandomEquipmentForSlot(
+        slot,
+        entity.gender,
+        excludedModels
+      );
+    });
+  }
+
+  /**
+   * Generates random equipment for a specific slot (Zombies only).
+   *
+   * @param slotId - The ID of the slot.
+   * @param gender - The gender of the entity.
+   * @param excludedModels [excludedModels=[]] - The excluded equipment models.
+   * @returns The generated equipment.
+   */
+  generateRandomEquipmentForSlot(
+    slotId: number,
+    gender: number,
+    excludedModels: string[] = []
+  ) {
+    const models = equipmentModelTexturesMapping[slotId];
+    if (excludedModels.length) {
+      for (const model in models) {
+        if (excludedModels.includes(model)) {
+          delete models[model];
+        }
+      }
+    }
+    const model = getRandomKeyFromAnObject(models);
+    const skins = equipmentModelTexturesMapping[slotId][model];
+    let skin;
+    if (skins) {
+      skin = getRandomFromArray(skins);
+    } else {
+      skin = "";
+    }
+    return {
+      modelName: model.replace("<gender>", gender == 1 ? "Male" : "Female"),
+      slotId,
+      textureAlias: skin,
+      guid: toBigHex(this.generateItemGuid())
+    };
+  }
+
+  isAccountItem(itemDefinitionId?: number): boolean {
+    if (!itemDefinitionId) return false;
+    const itemDef = this.getItemDefinition(itemDefinitionId);
+    return [
+      "RewardCrate",
+      "LockedRewardCrate",
+      "RewardCrateKey",
+      "AccountRecipe",
+      "IncrementEntitlement",
+      "EmoteAnimation",
+      "AccountGiveRewardSet"
+    ].includes(itemDef?.CODE_FACTORY_NAME ?? "");
+  }
+
+  /**
+   * Gets the rewards for a given itemDefinitionId.
+   *
+   * @param {number} [itemDefinitionId] - The ID of the crate to retrieve rewards from.
+   * @returns {RewardCrateRewardDefinition[]|undefined} The rewards.
+   */
+  getCrateRewards(itemDefinitionId?: number) {
+    if (!itemDefinitionId) return;
+    return Object.values(this._rewardCrateDefinitions).find(
+      (i) => i.itemDefinitionId === itemDefinitionId
+    )?.rewards;
+  }
+
+  /**
+   * Gets a random reward for a given crate.
+   *
+   * @param {number} [itemDefinitionId] - The ID of the crate to retrieve rewards from.
+   * @returns {number} Reward Item definition ID.
+   */
+  getRandomCrateReward(itemDefinitionId?: number): RandomReward | undefined {
+    const rewards = this.getCrateRewards(itemDefinitionId);
+    if (!rewards) return;
+    const totalChances = rewards.reduce(
+      (acc: any, reward: any) => acc + reward.rewardChance,
+      0
+    );
+    let randomChance = Math.random() * totalChances;
+    for (const rew of rewards) {
+      if (randomChance < rew.rewardChance) {
+        return {
+          reward: rew.itemDefinitionId,
+          isRare: rew.rewardChance === 1 || rew.rewardChance === 0.5
+        };
+      }
+      randomChance -= rew.rewardChance;
+    }
+  }
+
+  /**
+   * Gets the item definition for a given itemDefinitionId.
+   *
+   * @param {number} [itemDefinitionId] - The ID of the item definition to retrieve.
+   * @returns {ItemDefinition|undefined} The item definition or undefined.
+   */
+  getItemDefinition(itemDefinitionId?: number) {
+    if (!itemDefinitionId) return;
+    return this._itemDefinitions[itemDefinitionId];
+  }
+
+  /**
+   * Gets the max durability for a given itemDefinitionId.
+   *
+   * @param {number} [itemDefinitionId] - The ID of the item definition to retrieve.
+   * @returns {ItemDefinition|undefined} The item definition or undefined.
+   */
+  getItemBaseDurability(itemDefinitionId?: number): number {
+    if (!itemDefinitionId) return 0;
+    switch (true) {
+      case this.isGeneric(itemDefinitionId) &&
+        itemDefinitionId == Items.SKINNING_KNIFE:
+        return 2000;
+      case this.isConstruction(itemDefinitionId):
+      case this.isGeneric(itemDefinitionId) && !this.isConvey(itemDefinitionId):
+        return 0;
+      case itemDefinitionId == Items.WEAPON_HATCHET_MAKESHIFT:
+      case itemDefinitionId == Items.WEAPON_BRANCH:
+        return 500;
+      case itemDefinitionId == Items.WEAPON_BAT_ALUM:
+        return 3000;
+      case itemDefinitionId == Items.WEAPON_AXE_WOOD:
+      case itemDefinitionId == Items.WEAPON_AXE_FIRE:
+        return 4000;
+      case itemDefinitionId == Items.WEAPON_TORCH:
+      case itemDefinitionId == Items.WEAPON_COMBATKNIFE:
+      case this.isArmor(itemDefinitionId):
+        return 1000;
+      case this.isHelmet(itemDefinitionId):
+        return 100;
+      case this.isConvey(itemDefinitionId):
+        return 5400;
+      case this.isWeapon(itemDefinitionId):
+      default:
+        return 2000;
+    }
+  }
+
+  /**
+   * Gets the weapon definition for a given weaponDefinitionId.
+   *
+   * @param {number} weaponDefinitionId - The ID of the weapon definition to retrieve.
+   * @returns {WeaponDefinition|undefined} The weapon definition or undefined.
+   */
+  getWeaponDefinition(weaponDefinitionId: number) {
+    if (!weaponDefinitionId) return;
+    return this._weaponDefinitions[weaponDefinitionId]?.DATA;
+  }
+
+  /**
+   * Gets the firegroup definition for a given firegroupId.
+   *
+   * @param {number} firegroupId - The ID of the firegroup definition to retrieve.
+   * @returns {FiregroupDefinition|undefined} The firegroup definition or undefined.
+   */
+  getFiregroupDefinition(firegroupId: number) {
+    return this._firegroupDefinitions[firegroupId]?.DATA;
+  }
+
+  /**
+   * Gets the firemode definition for a given firemodeId.
+   *
+   * @param {number} firemodeId - The ID of the firemode definition to retrieve.
+   * @returns {FiremodeDefinition|undefined} The firemode definition or undefined.
+   */
+  getFiremodeDefinition(firemodeId: number) {
+    return this._firemodeDefinitions[firemodeId]?.DATA.DATA;
+  }
+
+  /**
+   * Gets the ammoId for a given weapon.
+   *
+   * @param {number} itemDefinitionId - The itemDefinitionId of the weapon.
+   * @returns {number} The ammoId (0 if undefined).
+   */
+  getWeaponAmmoId(itemDefinitionId: number): number {
+    const itemDefinition = this.getItemDefinition(itemDefinitionId),
+      weaponDefinition = this.getWeaponDefinition(itemDefinition?.PARAM1 || 0),
+      firegroupDefinition = this.getFiregroupDefinition(
+        weaponDefinition?.FIRE_GROUPS[0]?.FIRE_GROUP_ID
+      ),
+      firemodeDefinition = this.getFiremodeDefinition(
+        firegroupDefinition?.FIRE_MODES[0]?.FIRE_MODE_ID
+      );
+
+    return firemodeDefinition?.AMMO_ITEM_ID || 0;
+  }
+
+  /**
+   * Gets the reload time in milliseconds for a given weapon.
+   *
+   * @param {number} itemDefinitionId - The itemDefinitionId of the weapon.
+   * @returns {number} The reload time in milliseconds (0 if undefined).
+   */
+  getWeaponReloadTime(itemDefinitionId: number): number {
+    const itemDefinition = this.getItemDefinition(itemDefinitionId),
+      weaponDefinition = this.getWeaponDefinition(itemDefinition?.PARAM1 || 0),
+      firegroupDefinition = this.getFiregroupDefinition(
+        weaponDefinition?.FIRE_GROUPS[0]?.FIRE_GROUP_ID
+      ),
+      firemodeDefinition = this.getFiremodeDefinition(
+        firegroupDefinition?.FIRE_MODES[0]?.FIRE_MODE_ID
+      );
+
+    return firemodeDefinition?.RELOAD_TIME_MS || 0;
+  }
+
+  /**
+   * Gets the clip size for a given weapon.
+   *
+   * @param {number} itemDefinitionId - The itemDefinitionId of the weapon.
+   * @returns {number} The clip size (0 if undefined).
+   */
+  getWeaponClipSize(itemDefinitionId: number): number {
+    const itemDefinition = this.getItemDefinition(itemDefinitionId),
+      weaponDefinition = this.getWeaponDefinition(itemDefinition?.PARAM1 || 0);
+
+    return weaponDefinition.AMMO_SLOTS[0]?.CLIP_SIZE || 0;
+  }
+
+  /**
+   * Gets the maximum amount of ammo a clip can hold for a given weapon.
+   *
+   * @param {number} itemDefinitionId - The itemDefinitionId of the weapon.
+   * @returns {number} The maximum ammo (0 if undefined).
+   */
+  getWeaponMaxAmmo(itemDefinitionId: number): number {
+    const itemDefinition = this.getItemDefinition(itemDefinitionId),
+      weaponDefinition = this.getWeaponDefinition(itemDefinition?.PARAM1 || 0);
+
+    return weaponDefinition.AMMO_SLOTS[0]?.CLIP_SIZE || 0;
+  }
+
+  /**
+   * Gets the container definition for a given containerDefinitionId.
+   *
+   * @param {number} containerDefinitionId - The id of the container definition to retrieve.
+   * @returns {ContainerDefinition} The container definition.
+   */
+  getContainerDefinition(containerDefinitionId: number) {
+    if (this._containerDefinitions[containerDefinitionId]) {
+      return this._containerDefinitions[containerDefinitionId];
+    } else {
+      console.log(
+        `Tried to get containerDefinition for invalid containerDefinitionId ${containerDefinitionId}`
+      );
+      return this._containerDefinitions[119];
+    }
+  }
+
+  /**
+   * Gets the maximum value for a given resource.
+   *
+   * @param {ResourceIds} resourceId - The ID of the resource.
+   * @returns {number} The maximum value of the resource (0 if undefined).
+   */
+  getResourceMaxValue(resourceId: ResourceIds): number {
+    if (!resourceDefinitions[resourceId]) return 0;
+    return resourceDefinitions[resourceId].MAX_VALUE || 0;
+  }
+
+  /**
+   * Generates and returns an unused itemGuid.
+   *
+   * @returns {bigint} The generated itemGuid.
+   */
+  generateItemGuid(): bigint {
+    return ++this.lastItemGuid;
+  }
+
+  /**
+   * Generates a new item with the specified itemDefinitionId and count.
+   *
+   * @param {number} itemDefinitionId - The itemDefinitionId of the item to generate.
+   * @param {number} [count=1] - The count of the item.
+   * @param {boolean} [forceMaxDurability =false] - force the item to have his max durability.
+   * @returns {BaseItem|undefined} The generated item, or undefined if the item definition is invalid.
+   */
+  generateItem(
+    itemDefinitionId: number,
+    count: number = 1,
+    forceMaxDurability: boolean = false
+  ): BaseItem | undefined {
+    const itemDefinition = this.getItemDefinition(itemDefinitionId);
+    if (!itemDefinition) {
+      debug(
+        `[ERROR] GenerateItem: Invalid item definition: ${itemDefinitionId}`
+      );
+      return;
+    }
+    const generatedGuid = toBigHex(this.generateItemGuid());
+    let durability: number = this.getItemBaseDurability(itemDefinitionId);
+    let wornOffDurability: number = 0;
+
+    const weaponDefinitionId = itemDefinition.PARAM1;
+    switch (weaponDefinitionId) {
+      case WeaponDefinitionIds.WEAPON_NAGAFENS_RAGE:
+      case WeaponDefinitionIds.WEAPON_REAPER:
+      case WeaponDefinitionIds.WEAPON_FROSTBITE:
+      case WeaponDefinitionIds.WEAPON_BLAZE:
+      case WeaponDefinitionIds.WEAPON_PURGE:
+        durability = 1000;
+        break;
+      case WeaponDefinitionIds.WEAPON_WRENCH:
+        durability = 2000;
+        break;
+      case WeaponDefinitionIds.WEAPON_CROWBAR:
+      case WeaponDefinitionIds.WEAPON_HAMMER:
+        if (!forceMaxDurability) {
+          do {
+            wornOffDurability = Math.floor(Math.random() * durability);
+          } while (wornOffDurability < 500);
+          break;
+        }
+      case WeaponDefinitionIds.WEAPON_308:
+      case WeaponDefinitionIds.WEAPON_SHOTGUN:
+      case WeaponDefinitionIds.WEAPON_AK47:
+      case WeaponDefinitionIds.WEAPON_AR15:
+      case WeaponDefinitionIds.WEAPON_1911:
+      case WeaponDefinitionIds.WEAPON_M9:
+      case WeaponDefinitionIds.WEAPON_MAGNUM:
+      case WeaponDefinitionIds.WEAPON_R380:
+        if (!forceMaxDurability) {
+          do {
+            wornOffDurability = Math.floor(Math.random() * durability);
+          } while (wornOffDurability < 350);
+          break;
+        }
+    }
+    if (wornOffDurability > 0) durability = wornOffDurability;
+    const itemData: BaseItem = new BaseItem(
+      itemDefinitionId,
+      generatedGuid,
+      durability,
+      count
+    );
+    if (this.isWeapon(itemDefinitionId)) {
+      itemData.weapon = new Weapon(itemData);
+    }
+    return itemData;
+  }
+  generateAccountItem(
+    itemDefinitionId: number,
+    count: number = 1
+  ): BaseItem | undefined {
+    const itemDefinition = this.getItemDefinition(itemDefinitionId);
+    if (!itemDefinition) {
+      debug(
+        `[ERROR] GenerateItem: Invalid item definition: ${itemDefinitionId}`
+      );
+      return;
+    }
+    const generatedGuid = generateRandomGuid();
+
+    const itemData: BaseItem = new BaseItem(
+      itemDefinitionId,
+      generatedGuid,
+      100,
+      count
+    );
+    return itemData;
+  }
+
+  /**
+   * Checks if an item with the specified itemDefinitionId is a weapon.
+   *
+   * @param {number} itemDefinitionId - The itemDefinitionId to check.
+   * @returns {boolean} True if the item is a weapon, false otherwise.
+   */
+  isWeapon(itemDefinitionId: number): boolean {
+    return (
+      this.getItemDefinition(itemDefinitionId)?.ITEM_TYPE == ItemTypes.WEAPON
+    );
+  }
+
+  /**
+   * Checks if an item with the specified itemDefinitionId is a container.
+   *
+   * @param {number} itemDefinitionId - The itemDefinitionId to check.
+   * @returns {boolean} True if the item is a container, false otherwise.
+   */
+  isContainer(itemDefinitionId: number): boolean {
+    return (
+      this.getItemDefinition(itemDefinitionId)?.ITEM_TYPE == ItemTypes.CONTAINER
+    );
+  }
+
+  /**
+   * Checks if an item with the specified itemDefinitionId is an armor.
+   *
+   * @param {number} itemDefinitionId - The itemDefinitionId to check.
+   * @returns {boolean} True if the item is an armor, false otherwise.
+   */
+  isArmor(itemDefinitionId: number): boolean {
+    return (
+      this.getItemDefinition(itemDefinitionId)?.ITEM_CLASS ==
+      ItemClasses.BODY_ARMOR
+    );
+  }
+
+  /**
+   * Checks if an item with the specified itemDefinitionId is a helmet.
+   *
+   * @param {number} itemDefinitionId - The itemDefinitionId to check.
+   * @returns {boolean} True if the item is a helmet, false otherwise.
+   */
+  isHelmet(itemDefinitionId: number): boolean {
+    const itemDef = this.getItemDefinition(itemDefinitionId);
+    return itemDef?.ITEM_CLASS == 25000 && itemDef?.IS_ARMOR == 1;
+  }
+
+  /**
+   * Checks if an item with the specified itemDefinitionId is a convey.
+   *
+   * @param {number} itemDefinitionId - The itemDefinitionId to check.
+   * @returns {boolean} True if the item is a convey, false otherwise.
+   */
+  isConvey(itemDefinitionId: number): boolean {
+    return this.getItemDefinition(itemDefinitionId)?.DESCRIPTION_ID == 11895;
+  }
+
+  /**
+   * Checks if an item with the specified itemDefinitionId is a boot.
+   *
+   * @param {number} itemDefinitionId - The itemDefinitionId to check.
+   * @returns {boolean} True if the item is a convey, false otherwise.
+   */
+  isBoot(itemDefinitionId: number): boolean {
+    return [11155, 13581].includes(
+      this.getItemDefinition(itemDefinitionId)?.DESCRIPTION_ID ?? 0
+    );
+  }
+
+  /**
+   * Checks if an item with the specified itemDefinitionId is a zed shoe.
+   *
+   * @param {number} itemDefinitionId - The itemDefinitionId to check.
+   * @returns {boolean} True if the item is a convey, false otherwise.
+   */
+  isZed(itemDefinitionId: number): boolean {
+    return this.getItemDefinition(itemDefinitionId)?.DESCRIPTION_ID == 15026;
+  }
+
+  /**
+   * Checks if an item with the specified itemDefinitionId is a gator shoe.
+   *
+   * @param {number} itemDefinitionId - The itemDefinitionId to check.
+   * @returns {boolean} True if the item is a convey, false otherwise.
+   */
+  isGator(itemDefinitionId: number): boolean {
+    return [14239, 12496].includes(
+      this.getItemDefinition(itemDefinitionId)?.DESCRIPTION_ID ?? 0
+    );
+  }
+
+  /**
+   * Checks if an item with the specified itemDefinitionId is footwear.
+   *
+   * @param {number} itemDefinitionId - The itemDefinitionId to check.
+   * @returns {boolean} True if the item is a boot, false otherwise.
+   */
+  isFootwear(itemDefinitionId: number): boolean {
+    return (
+      this.getItemDefinition(itemDefinitionId)?.ITEM_CLASS ==
+      ItemClasses.FOOTWEAR
+    );
+  }
+
+  /**
+   * Checks if an item with the specified itemDefinitionId is a generic item type.
+   *
+   * @param {number} itemDefinitionId - The itemDefinitionId to check.
+   * @returns {boolean} True if the item is a generic type, false otherwise.
+   */
+  isGeneric(itemDefinitionId: number): boolean {
+    return this.getItemDefinition(itemDefinitionId)?.ITEM_TYPE == 1;
+  }
+
+  /**
+   * Checks if an item with the specified itemDefinitionId is a construction type.
+   *
+   * @param {number} itemDefinitionId - The itemDefinitionId to check.
+   * @returns {boolean} True if the item is a generic type, false otherwise.
+   */
+  isConstruction(itemDefinitionId: number): boolean {
+    return [40, 41].includes(
+      this.getItemDefinition(itemDefinitionId)?.ITEM_TYPE ?? 0
+    );
+  }
+
+  /**
+   * Checks if an item with the specified itemDefinitionId is stackable.
+   *
+   * @param {number} itemDefinitionId - The itemDefinitionId to check.
+   * @returns {boolean} True if the item is stackable, false otherwise.
+   */
+  isStackable(itemDefinitionId: number): boolean {
+    const itemDefinition = this.getItemDefinition(itemDefinitionId);
+    if (!itemDefinition) return false;
+    return itemDefinition.MAX_STACK_SIZE > 1 ? true : false;
+  }
+
+  /**
+   * Validates if an item can be equipped in the specified equipment slot.
+   *
+   * @param {number} itemDefinitionId - The itemDefinitionId of the item to validate.
+   * @param {number} equipmentSlotId - The equipment slot ID.
+   * @returns {boolean} True if the item can be equipped in the slot, false otherwise.
+   */
+  validateEquipmentSlot(itemDefinitionId: number, equipmentSlotId: number) {
+    const itemDefinition = this.getItemDefinition(itemDefinitionId);
+    if (!itemDefinition || !itemDefinition.FLAG_CAN_EQUIP) return false;
+    return !!equipSlotItemClasses.find(
+      (slot: any) =>
+        slot.ITEM_CLASS === itemDefinition.ITEM_CLASS &&
+        equipmentSlotId === slot.EQUIP_SLOT_ID
+    );
+  }
+
+  /**
+   * Validates that a given itemDefinitionId can be equipped in a given loadout slot.
+   *
+   * @param {number} itemDefinitionId - The definition ID of an item to validate.
+   * @param {number} loadoutSlotId - The loadoutSlotId to have the item validated for.
+   * @param {number} loadoutId - The loadoutId of the entity to get the slot for.
+   * @returns {boolean} Returns true/false if the item can go in a specified loadout slot.
+   */
+  validateLoadoutSlot(
+    itemDefinitionId: number,
+    loadoutSlotId: number,
+    loadoutId: number
+  ): boolean {
+    const itemDefinition = this.getItemDefinition(itemDefinitionId);
+    if (!itemDefinition || !itemDefinition.FLAG_CAN_EQUIP) return false;
+    return !!loadoutSlotItemClasses.find(
+      (slot: any) =>
+        slot.ITEM_CLASS == itemDefinition.ITEM_CLASS &&
+        loadoutSlotId == slot.SLOT &&
+        slot.LOADOUT_ID == loadoutId
+    );
+  }
+
+  /**
+   * Gets the first loadout slot that a specified item is able to go into.
+   *
+   * @param {number} itemDefId - The definition ID of an item to check.
+   * @param {number} [loadoutId=LoadoutIds.CHARACTER] - Optional: The loadoutId of the entity to get the slot for, default LoadoutIds.CHARACTER.
+   * @returns {number} Returns the ID of the first loadout slot that an item can go into (occupied or not).
+   */
+  getLoadoutSlot(itemDefId: number, loadoutId: number = LoadoutIds.CHARACTER) {
+    const itemDefinition = this.getItemDefinition(itemDefId);
+    if (!itemDefinition) return 0;
+    const loadoutSlotItemClass = loadoutSlotItemClasses.find(
+      (slot: any) =>
+        slot.ITEM_CLASS == itemDefinition.ITEM_CLASS &&
+        loadoutId == slot.LOADOUT_ID
+    );
+    return loadoutSlotItemClass?.SLOT || 0;
+  }
+
+  /**
+   * Switches the loadout slot for a client.
+   *
+   * @param {Client} client - The client to switch the loadout slot for.
+   * @param {LoadoutItem} loadoutItem - The new loadout item.
+   */
+  switchLoadoutSlot(client: Client, loadoutItem: LoadoutItem) {
+    const oldLoadoutSlot = client.character.currentLoadoutSlot;
+    this.reloadInterrupt(client, client.character._loadout[oldLoadoutSlot]);
+
+    // disable old ability
+    const weapon = client.character.getEquippedWeapon(),
+      currentWeaponItemDef = this.getItemDefinition(weapon?.itemDefinitionId);
+    if (currentWeaponItemDef) {
+      this.abilitiesManager.deactivateAbility(
+        this,
+        client,
+        currentWeaponItemDef.ACTIVATABLE_ABILITY_ID
+      );
+    }
+
+    // remove passive equip
+    this.clearEquipmentSlot(
+      client.character,
+      client.character.getActiveEquipmentSlot(loadoutItem),
+      true
+    );
+    client.character.currentLoadoutSlot = loadoutItem.slotId;
+    client.character.equipItem(this, loadoutItem, true, loadoutItem.slotId);
+
+    // equip passive slot
+    client.character.equipItem(
+      this,
+      client.character._loadout[oldLoadoutSlot],
+      true,
+      oldLoadoutSlot
+    );
+    if (loadoutItem.weapon) loadoutItem.weapon.currentReloadCount = 0;
+    if (this.isWeapon(loadoutItem.itemDefinitionId)) {
+      const itemDefinition = this.getItemDefinition(
+        loadoutItem.itemDefinitionId
+      );
+      if (itemDefinition) {
+        this.abilitiesManager.deactivateAbility(
+          this,
+          client,
+          itemDefinition.ACTIVATABLE_ABILITY_ID
+        );
+      }
+      this.sendRemoteWeaponUpdateDataToAllOthers(
+        client,
+        client.character.transientId,
+        loadoutItem.itemGuid,
+        "Update.SwitchFireMode",
+        {
+          firegroupIndex: 0,
+          firemodeIndex: 0
+        }
+      );
+
+      this.sendDataToAllOthersWithSpawnedEntity<CharacterWeaponStance>(
+        this._characters,
+        client,
+        client.character.characterId,
+        "Character.WeaponStance",
+        {
+          characterId: client.character.characterId,
+          stance: client.character.weaponStance
+        }
+      );
+    }
+  }
+
+  /**
+   * Clears a character's equipment slot.
+   *
+   * @param {BaseFullCharacter} character - The character to have their equipment slot cleared.
+   * @param {number} equipmentSlotId - The equipment slot to clear.
+   * @param {boolean} [sendPacket=true] - Optional: Specifies whether to send a packet to other clients, default is true.
+   * @returns {boolean} Returns true if the slot was cleared, false if the slot is invalid.
+   */
+  clearEquipmentSlot(
+    character: BaseFullCharacter,
+    equipmentSlotId: number,
+    sendPacket = true
+  ): boolean {
+    if (!equipmentSlotId) return false;
+    delete character._equipment[equipmentSlotId];
+
+    const client = this.getClientByContainerAccessor(character);
+    if (!client) return true;
+
+    if (client.character.initialized && sendPacket) {
+      const data = {
+        characterData: {
+          characterId: client.character.characterId
+        },
+        slotId: equipmentSlotId
+      };
+      this.sendDataToAllWithSpawnedEntity(
+        this._characters,
+        client.character.characterId,
+        "Equipment.UnsetCharacterEquipmentSlot",
+        data
+      );
+    }
+    if (equipmentSlotId === EquipSlots.RHAND) {
+      client.character.currentLoadoutSlot = LoadoutSlots.FISTS;
+      client.character.equipItem(
+        this,
+        client.character._loadout[LoadoutSlots.FISTS]
+      ); //equip fists
+    }
+    return true;
+  }
+  async lootAccountItem(
+    server: ZoneServer2016,
+    client: Client,
+    item?: BaseItem
+  ) {
+    if (!item) {
+      return;
+    }
+    const accountItems = await server.accountInventoriesManager.getAccountItems(
+      client.loginSessionId
+    );
+    if (!accountItems) return false;
+    const savedItem = accountItems.find((v) => {
+      return v.itemDefinitionId === item.itemDefinitionId;
+    });
+    // if an itemdef is already in the account inventory we only update the stack count
+    if (savedItem) {
+      savedItem.stackCount += item.stackCount;
+      await server.accountInventoriesManager.updateAccountItem(
+        client.loginSessionId,
+        savedItem
+      );
+      server.sendData(client, "Items.UpdateAccountItem", {
+        itemId: savedItem.itemGuid,
+        itemDefinitionId: savedItem.itemDefinitionId,
+        itemCount: savedItem.stackCount
+      });
+    } else {
+      await server.accountInventoriesManager.addAccountItem(
+        client.loginSessionId,
+        item
+      );
+      server.sendData(client, "Items.AddAccountItem", {
+        itemId: item.itemGuid,
+        itemDefinitionId: item.itemDefinitionId,
+        itemCount: item.stackCount
+      });
+    }
+  }
+
+  lootCrateWithChance(client: Client, dropChance: number) {
+    // dropChance ranges 0-1000
+    if (chance(dropChance)) {
+      this.rewardManager.dropReward(client);
+    }
+  }
+  /**
+   * Removes an item from the account inventory.
+   *
+   * @param {BaseFullCharacter} character - The character to have their items removed.
+   * @param {BaseItem} item - The item to remove.
+   * @param {number} [count=1]  - Optional: Specifies the amount of items that need to be removed, default is 1.
+   * @returns {boolean} Returns true if the item was successfully removed, false if there was an error.
+   */
+  async removeAccountItem(
+    character: BaseFullCharacter,
+    item: BaseItem,
+    count: number = 1
+  ): Promise<boolean> {
+    const client = this.getClientByCharId(character.characterId);
+    if (!client) return false;
+
+    item.stackCount -= count;
+    if (item.stackCount <= 0) {
+      await this.accountInventoriesManager.removeAccountItem(
+        client.loginSessionId,
+        item
+      );
+      this.sendData<ItemsRemoveAccountItem>(client, "Items.RemoveAccountItem", {
+        itemId: item.itemGuid,
+        itemDefinitionId: item.itemDefinitionId
+      });
+    } else {
+      await this.accountInventoriesManager.updateAccountItem(
+        client.loginSessionId,
+        item
+      );
+      this.sendData<ItemsUpdateAccountItem>(client, "Items.UpdateAccountItem", {
+        itemId: item.itemGuid,
+        itemDefinitionId: item.itemDefinitionId,
+        itemCount: item.stackCount
+      });
+    }
+
+    return true;
+  }
+
+  /**
+   * Removes an item from the loadout.
+   *
+   * @param {BaseFullCharacter} character - The character to have their items removed.
+   * @param {number} loadoutSlotId - The loadout slot containing the item to remove.
+   * @param {boolean} [updateEquipment=true] - Optional: Specifies whether to update the equipment, default is true.
+   * @returns {boolean} Returns true if the item was successfully removed, false if there was an error.
+   */
+  removeLoadoutItem(
+    character: BaseFullCharacter,
+    loadoutSlotId: number,
+    updateEquipment: boolean = true
+  ): boolean {
+    const item = character._loadout[loadoutSlotId],
+      itemDefId = item?.itemDefinitionId; // save before item gets deleted
+
+    if (!item || !itemDefId) return false;
+
+    const client = this.getClientByContainerAccessor(character);
+
+    if (client && this.isWeapon(item.itemDefinitionId)) {
+      this.sendRemoteWeaponDataToAllOthers(
+        client,
+        client.character.transientId,
+        "RemoteWeapon.RemoveWeapon",
+        {
+          guid: item.itemGuid
+        }
+      );
+    }
+    if (client) this.deleteItem(character, item.itemGuid);
+    delete character._loadout[loadoutSlotId];
+    character.updateLoadout(this);
+    if (client && this.isFootwear(itemDefId)) {
+      this.updateFootwear(client, itemDefId, true);
+    }
+    if (updateEquipment) {
+      this.clearEquipmentSlot(
+        character,
+        character.getActiveEquipmentSlot(item)
+      );
+    }
+    if (client) {
+      this.checkNightVision(client);
+    }
+    if (this.getItemDefinition(itemDefId)?.ITEM_TYPE === ItemTypes.CONTAINER) {
+      delete character._containers[loadoutSlotId];
+      if (client) this.initializeContainerList(client);
+    }
+    return true;
+  }
+
+  /**
+   * Returns a client object by either the characterId of the passed character,
+   * or the mountedCharacterId if the passed character is a BaseLootableEntity.
+   *
+   * @param {BaseFullCharacter | BaseLootableEntity} character - Either a Character or BaseLootableEntity to retrieve its accessing client.
+   * @returns {Client | undefined} Returns client or undefined.
+   */
+  getClientByContainerAccessor(character: BaseFullCharacter) {
+    let client: Client | undefined = this.getClientByCharId(
+      character.characterId
+    );
+    if (!client && character instanceof BaseLootableEntity) {
+      client = this.getClientByCharId(character.mountedCharacter || "");
+    }
+    return client;
+  }
+
+  /**
+   * Removes items from a specific item stack in a container.
+   *
+   * @param {BaseFullCharacter} character - The character to have their items removed.
+   * @param {BaseItem} item - The item object.
+   * @param {LoadoutContainer} container - The container that has the item stack in it.
+   * @param {number} [count] - Optional: The number of items to remove from the stack, default 1.
+   * @returns {boolean} Returns true if the items were successfully removed, false if there was an error.
+   */
+  removeContainerItem(
+    character: BaseFullCharacter,
+    item?: BaseItem,
+    container?: LoadoutContainer,
+    count?: number
+  ): boolean {
+    if (item) item.debugFlag = "removeContainerItem";
+    const client = this.getClientByContainerAccessor(character);
+    if (!container || !item) return false;
+    if (!count) count = item.stackCount;
+    if (item.stackCount == count) {
+      delete container.items[item.itemGuid];
+      if (client) this.deleteItem(character, item.itemGuid);
+    } else if (item.stackCount > count) {
+      item.stackCount -= count;
+      if (client) this.updateContainerItem(character, item, container);
+    } else {
+      // if count > removeItem.stackCount
+      return false;
+    }
+    if (client) this.updateContainer(character, container);
+    return true;
+  }
+
+  /**
+   * Removes items from a specific item stack in the inventory, including containers and loadout.
+   *
+   * @param {BaseFullCharacter} character - The character to have their items removed.
+   * @param {BaseItem} item - The item object.
+   * @param {number} [count=1] - Optional: The number of items to remove from the stack, default 1.
+   * @param {boolean} [updateEquipment=true] - Optional: Specifies whether to update the equipment, default is true.
+   * @returns {boolean} Returns true if the items were successfully removed, false if there was an error.
+   */
+  async removeInventoryItem(
+    character: BaseFullCharacter,
+    item: BaseItem,
+    count: number = 1,
+    updateEquipment: boolean = true
+  ): Promise<boolean> {
+    item.debugFlag = "removeInventoryItem";
+    if (count > item.stackCount) {
+      console.error(
+        `RemoveInventoryItem: Not enough items in stack! Count ${count} > Stackcount ${item.stackCount}`
+      );
+      count = item.stackCount;
+    }
+
+    if (this.isAccountItem(item.itemDefinitionId)) {
+      return await this.removeAccountItem(character, item);
+    } else if (character._loadout[item.slotId]?.itemGuid == item.itemGuid) {
+      return this.removeLoadoutItem(character, item.slotId, updateEquipment);
+    } else {
+      return this.removeContainerItem(
+        character,
+        item,
+        character.getItemContainer(item.itemGuid),
+        count
+      );
+    }
+  }
+
+  /**
+   * Removes a specified amount of an item across all inventory containers /
+   * loadout (LOADOUT DISABLED FOR NOW).
+   * @param client The client to have its items removed.
+   * @param itemDefinitionId The itemDefinitionId of the item(s) to be removed.
+   * @param requiredCount Optional: The number of items to remove, default 1.
+   * @returns Returns true if all items were successfully removed, false if there was an error.
+   */
+  removeInventoryItems(
+    character: BaseFullCharacter,
+    itemDefinitionId: number,
+    requiredCount: number = 1
+  ): boolean {
+    const loadoutSlotId = 0; //this.getActiveLoadoutSlot(client, itemDefinitionId);
+    // loadout disabled for now
+    if (
+      character._loadout[loadoutSlotId]?.itemDefinitionId == itemDefinitionId
+    ) {
+      // todo: check multiple loadout slots for items
+      return this.removeLoadoutItem(character, loadoutSlotId);
+    } else {
+      const removeItems: {
+        container: LoadoutContainer;
+        item: BaseItem;
+        count: number;
+      }[] = [];
+      for (const container of Object.values(character._containers)) {
+        if (!requiredCount) break;
+        for (const item of Object.values(container.items)) {
+          if (item.itemDefinitionId == itemDefinitionId) {
+            if (item.stackCount >= requiredCount) {
+              removeItems.push({ container, item, count: requiredCount });
+              requiredCount = 0;
+              break;
+            } else {
+              removeItems.push({ container, item, count: item.stackCount });
+              requiredCount -= item.stackCount;
+            }
+          }
+        }
+      }
+      if (requiredCount) {
+        // inventory doesn't have enough items
+        return false;
+      }
+      for (const itemStack of Object.values(removeItems)) {
+        if (
+          !this.removeContainerItem(
+            character,
+            itemStack.item,
+            itemStack.container,
+            itemStack.count
+          )
+        ) {
+          return false;
+        }
+      }
+      return true;
+    }
+  }
+
+  /**
+   * Removes a single item type from the inventory and spawns it on the ground
+   * @param character The character that should drop the item
+   * @param item The item object.
+   * @param count Optional: The number of items to drop on the ground, default 1.
+   * @param animationId The animation to play
+   */
+  dropItem(
+    character: BaseFullCharacter,
+    item: BaseItem,
+    count: number = 1,
+    animationId: number
+  ): void {
+    const client = this.getClientByContainerAccessor(character);
+
+    if (!client) return;
+
+    item.debugFlag = "dropItem";
+    if (!item) {
+      this.containerError(client, ContainerErrors.NO_ITEM_IN_SLOT);
+      return;
+    }
+    let dropItem: BaseItem | undefined;
+    if (item.stackCount == count) {
+      dropItem = item;
+    } else if (item.stackCount > count) {
+      dropItem = this.generateItem(item.itemDefinitionId, count);
+    } else {
+      return;
+    }
+    if (!this.removeInventoryItem(character, item, count)) return;
+    this.sendData<CharacterDroppedItemNotification>(
+      client,
+      "Character.DroppedItemNotification",
+      {
+        characterId: client.character.characterId,
+        itemDefId: item.itemDefinitionId,
+        count: count
+      }
+    );
+    const itemDefinition = this.getItemDefinition(item.itemDefinitionId);
+    this.startInteractionTimer(client, 0, 0, animationId);
+    if (
+      dropItem &&
+      dropItem.weapon &&
+      itemDefinition &&
+      itemDefinition.ITEM_CLASS != ItemClasses.WEAPON_THROWABLES
+    ) {
+      const ammo = this.generateItem(
+        this.getWeaponAmmoId(dropItem.itemDefinitionId),
+        dropItem.weapon.ammoCount
+      );
+      if (
+        ammo &&
+        dropItem.weapon.ammoCount > 0 &&
+        dropItem.weapon.itemDefinitionId != Items.WEAPON_REMOVER
+      ) {
+        client.character.lootContainerItem(this, ammo, ammo.stackCount, true);
+      }
+      dropItem.weapon.ammoCount = 0;
+    }
+    const obj = this.worldObjectManager.createLootEntity(
+      this,
+      dropItem,
+      client.character.state.position,
+      new Float32Array([0, Number(Math.random() * 10 - 5), 0, 1])
+    );
+
+    if (!obj) return;
+    obj.insideBuilding = character.insideBuilding;
+    this.executeFuncForAllReadyClientsInRange((c) => {
+      c.spawnedEntities.add(obj);
+      this.addLightweightNpc(c, obj);
+      this.sendData<ClientUpdateProximateItems>(
+        c,
+        "ClientUpdate.ProximateItems",
+        this.getProximityItems(c)
+      );
+    }, obj);
+  }
+
+  pickupItem(client: Client, guid: string) {
+    const object = this._spawnedItems[guid],
+      item: BaseItem = object.item;
+    if (!item) {
+      this.sendChatText(client, `[ERROR] Invalid item`);
+      return;
+    }
+    this.sendCompositeEffectToAllWithSpawnedEntity(
+      this._spawnedItems,
+      object,
+      this.getItemDefinition(item.itemDefinitionId)?.PICKUP_EFFECT ??
+        Effects.SFX_Item_PickUp_Generic
+    );
+
+    client.character.lootItem(this, item);
+    this.startInteractionTimer(client, 0, 0, 9);
+    if (
+      item.itemDefinitionId === Items.FUEL_BIOFUEL ||
+      item.itemDefinitionId === Items.FUEL_ETHANOL
+    ) {
+      this.deleteEntity(object.characterId, this._explosives);
+    }
+    this.deleteEntity(guid, this._spawnedItems);
+    delete this.worldObjectManager.spawnedLootObjects[object.spawnerId];
+  }
+
+  sendWeaponReload(
+    client: Client,
+    weaponItem: LoadoutItem,
+    ammoCount?: number
+  ) {
+    if (!weaponItem.weapon) return;
+    const maxAmmo = this.getWeaponMaxAmmo(weaponItem.itemDefinitionId);
+    this.sendWeaponData(client, "Weapon.Reload", {
+      weaponGuid: weaponItem.itemGuid,
+      unknownDword1: maxAmmo,
+      ammoCount: ammoCount || weaponItem.weapon.ammoCount,
+      unknownDword3: maxAmmo,
+      currentReloadCount: toHex(++weaponItem.weapon.currentReloadCount)
+    });
+  }
+
+  deleteItem(character: BaseFullCharacter, itemGuid: string) {
+    const characterIds = new Set<string>();
+
+    const vehicle = this._vehicles[character.characterId];
+    if (vehicle) {
+      vehicle.getPassengerList().forEach((characterId) => {
+        characterIds.add(characterId);
+      });
+    } else {
+      if (character instanceof BaseLootableEntity) {
+        characterIds.add(character.mountedCharacter || "");
+      } else {
+        characterIds.add(character.characterId);
+      }
+    }
+
+    characterIds.forEach((characterId) => {
+      const client = this.getClientByCharId(characterId);
+      if (!client || !client.character?.initialized) return;
+      this.sendData<ClientUpdateItemDelete>(client, "ClientUpdate.ItemDelete", {
+        characterId:
+          character instanceof Character || character instanceof Vehicle2016
+            ? character.characterId
+            : EXTERNAL_CONTAINER_GUID,
+        itemGuid: itemGuid
+      });
+    });
+  }
+
+  initializeContainerList(
+    client: Client,
+    character: BaseFullCharacter = client.character
+  ): void {
+    const characterId =
+      character instanceof Character || character instanceof Vehicle2016
+        ? character.characterId
+        : EXTERNAL_CONTAINER_GUID;
+    this.sendData<ContainerInitEquippedContainers>(
+      client,
+      "Container.InitEquippedContainers",
+      {
+        ignore: characterId,
+        characterId: characterId,
+        containers: character.pGetContainers(this)
+      }
+    );
+  }
+
+  addContainerItem(
+    character: BaseFullCharacter,
+    item: BaseItem | undefined,
+    container: LoadoutContainer,
+    sendUpdate: boolean = true
+  ) {
+    if (!item) return;
+
+    const itemDefId = item.itemDefinitionId,
+      client = this.getClientByContainerAccessor(character);
+    item.slotId = Object.keys(container.items).length;
+    item.containerGuid = container.itemGuid;
+    container.items[item.itemGuid] = item;
+
+    if (!client) return;
+    if (item.weapon) {
+      clearTimeout(item.weapon.reloadTimer);
+      delete item.weapon.reloadTimer;
+    }
+    this.addItem(
+      client,
+      container.items[item.itemGuid],
+      container.containerDefinitionId,
+      character
+    );
+    this.updateContainer(character, container);
+    if (sendUpdate && client.character.initialized) {
+      this.sendData<RewardAddNonRewardItem>(client, "Reward.AddNonRewardItem", {
+        itemDefId: itemDefId,
+        iconId: this.getItemDefinition(itemDefId)?.IMAGE_SET_ID ?? 0,
+        nameId: this.getItemDefinition(itemDefId)?.NAME_ID ?? 0,
+        count: item.stackCount
+      });
+    }
+  }
+
+  updateLoadoutItem(
+    client: Client,
+    item: LoadoutItem,
+    character: BaseFullCharacter = client.character
+  ) {
+    this.sendData<ClientUpdateItemUpdate>(client, "ClientUpdate.ItemUpdate", {
+      characterId: character.characterId,
+      data: character.pGetItemData(this, item, LOADOUT_CONTAINER_ID)
+    });
+    //this.updateLoadout(client.character);
+  }
+
+  updateContainer(character: BaseFullCharacter, container: LoadoutContainer) {
+    const characterIds = new Set<string>();
+
+    const vehicle = this._vehicles[character.characterId];
+    if (vehicle) {
+      vehicle.getPassengerList().forEach((characterId) => {
+        characterIds.add(characterId);
+      });
+    } else {
+      if (character instanceof BaseLootableEntity) {
+        characterIds.add(character.mountedCharacter || "");
+      } else {
+        characterIds.add(character.characterId);
+      }
+    }
+
+    characterIds.forEach((characterId) => {
+      const client = this.getClientByCharId(characterId);
+      if (!client || !client.character?.initialized) return;
+      this.sendData<ContainerUpdateEquippedContainer>(
+        client,
+        "Container.UpdateEquippedContainer",
+        {
+          ignore: character.characterId,
+          characterId: character.characterId,
+          containerData: character.pGetContainerData(this, container)
+        }
+      );
+    });
+  }
+
+  updateContainerItem(
+    character: BaseFullCharacter,
+    item: BaseItem,
+    container: LoadoutContainer
+  ) {
+    const client = this.getClientByContainerAccessor(character);
+    if (!client || !client.character.initialized) return;
+    this.sendData<ClientUpdateItemUpdate>(client, "ClientUpdate.ItemUpdate", {
+      characterId:
+        character instanceof Character || character instanceof Vehicle2016
+          ? character.characterId
+          : EXTERNAL_CONTAINER_GUID,
+      data: character.pGetItemData(this, item, container.containerDefinitionId)
+    });
+    this.updateContainer(character, container);
+  }
+
+  updateItem(client: Client, item: BaseItem) {
+    const loadoutItem = client.character.getLoadoutItem(item.itemGuid);
+    if (loadoutItem) {
+      this.updateLoadoutItem(client, loadoutItem);
+      return;
+    }
+
+    const container = client.character.getItemContainer(item.itemGuid);
+    if (container) {
+      this.updateContainerItem(client.character, item, container);
+      return;
+    }
+
+    const mountedContainer = client.character.mountedContainer;
+
+    if (mountedContainer) {
+      const container = mountedContainer.getContainer();
+      if (!container) return;
+      this.updateContainerItem(mountedContainer, item, container);
+    }
+  }
+
+  /**
+   * Clears all items from a character's inventory.
+   * @param client The client that'll have it's character's inventory cleared.
+   */
+  clearInventory(client: Client, updateEquipment = true) {
+    for (const item of Object.values(client.character._loadout)) {
+      if (client.character._containers[item.slotId]) {
+        const container = client.character._containers[item.slotId];
+        for (const item of Object.values(container.items)) {
+          this.removeInventoryItem(client.character, item, item.stackCount);
+        }
+      }
+      if (item.slotId != LoadoutSlots.FISTS && item.itemDefinitionId) {
+        this.removeInventoryItem(
+          client.character,
+          item,
+          item.stackCount,
+          updateEquipment
+        );
+      }
+    }
+  }
+
+  isAdminItem(itemDefinitionId: Items): boolean {
+    switch (itemDefinitionId) {
+      case Items.WEAPON_REMOVER:
+      case Items.FANNY_PACK_DEV:
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  useAirdrop(
+    client: Client,
+    character: Character | BaseLootableEntity,
+    item: BaseItem
+  ) {
+    if (!this.airdropManager.allowedAirdropSpawn() && !client.isDebugMode) {
+      this.sendAlert(client, "All planes are busy.");
+      return;
+    }
+
+    if (
+      _.size(this._clients) < this.airdropManager.minimumPlayers &&
+      !this._soloMode &&
+      !client.isDebugMode
+    ) {
+      this.sendAlert(client, "No planes ready. Not enough survivors.");
+      return;
+    }
+    let blockedArea = false;
+    for (const a in this._constructionFoundations) {
+      if (
+        isPosInRadius(
+          50,
+          this._constructionFoundations[a].state.position,
+          client.character.state.position
+        )
+      ) {
+        blockedArea = true;
+        break;
+      }
+    }
+
+    if ((client.currentPOI || blockedArea) && !client.isDebugMode) {
+      this.sendAlert(client, "You are too close to a restricted area.");
+      return;
+    }
+
+    if (
+      ![Items.AIRDROP_TICKET, Items.AIRDROP_CODE].includes(
+        item.itemDefinitionId
+      ) ||
+      !this.airdropManager.spawnAirdrop(
+        client.character.state.position,
+        client.character.hasAirdropClearance ? "Hospital" : "",
+        client.isDebugMode,
+        client.character.characterId
+      ) ||
+      !this.removeInventoryItem(character, item)
+    )
+      return;
+    this.sendAlert(client, "Your delivery is on the way!");
+
+    if (client.character.hasAirdropClearance) {
+      client.character.hasAirdropClearance = false;
+    }
+  }
+
+  useAmmoBox(
+    client: Client,
+    character: Character | BaseLootableEntity,
+    item: BaseItem
+  ) {
+    const itemDef = this.getItemDefinition(item.itemDefinitionId);
+    if (!itemDef) return;
+    this.utilizeHudTimer(client, itemDef.NAME_ID, 5000, 0, () => {
+      if (!this.removeInventoryItem(character, item)) return;
+      switch (item.itemDefinitionId) {
+        case Items.BUNDLE_GAUZE:
+        case Items.BUNDLE_EXPLOSIVE_ARROWS:
+        case Items.BUNDLE_FLAMING_ARROWS:
+        case Items.BUNDLE_WOODEN_ARROWS_1:
+        case Items.BUNDLE_WOODEN_ARROWS_2:
+        case Items.BUNDLE_WOODEN_ARROWS:
+          character.lootItem(
+            this,
+            this.generateItem(itemDef.PARAM1, itemDef.PARAM2),
+            undefined,
+            character instanceof Character
+          );
+          break;
+        case Items.AMMO_BOX_223:
+          character.lootItem(
+            this,
+            this.generateItem(Items.AMMO_223, 60),
+            undefined,
+            character instanceof Character
+          );
+          break;
+        case Items.AMMO_BOX_45:
+          character.lootItem(
+            this,
+            this.generateItem(Items.AMMO_45, 60),
+            undefined,
+            character instanceof Character
+          );
+          break;
+      }
+    });
+  }
+
+  useConsumable(
+    client: Client,
+    character: Character | BaseLootableEntity,
+    item: BaseItem,
+    animationId: number
+  ) {
+    const itemDef = this.getItemDefinition(item.itemDefinitionId);
+    if (!itemDef) return;
+    let doReturn = true;
+    let drinkCount = 0;
+    let eatCount = 0;
+    let comfortCount = 0;
+    let staminaCount = 0;
+    let enduranceCount = 0;
+    let givetrash = 0;
+    let healCount = 0;
+    let bandagingCount = 0;
+    let timeout = 0;
+    let healType: HealTypes;
+    for (const a in UseOptions) {
+      if (
+        UseOptions[a].itemDef == item.itemDefinitionId &&
+        (UseOptions[a].type == ItemUseOptions.EAT ||
+          UseOptions[a].type == ItemUseOptions.DRINK ||
+          UseOptions[a].type == ItemUseOptions.USE_MEDICAL)
+      ) {
+        const useOption = UseOptions[a];
+        doReturn = false;
+        timeout = useOption.timeout;
+        if (useOption.drinkCount) drinkCount = useOption.drinkCount;
+        if (useOption.eatCount) eatCount = useOption.eatCount;
+        if (useOption.comfortCount) comfortCount = useOption.comfortCount;
+        if (useOption.staminaCount) staminaCount = useOption.staminaCount;
+        if (useOption.enduranceCount) enduranceCount = useOption.enduranceCount;
+        if (useOption.givetrash) givetrash = useOption.givetrash;
+        if (useOption.healCount) healCount = useOption.healCount;
+        if (useOption.bandagingCount) bandagingCount = useOption.bandagingCount;
+        if (useOption.healType) healType = useOption.healType;
+      }
+    }
+    if (doReturn) {
+      this.sendChatText(
+        client,
+        "[ERROR] consumable not mapped to item Definition " +
+          item.itemDefinitionId
+      );
+      return;
+    }
+
+    this.utilizeHudTimer(client, itemDef.NAME_ID, timeout, animationId, () => {
+      this.useComsumablePass(
+        client,
+        character,
+        item,
+        eatCount,
+        drinkCount,
+        comfortCount,
+        staminaCount,
+        givetrash,
+        healCount,
+        bandagingCount,
+        enduranceCount,
+        healType
+      );
+    });
+  }
+
+  taskOptionPass(
+    client: Client,
+    removedItem: { itemDefinitionId: number; count: number },
+    rewardItems: { itemDefinitionId: number; count: number }[]
+  ) {
+    if (
+      !this.removeInventoryItems(
+        client.character,
+        removedItem.itemDefinitionId,
+        removedItem.count
+      )
+    )
+      return;
+    rewardItems.forEach(
+      (itemInstance: { itemDefinitionId: number; count: number }) => {
+        const item = this.generateItem(
+          itemInstance.itemDefinitionId,
+          itemInstance.count
+        );
+        client.character.lootContainerItem(this, item);
+      }
+    );
+    this.lootCrateWithChance(client, 25);
+  }
+
+  igniteOption(client: Client, item: BaseItem) {
+    const itemDef = this.getItemDefinition(item.itemDefinitionId);
+    if (!itemDef) return;
+    let timeout = 0;
+    let doReturn = true;
+    for (const a in UseOptions) {
+      if (
+        UseOptions[a].itemDef == item.itemDefinitionId &&
+        UseOptions[a].type == ItemUseOptions.IGNITE
+      ) {
+        const useOption = UseOptions[a];
+        doReturn = false;
+        timeout = useOption.timeout;
+      }
+    }
+    if (doReturn) {
+      this.sendChatText(
+        client,
+        "[ERROR] use option not mapped to item Definition " +
+          item.itemDefinitionId
+      );
+      return;
+    }
+    this.utilizeHudTimer(client, itemDef.NAME_ID, timeout, 0, () => {
+      this.igniteoptionPass(client);
+    });
+  }
+
+  taskOption(
+    client: Client,
+    timeout: number,
+    nameId: number,
+    removedItem: { itemDefinitionId: number; count: number },
+    rewardItems: { itemDefinitionId: number; count: number }[]
+  ) {
+    this.utilizeHudTimer(client, nameId, timeout, 0, () => {
+      this.taskOptionPass(client, removedItem, rewardItems);
+    });
+  }
+
+  fillPass(client: Client, character: BaseFullCharacter, item: BaseItem) {
+    if (client.character.characterStates.inWater) {
+      if (!this.removeInventoryItem(character, item)) return;
+      character.lootContainerItem(this, this.generateItem(Items.WATER_DIRTY)); // give dirty water
+    } else {
+      this.sendAlert(client, "There is no water source nearby");
+    }
+  }
+
+  sniffPass(client: Client, character: BaseFullCharacter, item: BaseItem) {
+    if (!this.removeInventoryItem(character, item)) return;
+    if (item.itemDefinitionId === Items.SWIZZLE) {
+      this.challengeManager.registerChallengeProgression(
+        client,
+        ChallengeType.SWIZZLE,
+        1
+      );
+      this.applyMovementModifier(client, MovementModifiers.SWIZZLE);
+    } else {
+      this.applyMovementModifier(client, MovementModifiers.ADRENALINE);
+    }
+  }
+
+  fertilizePlants(
+    client: Client,
+    character: BaseFullCharacter,
+    item: BaseItem
+  ) {
+    if (!this.removeInventoryItem(character, item)) return;
+    for (const characterId in this._temporaryObjects) {
+      const object = this._temporaryObjects[characterId];
+      if (
+        object instanceof PlantingDiameter &&
+        isPosInRadius(3, object.state.position, client.character.state.position)
+      ) {
+        object.isFertilized = true;
+        object.fertilizedTimestamp = new Date().getTime() + 86400000; // + 1 day
+        Object.values(object.seedSlots).forEach((plant) => {
+          if (plant.isFertilized) return;
+          plant.isFertilized = true;
+          const roz = (plant.nextStateTime - new Date().getTime()) / 2;
+          plant.nextStateTime = new Date().getTime() + roz;
+          this.sendDataToAllWithSpawnedEntity<CharacterPlayWorldCompositeEffect>(
+            // play burning effect & remove it after 15s
+            this._plants,
+            plant.characterId,
+            "Character.PlayWorldCompositeEffect",
+            {
+              characterId: plant.characterId,
+              effectId: Effects.EFX_Crop_Fertilizer,
+              position: new Float32Array([
+                plant.state.position[0],
+                plant.state.position[1],
+                plant.state.position[2],
+                1
+              ]),
+              effectTime: 180
+            }
+          );
+        });
+      }
+    }
+  }
+
+  usePills(client: Client, character: BaseFullCharacter, item: BaseItem) {
+    if (!this.removeInventoryItem(character, item)) return;
+    let hudIndicator: HudIndicator | undefined = undefined;
+    switch (item.itemDefinitionId) {
+      case Items.COLD_MEDICINE:
+        hudIndicator = this._hudIndicators["COLD_MEDICINE"];
+        break;
+      case Items.IMMUNITY_BOOSTERS:
+        hudIndicator = this._hudIndicators["IMMUNITY_BOOST_LOW"];
+        break;
+      case Items.VITAMINS:
+        hudIndicator = this._hudIndicators["IMMUNITY_BOOST_LOW"];
+        break;
+    }
+    if (!hudIndicator) return;
+    if (client.character.hudIndicators[hudIndicator.typeName]) {
+      client.character.hudIndicators[hudIndicator.typeName].expirationTime +=
+        600000;
+    } else {
+      client.character.hudIndicators[hudIndicator.typeName] = {
+        typeName: hudIndicator.typeName,
+        expirationTime: Date.now() + 600000
+      };
+      this.sendHudIndicators(client);
+    }
+  }
+
+  useDeerScent(client: Client, character: BaseFullCharacter, item: BaseItem) {
+    client.character.isDeerScented = true;
+    if (!this.removeInventoryItem(character, item)) return;
+    const hudIndicator: HudIndicator | undefined =
+      this._hudIndicators["DEER SCENT"];
+    if (!hudIndicator) return;
+    if (client.character.timeouts["DEER_SCENT"]) {
+      client.character.timeouts["DEER_SCENT"]._onTimeout();
+      clearTimeout(client.character.timeouts["DEER_SCENT"]);
+      delete client.character.timeouts["DEER_SCENT"];
+      if (client.character.hudIndicators[hudIndicator.typeName]) {
+        client.character.hudIndicators[hudIndicator.typeName].expirationTime +=
+          300000;
+      }
+    }
+    client.character.hudIndicators[hudIndicator.typeName] = {
+      typeName: hudIndicator.typeName,
+      expirationTime: Date.now() + 300000
+    };
+    this.sendHudIndicators(client);
+    client.character.timeouts["DEER_SCENT"] = setTimeout(() => {
+      if (!client.character.timeouts["DEER_SCENT"]) {
+        return;
+      }
+      client.character.isDeerScented = false;
+      delete client.character.timeouts["DEER_SCENT"];
+    }, 300000);
+  }
+
+  sleep(client: Client) {
+    if (this.isBattleRoyale()) return;
+    client.character._resources[ResourceIds.ENDURANCE] = 8000;
+    client.character._resources[ResourceIds.STAMINA] = 600;
+    this.applyMovementModifier(client, MovementModifiers.RESTED);
+    this.sendDataToAllWithSpawnedEntity(
+      this._characters,
+      client.character.characterId,
+      "Animation.Play",
+      {
+        characterId: client.character.characterId,
+        animationId: 84 // yawning / waking up emote
+      }
+    );
+    this.updateResourceToAllWithSpawnedEntity(
+      client.character.characterId,
+      client.character._resources[ResourceIds.STAMINA],
+      ResourceIds.STAMINA,
+      ResourceTypes.STAMINA,
+      this._characters
+    );
+    this.updateResource(
+      client,
+      client.character.characterId,
+      8000,
+      ResourceIds.ENDURANCE,
+      ResourceTypes.ENDURANCE
+    );
+  }
+
+  useItem(
+    client: Client,
+    character: BaseFullCharacter,
+    item: BaseItem,
+    animationId: number
+  ) {
+    const itemDef = this.getItemDefinition(item.itemDefinitionId);
+    if (!itemDef) return;
+    const nameId = itemDef.NAME_ID;
+    let timeout = 0;
+    let useoption = "";
+    let doReturn = true;
+    for (const a in UseOptions) {
+      if (
+        UseOptions[a].itemDef == item.itemDefinitionId &&
+        UseOptions[a].type == ItemUseOptions.USE
+      ) {
+        const useOption = UseOptions[a];
+        doReturn = false;
+        timeout = useOption.timeout;
+      }
+    }
+    if (doReturn) {
+      this.sendChatText(
+        client,
+        "[ERROR] use option not mapped to item Definition " +
+          item.itemDefinitionId
+      );
+      return;
+    }
+    switch (item.itemDefinitionId) {
+      case Items.WATER_EMPTY:
+        useoption = "fill";
+        break;
+      case Items.SWIZZLE:
+      case Items.ADRENALINE_SHOT:
+        useoption = "adrenaline";
+        timeout = 3000;
+        break;
+      case Items.FERTILIZER:
+        this.utilizeHudTimer(client, nameId, timeout, animationId, () => {
+          this.fertilizePlants(client, character, item);
+        });
+        return;
+      case Items.COLD_MEDICINE:
+      case Items.VITAMINS:
+      case Items.IMMUNITY_BOOSTERS:
+        this.utilizeHudTimer(client, nameId, timeout, animationId, () => {
+          this.usePills(client, character, item);
+        });
+        return;
+      case Items.DEER_SCENT:
+        this.utilizeHudTimer(client, nameId, timeout, animationId, () => {
+          this.useDeerScent(client, character, item);
+        });
+        return;
+      default:
+        this.sendChatText(
+          client,
+          "[ERROR] No use option mapped to item Definition " +
+            item.itemDefinitionId
+        );
+    }
+    switch (useoption) {
+      case "fill": // empty bottle
+        this.utilizeHudTimer(client, nameId, timeout, animationId, () => {
+          this.fillPass(client, character, item);
+        });
+        break;
+      case "sniff": // swizzle
+        this.utilizeHudTimer(client, nameId, timeout, animationId, () => {
+          this.sniffPass(client, character, item);
+        });
+        break;
+      case "adrenaline": // swizzle
+        this.utilizeHudTimer(client, nameId, timeout, animationId, () => {
+          if (
+            client.character.hudIndicators[
+              this._hudIndicators["ADRENALINE"].typeName
+            ]
+          ) {
+            setTimeout(() => {
+              this.sendChatText(client, "You will die of an heart attack.");
+            }, 2000);
+            setTimeout(() => {
+              client.character.timeouts["ADRENALINE"]._onTimeout(true);
+              this.killCharacter(client, {
+                entity: client.character.characterId,
+                damage: 0xff
+              });
+            }, 5000);
+          } else {
+            this.sniffPass(client, character, item);
+          }
+        });
+        break;
+      default:
+        return;
+    }
+  }
+
+  sliceItem(
+    client: Client,
+    character: Character | BaseLootableEntity,
+    item: BaseItem,
+    animationId: number
+  ) {
+    const itemDef = this.getItemDefinition(item.itemDefinitionId);
+    if (!itemDef) return;
+    const nameId = itemDef.NAME_ID;
+    let timeout = 0;
+    let doReturn = true;
+    for (const a in UseOptions) {
+      if (
+        UseOptions[a].itemDef == item.itemDefinitionId &&
+        UseOptions[a].type == ItemUseOptions.SLICE
+      ) {
+        const useOption = UseOptions[a];
+        doReturn = false;
+        timeout = useOption.timeout;
+      }
+    }
+    if (doReturn) {
+      this.sendChatText(
+        client,
+        "[ERROR] use option not mapped to item Definition " +
+          item.itemDefinitionId
+      );
+      return;
+    }
+    this.utilizeHudTimer(client, nameId, timeout, animationId, () => {
+      this.slicePass(character, item);
+    });
+  }
+
+  refuelVehicle(
+    client: Client,
+    character: Character | BaseLootableEntity,
+    item: BaseItem,
+    vehicleGuid: string,
+    animationId: number
+  ) {
+    const itemDef = this.getItemDefinition(item.itemDefinitionId);
+    if (!itemDef) return;
+    const nameId = itemDef.NAME_ID;
+    let fuelValue = 0;
+    let timeout = 0;
+    let doReturn = true;
+
+    for (const a in UseOptions) {
+      if (
+        UseOptions[a].itemDef == item.itemDefinitionId &&
+        UseOptions[a].type == ItemUseOptions.REFUEL
+      ) {
+        const useOption = UseOptions[a];
+        doReturn = false;
+        timeout = useOption.timeout;
+        if (useOption.refuelCount) fuelValue = useOption.refuelCount;
+      }
+    }
+    if (doReturn) {
+      this.sendChatText(
+        client,
+        "[ERROR] fuel not mapped to item Definition " + item.itemDefinitionId
+      );
+      return;
+    }
+
+    const vehicle = this._vehicles[vehicleGuid];
+    if (!vehicle) {
+      this.sendChatText(client, "[ERROR] Vehicle not found!");
+      return;
+    }
+    if (vehicle._resources[ResourceIds.FUEL] >= 10000) {
+      this.sendAlert(client, "Fuel tank is full!");
+      return;
+    }
+    if (vehicle.vehicleId == VehicleIds.ATV) {
+      fuelValue *= 2;
+    }
+    this.utilizeHudTimer(client, nameId, timeout, animationId, () => {
+      this.refuelVehiclePass(client, character, item, vehicleGuid, fuelValue);
+    });
+  }
+
+  shredItem(
+    client: Client,
+    character: Character | BaseLootableEntity,
+    item: BaseItem,
+    animationId: number
+  ) {
+    const itemDefinition = this.getItemDefinition(item.itemDefinitionId);
+    if (!itemDefinition) return;
+    const nameId = itemDefinition.NAME_ID,
+      itemType = itemDefinition.ITEM_TYPE;
+    let count = 1;
+    const timeout = 3000;
+    if (
+      item.itemDefinitionId === Items.BELT_POUCH ||
+      item.itemDefinitionId === Items.WAIST_PACK
+    ) {
+      count = 1;
+    } else {
+      switch (itemType) {
+        case 36:
+        case 39:
+          count = 1;
+          break;
+        case 34: // salvage/shred
+          count = 4;
+          break;
+        default:
+          this.sendChatText(client, "[ERROR] Unknown salvage item or count.");
+      }
+    }
+
+    this.utilizeHudTimer(client, nameId, timeout, animationId, () => {
+      this.shredItemPass(character, item, count);
+    });
+  }
+
+  async salvageAmmo(
+    client: Client,
+    character: BaseFullCharacter,
+    item: BaseItem,
+    animationId: number
+  ): Promise<boolean> {
+    const itemDefinition = this.getItemDefinition(item.itemDefinitionId);
+    if (!itemDefinition) return false;
+    const nameId = itemDefinition.NAME_ID;
+    const timeout = 1000;
+    const allowedItems = [
+      Items.AMMO_12GA,
+      Items.AMMO_223,
+      Items.AMMO_308,
+      Items.AMMO_380,
+      Items.AMMO_44,
+      Items.AMMO_45,
+      Items.AMMO_762,
+      Items.AMMO_9MM
+    ];
+    if (!allowedItems.includes(item.itemDefinitionId)) {
+      this.sendAlert(
+        client,
+        `[ERROR] Salvage option not mapped to item definition ${item.itemDefinitionId}`
+      );
+      return false;
+    }
+    const count =
+      item.itemDefinitionId == Items.AMMO_12GA ||
+      item.itemDefinitionId == Items.AMMO_762 ||
+      item.itemDefinitionId == Items.AMMO_308 ||
+      item.itemDefinitionId == Items.AMMO_44
+        ? 2
+        : 1;
+
+    return await new Promise<boolean>((resolve) => {
+      this.utilizeHudTimer(client, nameId, timeout, animationId, async () => {
+        if (
+          client.character.mountedContainer != character &&
+          character != client.character
+        ) {
+          resolve(false);
+          return;
+        }
+        resolve(await this.salvageItemPass(character, item, count));
+      });
+    });
+  }
+
+  async useComsumablePass(
+    client: Client,
+    character: Character | BaseLootableEntity,
+    item: BaseItem,
+    eatCount: number,
+    drinkCount: number,
+    comfortCount: number,
+    staminaCount: number,
+    givetrash: number,
+    healCount: number,
+    bandagingCount: number,
+    enduranceCount: number,
+    healType: HealTypes
+  ) {
+    if (!this.removeInventoryItem(character, item)) return;
+    if (eatCount) {
+      client.character._resources[ResourceIds.HUNGER] += eatCount;
+      this.updateResource(
+        client,
+        client.character.characterId,
+        client.character._resources[ResourceIds.HUNGER],
+        ResourceIds.HUNGER
+      );
+    }
+    if (drinkCount) {
+      client.character._resources[ResourceIds.HYDRATION] += drinkCount;
+      this.updateResource(
+        client,
+        client.character.characterId,
+        client.character._resources[ResourceIds.HYDRATION],
+        ResourceIds.HYDRATION
+      );
+    }
+    if (staminaCount) {
+      client.character._resources[ResourceIds.STAMINA] += staminaCount;
+      this.updateResource(
+        client,
+        client.character.characterId,
+        client.character._resources[ResourceIds.STAMINA],
+        ResourceIds.STAMINA
+      );
+    }
+
+    if (enduranceCount) {
+      client.character._resources[ResourceIds.ENDURANCE] += enduranceCount;
+      this.updateResource(
+        client,
+        client.character.characterId,
+        client.character._resources[ResourceIds.ENDURANCE],
+        ResourceIds.ENDURANCE
+      );
+    }
+
+    if (comfortCount) {
+      client.character._resources[ResourceIds.COMFORT] += comfortCount;
+      this.updateResource(
+        client,
+        client.character.characterId,
+        client.character._resources[ResourceIds.COMFORT],
+        ResourceIds.COMFORT
+      );
+    }
+
+    const poisonousFoods = [
+      Items.MEAT_ROTTEN,
+      Items.MEAT_BEAR,
+      Items.MEAT_VENISON,
+      Items.MEAT_RABBIT,
+      Items.MEAT_WOLF
+    ];
+    if (poisonousFoods.includes(item.itemDefinitionId)) {
+      client.character.isPoisoned = true;
+      for (let i = 0; i < 12; i++) {
+        const damageInfo: DamageInfo = {
+          entity: "",
+          damage: 25
+        };
+        client.character.damage(this, damageInfo);
+        await scheduler.wait(500);
+      }
+      client.character.isPoisoned = false;
+    }
+    if (item.itemDefinitionId == Items.WATER_DIRTY) {
+      const dmgInfoDirtyWater: DamageInfo = {
+        entity: "",
+        damage: 500
+      };
+      client.character.damage(this, dmgInfoDirtyWater);
+    }
+    if (givetrash) {
+      character.lootContainerItem(
+        this,
+        this.generateItem(givetrash),
+        undefined,
+        character instanceof Character
+      );
+    }
+    if (item.itemDefinitionId == Items.COFFEE_SUGAR) {
+      client.character.isCoffeeSugared = true;
+      for (let i = 0; i < 10; i++) {
+        client.character._resources[ResourceIds.STAMINA] += 40;
+        this.updateResource(
+          client,
+          client.character.characterId,
+          client.character._resources[ResourceIds.STAMINA],
+          ResourceIds.STAMINA
+        );
+        client.character._resources[ResourceIds.ENDURANCE] += 400;
+        this.updateResource(
+          client,
+          client.character.characterId,
+          client.character._resources[ResourceIds.ENDURANCE],
+          ResourceIds.ENDURANCE
+        );
+        await scheduler.wait(1000);
+      }
+      client.character.isCoffeeSugared = false;
+    }
+    if (bandagingCount && healCount) {
+      if (!client.character.healingIntervals[healType]) {
+        client.character.starthealingInterval(client, this, healType);
+      }
+      client.character.healType[healType].healingMaxTicks += healCount;
+      if (client.character._resources[ResourceIds.BLEEDING] > 0) {
+        client.character._resources[ResourceIds.BLEEDING] -= bandagingCount;
+        const bleeding = client.character._resources[ResourceIds.BLEEDING];
+        this.updateResourceToAllWithSpawnedEntity(
+          client.character.characterId,
+          bleeding,
+          ResourceIds.BLEEDING,
+          ResourceTypes.BLEEDING,
+          this._characters
+        );
+        if (client.character._resources[ResourceIds.BLEEDING] < 0)
+          client.character._resources[ResourceIds.BLEEDING] = 0;
+      }
+      this.updateResourceToAllWithSpawnedEntity(
+        client.character.characterId,
+        client.character._resources[ResourceIds.BLEEDING],
+        ResourceIds.BLEEDING,
+        ResourceIds.BLEEDING,
+        this._characters
+      );
+    }
+  }
+
+  slicePass(character: Character | BaseLootableEntity, item: BaseItem) {
+    if (!this.removeInventoryItem(character, item)) return;
+    if (item.itemDefinitionId == Items.BLACKBERRY_PIE) {
+      character.lootContainerItem(
+        this,
+        this.generateItem(Items.BLACKBERRY_PIE_SLICE, 4)
+      );
+    }
+  }
+
+  async igniteoptionPass(client: Client) {
+    for (const a in this._explosives) {
+      const explosive = this._explosives[a];
+      if (
+        isPosInRadius(
+          2.0,
+          client.character.state.position,
+          explosive.state.position
+        )
+      ) {
+        explosive.ignite(this, client);
+        return;
+      }
+    }
+    for (const a in this._lootableConstruction) {
+      const smeltable = this._lootableConstruction[a];
+      if (
+        isPosInRadius(
+          1.5,
+          client.character.state.position,
+          smeltable.state.position
+        )
+      ) {
+        if (smeltable instanceof LootableConstructionEntity) {
+          if (smeltable.subEntity instanceof SmeltingEntity) {
+            if (smeltable.subEntity.isWorking) continue;
+            smeltable.subEntity.isWorking = true;
+            const effectTime =
+              Math.ceil(this.smeltingManager.burnTime / 1000) -
+              Math.floor(
+                (Date.now() - this.smeltingManager.lastBurnTime) / 1000
+              );
+            this.smeltingManager._smeltingEntities[smeltable.characterId] =
+              smeltable.characterId;
+            this.sendDataToAllWithSpawnedEntity<CharacterPlayWorldCompositeEffect>(
+              smeltable.subEntity.dictionary,
+              smeltable.characterId,
+              "Character.PlayWorldCompositeEffect",
+              {
+                characterId: smeltable.characterId,
+                effectId: smeltable.subEntity.workingEffect,
+                position: smeltable.state.position,
+                effectTime
+              }
+            );
+          }
+        }
+      }
+    }
+    for (const a in this._worldLootableConstruction) {
+      const smeltable = this._worldLootableConstruction[a];
+      if (
+        isPosInRadius(
+          1.5,
+          client.character.state.position,
+          smeltable.state.position
+        )
+      ) {
+        if (smeltable instanceof LootableConstructionEntity) {
+          if (smeltable.subEntity instanceof SmeltingEntity) {
+            if (smeltable.subEntity.isWorking) continue;
+            smeltable.subEntity.isWorking = true;
+            const effectTime =
+              Math.ceil(this.smeltingManager.burnTime / 1000) -
+              Math.floor(
+                (Date.now() - this.smeltingManager.lastBurnTime) / 1000
+              );
+            this.smeltingManager._smeltingEntities[smeltable.characterId] =
+              smeltable.characterId;
+
+            this.sendDataToAllWithSpawnedEntity<CharacterPlayWorldCompositeEffect>(
+              smeltable.subEntity.dictionary,
+              smeltable.characterId,
+              "Character.PlayWorldCompositeEffect",
+              {
+                characterId: smeltable.characterId,
+                effectId: smeltable.subEntity.workingEffect,
+                position: smeltable.state.position,
+                effectTime
+              }
+            );
+          }
+        }
+      }
+    }
+  }
+
+  refuelVehiclePass(
+    client: Client,
+    character: Character | BaseLootableEntity,
+    item: BaseItem,
+    vehicleGuid: string,
+    fuelValue: number
+  ) {
+    // Also check if the vehicle is dismounted, jumping out of the car won't cancel the interaction
+    if (
+      !client.vehicle.mountedVehicle ||
+      !this.removeInventoryItem(character, item)
+    )
+      return;
+    const vehicle = this._vehicles[vehicleGuid];
+    vehicle._resources[ResourceIds.FUEL] += fuelValue;
+    // check if refuel amount is over 100, if so adjust to 100 to prevent over-fueling.
+    if (vehicle._resources[ResourceIds.FUEL] >= 10000) {
+      vehicle._resources[ResourceIds.FUEL] = 10000;
+    }
+    this.updateResourceToAllWithSpawnedEntity(
+      vehicleGuid,
+      vehicle._resources[ResourceIds.FUEL],
+      ResourceIds.FUEL,
+      ResourceTypes.FUEL,
+      this._vehicles
+    );
+  }
+
+  shredItemPass(
+    character: Character | BaseLootableEntity,
+    item: BaseItem,
+    count: number
+  ) {
+    if (!this.removeInventoryItem(character, item)) return;
+    character.lootItem(
+      this,
+      this.generateItem(Items.CLOTH, count),
+      undefined,
+      character instanceof Character
+    );
+  }
+
+  async salvageItemPass(
+    character: BaseFullCharacter,
+    item: BaseItem,
+    count: number
+  ): Promise<boolean> {
+    if (!this.removeInventoryItem(character, item)) return false;
+    if (item.itemDefinitionId == Items.AMMO_12GA) {
+      character.lootItem(this, this.generateItem(Items.SHARD_PLASTIC, 1));
+    }
+    character.lootItem(this, this.generateItem(Items.ALLOY_LEAD, count));
+    character.lootItem(this, this.generateItem(Items.SHARD_BRASS, 1));
+    character.lootItem(this, this.generateItem(Items.GUNPOWDER_REFINED, 1));
+    return true;
+  }
+
+  repairOption(
+    client: Client,
+    character: Character | BaseLootableEntity,
+    item: BaseItem,
+    repairItem: BaseItem,
+    animationId: number
+  ) {
+    const durability = repairItem.currentDurability;
+    if (durability >= 2000) {
+      // todo: get max durability from somewhere, do not hard-code
+      this.sendChatText(client, "This weapon is already at max durability.");
+      return;
+    }
+
+    const itemDefinition = this.getItemDefinition(repairItem.itemDefinitionId);
+    if (!itemDefinition) return;
+    const weaponDefinitionId = itemDefinition.PARAM1;
+
+    switch (weaponDefinitionId) {
+      case WeaponDefinitionIds.WEAPON_NAGAFENS_RAGE:
+      case WeaponDefinitionIds.WEAPON_REAPER:
+      case WeaponDefinitionIds.WEAPON_BLAZE:
+      case WeaponDefinitionIds.WEAPON_FROSTBITE:
+      case WeaponDefinitionIds.WEAPON_PURGE:
+        this.sendChatText(client, "This weapon cannot be repaired.");
+        return;
+    }
+
+    const itemDef = this.getItemDefinition(item.itemDefinitionId);
+    if (!itemDef) return;
+    const nameId = itemDef.NAME_ID;
+
+    this.utilizeHudTimer(client, nameId, 5000, animationId, () => {
+      this.repairOptionPass(client, character, item, repairItem, durability);
+      this.challengeManager.registerChallengeProgression(
+        client,
+        ChallengeType.NO_WASTE,
+        1
+      );
+    });
+  }
+
+  repairOptionPass(
+    client: Client,
+    character: Character | BaseLootableEntity,
+    item: BaseItem,
+    repairItem: BaseItem,
+    durability: number
+  ) {
+    const diff = 2000 - durability,
+      isGunKit = item.itemDefinitionId == Items.GUN_REPAIR_KIT,
+      repairAmount = diff < 500 ? diff : 500;
+
+    if (!this.removeInventoryItem(character, item)) return;
+    if (isGunKit) {
+      repairItem.currentDurability = 2000;
+    } else {
+      repairItem.currentDurability += repairAmount;
+    }
+
+    // used to update the item's durability on-screen regardless of container / loadout
+    this.updateItem(client, repairItem);
+  }
+
+  createThrowableProjectile(
+    client: Client,
+    packet: any,
+    itemDefinition: ItemDefinition,
+    createNpc: boolean,
+    overrideProjectileId?: boolean
+  ) {
+    const characterId = this.generateGuid();
+    const transientId = this.getTransientId(characterId);
+    const npc = new ProjectileEntity(
+      characterId,
+      transientId,
+      0,
+      packet.packet.position,
+      new Float32Array([0, 0, 0, 0]),
+      this,
+      itemDefinition.ID,
+      overrideProjectileId
+        ? packet.packet.sessionProjectileCount +
+            parseInt(client.character.characterId.slice(-5), 16)
+        : packet.packet.projectileUniqueId,
+      client.character.characterId
+    );
+    this._throwableProjectiles[npc.characterId] = npc;
+    if (!createNpc) return;
+    this.getClientsInRange(200, packet.packet.position).forEach((c: Client) => {
+      this.addLightweightNpc(c, npc);
+      c.spawnedEntities.add(npc);
+    });
+  }
+
+  handleWeaponFireStateUpdate(
+    client: Client,
+    weaponItem: LoadoutItem,
+    firestate: number
+  ) {
+    if (firestate == 64) {
+      // empty firestate
+      this.sendRemoteWeaponUpdateDataToAllOthers(
+        client,
+        client.character.transientId,
+        weaponItem.itemGuid,
+        "Update.Empty",
+        {}
+      );
+      this.sendRemoteWeaponUpdateDataToAllOthers(
+        client,
+        client.character.transientId,
+        weaponItem.itemGuid,
+        "Update.FireState",
+        {
+          state: {
+            firestate: 64,
+            transientId: client.character.transientId,
+            position: client.character.state.position
+          }
+        }
+      );
+    }
+    // prevent empty weapons from entering an active firestate
+    const itemDefinition = this.getItemDefinition(weaponItem.itemDefinitionId);
+    if (!itemDefinition) return;
+    const weaponDefinitionId = itemDefinition.PARAM1;
+    if (!weaponItem.weapon?.ammoCount) {
+      switch (weaponDefinitionId) {
+        case WeaponDefinitionIds.WEAPON_BOW_MAKESHIFT:
+        case WeaponDefinitionIds.WEAPON_BOW_RECURVE:
+        case WeaponDefinitionIds.WEAPON_BOW_WOOD:
+          break;
+        default:
+          return;
+      }
+    }
+    if (firestate > 0) {
+      this.sendRemoteWeaponUpdateDataToAllOthers(
+        client,
+        client.character.transientId,
+        weaponItem.itemGuid,
+        "Update.Chamber",
+        {}
+      );
+    }
+    this.sendRemoteWeaponUpdateDataToAllOthers(
+      client,
+      client.character.transientId,
+      weaponItem.itemGuid,
+      "Update.FireState",
+      {
+        state: {
+          firestate: firestate,
+          transientId: client.character.transientId,
+          position: client.character.state.position
+        }
+      }
+    );
+  }
+
+  handleWeaponFire(client: Client, weaponItem: LoadoutItem, packet: any) {
+    if (!weaponItem.weapon || weaponItem.weapon.ammoCount <= 0) {
+      return;
+    }
+    this.challengeManager.registerChallengeProgression(
+      client,
+      ChallengeType.GLOBAL_DISARMAMENT,
+      1
+    );
+    if (weaponItem.weapon.ammoCount > 0) {
+      weaponItem.weapon.ammoCount -= 1;
+    }
+    /*if (!client.vehicle.mountedVehicle && this.fairPlayManager.fairPlayValues) {
+      if (
+        getDistance(client.character.state.position, packet.packet.position) >
+        this.fairPlayManager.fairPlayValues?.maxPositionDesync
+      ) {
+        this.sendChatText(
+          client,
+          `FairPlay: Your shot didnt register due to position desync`
+        );
+        this.sendChatTextToAdmins(
+          `FairPlay: ${
+            client.character.name
+          }'s shot didnt register due to position desync by ${getDistance(
+            client.character.state.position,
+            packet.packet.position
+          )}`
+        );
+      }
+    }*/
+    /*const drift = Math.abs(
+      packet.gameTime - getCurrentServerTimeWrapper().getTruncatedU32()
+    );
+    if (drift > this.fairPlayManager.maxPing + 200) {
+      this.sendChatText(
+        client,
+        `FairPlay: Your shot didnt register due to packet loss or high ping`
+      );
+      this.sendChatTextToAdmins(
+        `FairPlay: ${client.character.name}'s shot wasnt registered due to time drift by ${drift}`
+      );
+      return;
+    }*/
+    const itemDefinition = this.getItemDefinition(weaponItem.itemDefinitionId);
+    if (!itemDefinition) return;
+    const weaponDefinitionId = itemDefinition.PARAM1;
+    const keys = Object.keys(client.fireHints);
+    const lastFireHint = client.fireHints[Number(keys[keys.length - 1])];
+    if (lastFireHint) {
+      let blockedTime = 50;
+      switch (weaponDefinitionId) {
+        case WeaponDefinitionIds.WEAPON_308:
+        case WeaponDefinitionIds.WEAPON_REAPER:
+          blockedTime = 1300;
+          break;
+        case WeaponDefinitionIds.WEAPON_SHOTGUN:
+        case WeaponDefinitionIds.WEAPON_NAGAFENS_RAGE:
+          blockedTime = 400;
+          break;
+      }
+      if (packet.gameTime - lastFireHint.timeStamp < blockedTime) return;
+    }
+    let hitNumber = 0;
+    if (
+      !client.vehicle.mountedVehicle &&
+      !isPosInRadius(3, client.character.state.position, packet.packet.position)
+    ) {
+      hitNumber = 1;
+    }
+    const shotProjectiles =
+      weaponDefinitionId == WeaponDefinitionIds.WEAPON_SHOTGUN ||
+      weaponDefinitionId == WeaponDefinitionIds.WEAPON_NAGAFENS_RAGE
+        ? 12
+        : 1;
+    for (let x = 0; x < shotProjectiles; x++) {
+      const fireHint: FireHint = {
+        id: packet.packet.sessionProjectileCount + x,
+        position: packet.packet.position,
+        rotation: client.character.state.yaw,
+        hitNumber: hitNumber,
+        weaponItem: weaponItem,
+        timeStamp: packet.gameTime,
+        projectileUniqueId:
+          packet.packet.sessionProjectileCount +
+          x +
+          parseInt(client.character.characterId.slice(-5), 16)
+      };
+      client.fireHints[packet.packet.sessionProjectileCount + x] = fireHint;
+      setTimeout(() => {
+        delete client.fireHints[packet.packet.sessionProjectileCount + x];
+      }, 10000);
+    }
+    this.fairPlayManager.hitMissFairPlayCheck(this, client, false, "");
+    this.stopHudTimer(client);
+    this.sendRemoteWeaponUpdateDataToAllOthers(
+      client,
+      client.character.transientId,
+      weaponItem.itemGuid,
+      "Update.ProjectileLaunch",
+      {}
+    );
+
+    if (itemDefinition.ITEM_CLASS == ItemClasses.THROWABLES) {
+      this.createThrowableProjectile(client, packet, itemDefinition, true);
+      const inv = client.character.getInventoryAsContainer();
+      const similarItems = inv[itemDefinition.ID];
+      const currentSlotId = weaponItem.slotId;
+
+      // remove the equipped grenade
+      this.removeInventoryItem(client.character, weaponItem);
+
+      // auto-equip the next similar grenade from inventory if available
+      if (similarItems && similarItems.length) {
+        const nextNade = similarItems.find((v) => {
+          return v !== weaponItem;
+        });
+        if (nextNade) {
+          client.character.equipContainerItem(this, nextNade, currentSlotId);
+        }
+      }
+      return;
+    } else if (itemDefinition.ID == Items.WEAPON_BOW_RECURVE) {
+      this.createThrowableProjectile(
+        client,
+        packet,
+        itemDefinition,
+        false,
+        true
+      );
+      return;
+    }
+    if (this.damageWeapons) {
+      this.damageItem(client.character, weaponItem, 5);
+    }
+  }
+
+  handleWeaponReload(client: Client, weaponItem: LoadoutItem) {
+    if (!weaponItem.weapon) return;
+    if (weaponItem.weapon.reloadTimer) return;
+    const maxAmmo = this.getWeaponMaxAmmo(weaponItem.itemDefinitionId); // max clip size
+    if (weaponItem.weapon.ammoCount >= maxAmmo) return;
+    // force 0 firestate so gun doesnt shoot randomly after reloading
+    this.sendRemoteWeaponUpdateDataToAllOthers(
+      client,
+      client.character.transientId,
+      weaponItem.itemGuid,
+      "Update.FireState",
+      {
+        state: {
+          firestate: 0,
+          transientId: client.character.transientId,
+          position: client.character.state.position
+        }
+      }
+    );
+    this.sendRemoteWeaponUpdateDataToAllOthers(
+      client,
+      client.character.transientId,
+      weaponItem.itemGuid,
+      "Update.Reload",
+      {}
+    );
+    const weaponAmmoId = this.getWeaponAmmoId(weaponItem.itemDefinitionId),
+      reloadTime = this.getWeaponReloadTime(weaponItem.itemDefinitionId);
+
+    const itemDefinition = this.getItemDefinition(weaponItem.itemDefinitionId);
+    if (!itemDefinition) return;
+    const weaponDefinitionId = itemDefinition.PARAM1;
+
+    // Allow reloading for grenades
+    if (itemDefinition.ITEM_CLASS == ItemClasses.WEAPON_THROWABLES) {
+      weaponItem.weapon.ammoCount = 1;
+      this.sendWeaponReload(client, weaponItem, 1);
+      return;
+    }
+
+    switch (weaponDefinitionId) {
+      case WeaponDefinitionIds.WEAPON_BOW_MAKESHIFT:
+      case WeaponDefinitionIds.WEAPON_BOW_RECURVE:
+      case WeaponDefinitionIds.WEAPON_BOW_WOOD:
+        weaponItem.weapon.reloadTimer = setTimeout(() => {
+          const currentWeapon = client.character.getEquippedWeapon();
+          if (
+            !weaponItem.weapon ||
+            !currentWeapon ||
+            currentWeapon.itemGuid != weaponItem.itemGuid
+          ) {
+            client.character.clearReloadTimeout();
+            return;
+          }
+          if (!weaponItem.weapon?.reloadTimer) {
+            client.character.clearReloadTimeout();
+            return;
+          }
+          const maxReloadAmount = maxAmmo - weaponItem.weapon.ammoCount, // how much ammo is needed for full clip
+            reserveAmmo = client.character.getInventoryItemAmount(weaponAmmoId), // how much ammo is in inventory
+            reloadAmount =
+              reserveAmmo >= maxReloadAmount ? maxReloadAmount : reserveAmmo; // actual amount able to reload
+
+          if (
+            !this.removeInventoryItems(
+              client.character,
+              weaponAmmoId,
+              reloadAmount
+            )
+          ) {
+            client.character.clearReloadTimeout();
+            return;
+          }
+          this.sendWeaponReload(
+            client,
+            weaponItem,
+            (weaponItem.weapon.ammoCount += reloadAmount)
+          );
+          client.character.clearReloadTimeout();
+        }, reloadTime);
+        return;
+    }
+
+    //#region SHOTGUN ONLY
+    if (weaponAmmoId == Items.AMMO_12GA) {
+      weaponItem.weapon.reloadTimer = setTimeout(() => {
+        if (!weaponItem.weapon?.reloadTimer) {
+          client.character.clearReloadTimeout();
+          return;
+        }
+        const reserveAmmo = // how much ammo is in inventory
+          client.character.getInventoryItemAmount(weaponAmmoId);
+        if (
+          !reserveAmmo ||
+          (weaponItem.weapon.ammoCount < maxAmmo &&
+            !this.removeInventoryItems(client.character, weaponAmmoId, 1)) ||
+          ++weaponItem.weapon.ammoCount == maxAmmo
+        ) {
+          this.sendWeaponReload(client, weaponItem);
+          this.sendRemoteWeaponUpdateDataToAllOthers(
+            client,
+            client.character.transientId,
+            weaponItem.itemGuid,
+            "Update.ReloadLoopEnd",
+            {
+              endLoop: true
+            }
+          );
+          client.character.clearReloadTimeout();
+          return;
+        }
+        if (reserveAmmo - 1 < 0) {
+          // updated reserve ammo
+          this.sendWeaponReload(client, weaponItem);
+          this.sendRemoteWeaponUpdateDataToAllOthers(
+            client,
+            client.character.transientId,
+            weaponItem.itemGuid,
+            "Update.ReloadLoopEnd",
+            {
+              endLoop: true
+            }
+          );
+          client.character.clearReloadTimeout();
+          return;
+        }
+        weaponItem.weapon.reloadTimer.refresh();
+      }, reloadTime);
+      return;
+    }
+    //#endregion
+    weaponItem.weapon.reloadTimer = setTimeout(() => {
+      const currentWeapon = client.character.getEquippedWeapon();
+      if (
+        !weaponItem.weapon?.reloadTimer ||
+        !currentWeapon ||
+        currentWeapon.itemGuid != weaponItem.itemGuid
+      ) {
+        return;
+      }
+      const maxReloadAmount = maxAmmo - weaponItem.weapon.ammoCount, // how much ammo is needed for full clip
+        reserveAmmo = client.character.getInventoryItemAmount(weaponAmmoId), // how much ammo is in inventory
+        reloadAmount =
+          reserveAmmo >= maxReloadAmount ? maxReloadAmount : reserveAmmo; // actual amount able to reload
+
+      if (
+        !this.removeInventoryItems(client.character, weaponAmmoId, reloadAmount)
+      ) {
+        return;
+      }
+      this.sendWeaponReload(
+        client,
+        weaponItem,
+        (weaponItem.weapon.ammoCount += reloadAmount)
+      );
+      client.character.clearReloadTimeout();
+    }, reloadTime);
+  }
+
+  pUtilizeHudTimer = promisify(this.utilizeHudTimer);
+
+  stopHudTimer(client: Client) {
+    if (client.hudTimer === null) {
+      // No timer running so nothing to do
+      return;
+    }
+    this.utilizeHudTimer(client, 0, 0, 0, () => {
+      client.hudTimer = null;
+      this.sendDataToAllWithSpawnedEntity(
+        this._characters,
+        client.character.characterId,
+        "CharacterState.InteractionStop",
+        {
+          characterId: client.character.characterId
+        }
+      );
+      // TODO: this should be somewhere else
+      const vehicle = this._vehicles[client.vehicle.mountedVehicle ?? ""];
+      if (!vehicle) return;
+      vehicle.removeHotwireEffect(this);
+    });
+  }
+
+  utilizeHudTimer(
+    client: Client,
+    nameId: number,
+    timeout: number,
+    animationId: number,
+    callback: any
+  ) {
+    if (!animationId) {
+      this.startTimer(client, nameId, timeout);
+    } else {
+      this.startInteractionTimer(client, nameId, timeout, animationId);
+    }
+    if (client.hudTimer != null) {
+      clearTimeout(client.hudTimer);
+    }
+    client.posAtTimerStart = client.character.state.position;
+    client.hudTimer = setTimeout(() => {
+      callback.apply(this);
+      client.hudTimer = null;
+      this.sendDataToAllWithSpawnedEntity(
+        this._characters,
+        client.character.characterId,
+        "CharacterState.InteractionStop",
+        {
+          characterId: client.character.characterId
+        }
+      );
+    }, timeout);
+  }
+
+  containerError(client: Client, error: ContainerErrors) {
+    switch (error) {
+      case ContainerErrors.DOES_NOT_ACCEPT_ITEMS:
+        this.sendChatText(
+          client,
+          "Container Error: ContainerDoesNotAcceptItems"
+        );
+        break;
+      case ContainerErrors.NOT_MUTABLE:
+        this.sendChatText(client, "Container Error: ContainerIsNotMutable");
+        break;
+      case ContainerErrors.NOT_CONSTRUCTED:
+        this.sendChatText(client, "Container Error: ContainerNotConstructed");
+        break;
+      case ContainerErrors.NO_SPACE:
+        this.sendChatText(client, "Container Error: ContainerHasNoSpace");
+        break;
+      case ContainerErrors.INVALID_LOADOUT_SLOT:
+        this.sendChatText(client, "Container Error: InvalidLoadoutSlot");
+        break;
+      case ContainerErrors.NO_PERMISSION:
+        this.sendChatText(client, "Container Error: NoPermission");
+      case ContainerErrors.UNACCEPTED_ITEM:
+        this.sendChatText(client, "Container Error: Item not accepted");
+        break;
+      default:
+        this.sendData<ContainerError>(client, "Container.Error", {
+          characterId: client.character.characterId,
+          containerError: error
+        });
+        break;
+    }
+  }
+
+  clearMovementModifiers(client: Client) {
+    for (const a in client.character.timeouts) {
+      client.character.timeouts[a]._onTimeout();
+      clearTimeout(client.character.timeouts[a]);
+      delete client.character.timeouts[a];
+    }
+  }
+
+  applyMovementModifier(client: Client, modifier: MovementModifiers) {
+    this.multiplyMovementModifier(client, modifier);
+    let hudIndicator: HudIndicator | undefined;
+    switch (modifier) {
+      case MovementModifiers.SWIZZLE:
+        hudIndicator = this._hudIndicators["SWIZZLE"];
+        if (client.character.timeouts["swizzle"]) {
+          client.character.timeouts["swizzle"]._onTimeout();
+          clearTimeout(client.character.timeouts["swizzle"]);
+          delete client.character.timeouts["swizzle"];
+          if (client.character.hudIndicators[hudIndicator.typeName]) {
+            client.character.hudIndicators[
+              hudIndicator.typeName
+            ].expirationTime += 30000;
+          }
+        }
+        client.character.hudIndicators[hudIndicator.typeName] = {
+          typeName: hudIndicator.typeName,
+          expirationTime: Date.now() + 30000
+        };
+        this.sendHudIndicators(client);
+        this.addScreenEffect(client, this._screenEffects["SWIZZLE"]);
+        client.character.timeouts["swizzle"] = setTimeout(() => {
+          if (!client.character.timeouts["swizzle"]) {
+            return;
+          }
+          this.divideMovementModifier(client, modifier);
+          delete client.character.timeouts["swizzle"];
+        }, 30000);
+        break;
+      case MovementModifiers.RESTED:
+        hudIndicator = this._hudIndicators["WELL_RESTED"];
+        if (client.character.timeouts["WELL_RESTED"]) {
+          client.character.timeouts["WELL_RESTED"]._onTimeout();
+          clearTimeout(client.character.timeouts["WELL_RESTED"]);
+          delete client.character.timeouts["WELL_RESTED"];
+          if (client.character.hudIndicators[hudIndicator.typeName]) {
+            client.character.hudIndicators[
+              hudIndicator.typeName
+            ].expirationTime += 120000;
+          }
+        }
+        client.character.hudIndicators[hudIndicator.typeName] = {
+          typeName: hudIndicator.typeName,
+          expirationTime: Date.now() + 120000
+        };
+        this.sendHudIndicators(client);
+        client.character.timeouts["WELL_RESTED"] = setTimeout(() => {
+          if (!client.character.timeouts["WELL_RESTED"]) {
+            return;
+          }
+          this.divideMovementModifier(client, modifier);
+          delete client.character.timeouts["WELL_RESTED"];
+        }, 120000);
+        break;
+      case MovementModifiers.SNARED:
+        if (client.character.timeouts["snared"]) {
+          client.character.timeouts["snared"]._onTimeout();
+          clearTimeout(client.character.timeouts["snared"]);
+          delete client.character.timeouts["snared"];
+        }
+        client.character.timeouts["snared"] = setTimeout(() => {
+          if (!client.character.timeouts["snared"]) {
+            return;
+          }
+          this.divideMovementModifier(client, modifier);
+          delete client.character.timeouts["snared"];
+        }, 15000);
+        break;
+      case MovementModifiers.ADRENALINE:
+        hudIndicator = this._hudIndicators[ResourceIndicators.ADRENALINE];
+        if (client.character.timeouts["ADRENALINE"]) {
+          client.character.timeouts["ADRENALINE"]._onTimeout();
+          clearTimeout(client.character.timeouts["ADRENALINE"]);
+          delete client.character.timeouts["ADRENALINE"];
+          if (client.character.hudIndicators[hudIndicator.typeName]) {
+            client.character.hudIndicators[
+              hudIndicator.typeName
+            ].expirationTime += 30000;
+          }
+        }
+        client.character.hudIndicators[hudIndicator.typeName] = {
+          typeName: hudIndicator.typeName,
+          expirationTime: Date.now() + 30000
+        };
+        this.sendHudIndicators(client);
+        const adrenalineBoostInterval = setInterval(() => {
+          client.character._resources[ResourceIds.STAMINA] = 600;
+        }, 1000);
+        client.character.timeouts["ADRENALINE"] = setTimeout(
+          (skipAfterEffect: boolean) => {
+            if (!client.character.timeouts["ADRENALINE"]) {
+              return;
+            }
+            this.divideMovementModifier(client, modifier);
+            delete client.character.timeouts["ADRENALINE"];
+            clearInterval(adrenalineBoostInterval);
+
+            if (!skipAfterEffect && client.character.isAlive) {
+              setTimeout(() => {
+                hudIndicator =
+                  this._hudIndicators[
+                    ResourceIndicators.ADRENALINE_AFTER_EFFECTS
+                  ];
+                if (client.character.timeouts["ADRENALINE AFTER EFFECTS"]) {
+                  client.character.timeouts[
+                    "ADRENALINE AFTER EFFECTS"
+                  ]._onTimeout();
+                  clearTimeout(
+                    client.character.timeouts["ADRENALINE AFTER EFFECTS"]
+                  );
+                  delete client.character.timeouts["ADRENALINE AFTER EFFECTS"];
+                  if (client.character.hudIndicators[hudIndicator.typeName]) {
+                    client.character.hudIndicators[
+                      hudIndicator.typeName
+                    ].expirationTime += 30000;
+                  }
+                }
+                client.character.hudIndicators[hudIndicator.typeName] = {
+                  typeName: hudIndicator.typeName,
+                  expirationTime: Date.now() + 30000
+                };
+                this.sendHudIndicators(client);
+                const adrenalineAfterEffectsInterval = setInterval(() => {
+                  // 4% per interval
+                  client.character._resources[ResourceIds.STAMINA] -= 24;
+                }, 1000);
+                client.character.timeouts["ADRENALINE AFTER EFFECTS"] =
+                  setTimeout(() => {
+                    clearInterval(adrenalineAfterEffectsInterval);
+                    if (
+                      !client.character.timeouts["ADRENALINE AFTER EFFECTS"]
+                    ) {
+                      return;
+                    }
+                    delete client.character.timeouts[
+                      "ADRENALINE AFTER EFFECTS"
+                    ];
+                    clearInterval(adrenalineAfterEffectsInterval);
+                  }, 30000);
+              }, 2000);
+            }
+          },
+          30000
+        );
+
+        break;
+      case MovementModifiers.BOOTS:
+        // some stuff
+        break;
+    }
+  }
+
+  multiplyMovementModifier(client: Client, modifier: number) {
+    this.sendData<ClientUpdateModifyMovementSpeed>(
+      client,
+      "ClientUpdate.ModifyMovementSpeed",
+      {
+        speed: modifier
+      }
+    );
+  }
+
+  divideMovementModifier(client: Client, modifier: number) {
+    const modifierFixed = 1 / modifier;
+    if (!client.character.initialized) return;
+    this.sendData<ClientUpdateModifyMovementSpeed>(
+      client,
+      "ClientUpdate.ModifyMovementSpeed",
+      {
+        speed: modifierFixed
+      }
+    );
+  }
+
+  checkRespirator(character: Character) {
+    if (!character._equipment[EquipSlots.FACE]) return false;
+    const itemGuid = character._equipment[EquipSlots.FACE].guid;
+    if (itemGuid) {
+      const item = character.getInventoryItem(itemGuid);
+      const itemDefinition = this.getItemDefinition(
+        item?.itemDefinitionId ?? 0
+      );
+      if (!item || !itemDefinition) return false;
+
+      if (itemDefinition.DESCRIPTION_ID == 11014) {
+        return true;
+      } else {
+        return false;
+      }
+    }
+  }
+
+  updateFootwear(
+    client: Client,
+    itemDefId: number,
+    isRemoved: boolean = false
+  ) {
+    if (!client.character.isReady) return;
+    let movementType: MovementModifiers | undefined;
+
+    if (
+      this.isConvey(itemDefId) ||
+      this.isZed(itemDefId) ||
+      this.isGator(itemDefId)
+    ) {
+      movementType = MovementModifiers.CONVEYS;
+    } else if (this.isBoot(itemDefId)) {
+      movementType = MovementModifiers.BOOTS;
+    }
+
+    if (movementType) {
+      if (isRemoved) {
+        this.divideMovementModifier(client, movementType);
+      } else {
+        this.multiplyMovementModifier(client, movementType);
+      }
+    }
+
+    client.character.updateFootwearAudio(this);
+  }
+
+  checkNightVision(client: Client, character = client.character) {
+    if (
+      character._loadout[29] &&
+      character._loadout[29].itemDefinitionId == Items.NV_GOGGLES
+    )
+      return;
+    const index = character.screenEffects.indexOf("NIGHTVISION");
+    if (index > -1) {
+      character.screenEffects.splice(index, 1);
+      this.removeScreenEffect(client, this._screenEffects["NIGHTVISION"]);
+    }
+  }
+
+  detectEnasMovement(
+    server: ZoneServer2016,
+    client: Client,
+    stanceFlags: StanceFlags
+  ) {
+    if (stanceFlags.CROUCHING) {
+      if (client.character.isCrouching) {
+        return;
+      }
+      client.character.isCrouching = true;
+      if (Date.now() - client.character.lastCrouchTime <= 1500) {
+        client.character.crouchCount++;
+      } else {
+        client.character.crouchCount = 0;
+        client.character.lastCrouchTime = 0;
+      }
+      client.character.lastCrouchTime = Date.now();
+      if (client.character.crouchCount >= 6) {
+        server.sendData<ClientUpdateModifyMovementSpeed>(
+          client,
+          "ClientUpdate.ModifyMovementSpeed",
+          {
+            speed: 0.5
+          }
+        );
+        setTimeout(() => {
+          server.sendData<ClientUpdateModifyMovementSpeed>(
+            client,
+            "ClientUpdate.ModifyMovementSpeed",
+            {
+              speed: 2
+            }
+          );
+        }, 1500);
+        client.character.crouchCount = 0;
+      }
+    } else {
+      client.character.isCrouching = false;
+    }
+  }
+
+  //#endregion
+
+  async reloadZonePacketHandlers() {
+    //@ts-expect-error we reload it
+    delete this._packetHandlers;
+    delete require.cache[require.resolve("./zonepackethandlers")];
+    this._packetHandlers =
+      new (require("./zonepackethandlers").ZonePacketHandlers)();
+    await this.reloadCommandCache();
+  }
+  generateGuid(): string {
+    return generateRandomGuid();
+  }
+  private _sendRawDataReliable(client: Client, data: Buffer, gatewayChannel = 0) {
+    try {
+      if (gatewayChannel === 0 && Buffer.isBuffer(data)) {
+        const name = data[0] === 0x11 && data[1] === 0x0a && data[2] === 0x00 ? "ClientUpdate.UpdateLocation" :
+          data[0] === 0x0f && data[1] === 0x02 ? "Character.Knockback" : undefined;
+        if (name) this._devHttpServer?.observeTestPlayerMotionSend(client, name, undefined, data);
+      }
+    } catch { /* Diagnostic only; retain the exact original raw send below. */ }
+    /*this.tasksManager.register(() => {
+      this._gatewayServer.sendTunnelData(
+        client.soeClientId,
+        data,
+        SOEOutputChannels.Reliable
+      );
+    });*/
+    this._gatewayServer.sendTunnelData(
+      client.soeClientId,
+      data,
+      SOEOutputChannels.Reliable,
+      gatewayChannel
+    );
+  }
+  sendRawDataReliable(client: Client, data: Buffer, gatewayChannel = 0) {
+    this._sendRawDataReliable(client, data, gatewayChannel);
+  }
+  sendUnbufferedRawDataReliable(client: Client, data: Buffer) {
+    this._sendRawDataReliable(client, data);
+  }
+  getAllCurrentUsedTransientId() {
+    const allTransient: any = {};
+    for (const key in this._doors) {
+      const door = this._doors[key];
+      allTransient[door.transientId] = key;
+    }
+    for (const key in this._lootableProps) {
+      const prop = this._lootableProps[key];
+      allTransient[prop.transientId] = key;
+    }
+    for (const key in this._vehicles) {
+      const vehicle = this._vehicles[key];
+      allTransient[vehicle.transientId] = key;
+    }
+    for (const key in this._npcs) {
+      const npc = this._npcs[key];
+      allTransient[npc.transientId] = key;
+    }
+    for (const key in this._spawnedItems) {
+      const object = this._spawnedItems[key];
+      allTransient[object.transientId] = key;
+    }
+    return allTransient;
+  }
+  private async fetchLoginInfo() {
+    const resolver = new Resolver();
+    const loginServerAddress = await resolveHostAddress(
+      resolver,
+      "loginserver.h1emu.com"
+    );
+    this._loginServerInfo.address = loginServerAddress[0] as string;
+  }
+  executeFuncForAllReadyClients(callback: (client: Client) => void) {
+    for (const client in this._clients) {
+      const clientObj: Client = this._clients[client];
+      if (!clientObj.isLoading) {
+        callback(clientObj);
+      }
+    }
+  }
+
+  executeFuncForAllReadyClientsInRange(
+    callback: (client: Client) => void,
+    entity: BaseEntity
+  ) {
+    for (const client in this._clients) {
+      const clientObj: Client = this._clients[client];
+      if (
+        !clientObj.isLoading &&
+        isPosInRadius(
+          entity.npcRenderDistance || this.charactersRenderDistance,
+          clientObj.character.state.position,
+          entity.state.position
+        )
+      ) {
+        callback(clientObj);
+      }
+    }
+  }
+  async startRoutinesLoop() {
+    if (_.size(this._clients) <= 0) {
+      this.routinesLoopTimer = setTimeout(() => {
+        this.startRoutinesLoop();
+      }, 3000);
+      return;
+    }
+    for (const a in this._clients) {
+      while (this.isSaving) {
+        await scheduler.wait(500);
+      }
+      const startTime = Date.now();
+      const client = this._clients[a];
+      if (!client.isLoading) {
+        client.routineCounter++;
+        this.constructionManager.constructionPermissionsManager(this, client);
+        if (!this.disableMapBoundsCheck) {
+          this.checkInMapBounds(client);
+        }
+        this.checkZonePing(client);
+        if (client.routineCounter >= 3) {
+          this.createFairPlayInternalPacket(client);
+          this.assignChunkRenderDistance(client);
+          this.removeOutOfDistanceEntities(client);
+          if (!this.disablePOIManager) {
+            this.POIManager(client);
+          }
+          client.routineCounter = 0;
+        }
+        //this.constructionManager.spawnConstructionParentsInRange(this, client); // put back into grid for now
+        this.vehicleManager(client);
+        this.spawnGridObjects(client); // Spawn base parts before the player
+        this.spawnCharacters(client);
+        //this.constructionManager.worldConstructionManager(this, client); // put into grid
+        client.posAtLastRoutine = client.character.state.position;
+      }
+      const endTime = Date.now();
+      const timeTaken = endTime - startTime;
+      if (timeTaken > this.tickRate) {
+        console.log(
+          `Routine took ${timeTaken}ms to execute, which is more than the tickRate ${this.tickRate}`
+        );
+      }
+      await scheduler.wait(this.tickRate, {});
+    }
+    this.updateSpectatorMap();
+    this.startRoutinesLoop();
+  }
+
+  executeRoutine(client: Client) {
+    this.constructionManager.constructionPermissionsManager(this, client);
+    //this.constructionManager.spawnConstructionParentsInRange(this, client); // put into grid
+    this.vehicleManager(client);
+    this.removeOutOfDistanceEntities(client);
+    this.spawnGridObjects(client); // Spawn base parts before the player
+    this.spawnCharacters(client);
+    //this.constructionManager.worldConstructionManager(this, client);
+    if (!this.disablePOIManager) {
+      this.POIManager(client);
+    }
+    client.posAtLastRoutine = client.character.state.position;
+  }
+
+  firstRoutine(client: Client) {
+    this.spawnLoadingGridObjects(client);
+    this.spawnCharacters(client);
+    //this.constructionManager.worldConstructionManager(this, client);
+    if (!this.disablePOIManager) {
+      this.POIManager(client);
+    }
+    client.posAtLastRoutine = client.character.state.position;
+  }
+
+  async checkZonePing(client: Client) {
+    const ping = this._gatewayServer.getSoeClientAvgPing(client.soeClientId);
+    if (
+      client.isAdmin ||
+      Number(client.character.lastLoginDate) + 30000 > new Date().getTime() ||
+      !ping
+    ) {
+      return;
+    }
+
+    client.zonePings.push(ping > 400 ? 400 : ping); // dont push values higher than 400, that would increase average value drasticaly and it's the resend rate
+    if (ping >= this.fairPlayManager.maxPing) {
+      this.sendAlert(
+        client,
+        `Your ping is very high: ${ping}. You may be kicked soon`
+      );
+      client.pingWarnings += 1;
+    } else {
+      client.pingWarnings = 0;
+    }
+    if (client.zonePings.length < 15) return;
+
+    const averagePing =
+      client.zonePings.reduce((a, b) => a + b, 0) / client.zonePings.length;
+    if (
+      averagePing >= this.fairPlayManager.maxPing &&
+      client.pingWarnings > 3
+    ) {
+      this.kickPlayer(client);
+      this.sendChatTextToAdmins(
+        `${client.character.name} has been been kicked for average ping: ${averagePing}`
+      );
+      return;
+    }
+    client.zonePings.splice(0, 1); // remove oldest ping val
+  }
+
+  checkInMapBounds(client: Client) {
+    let inMapBounds: boolean = false;
+    this._spawnGrid.forEach((cell: SpawnCell) => {
+      const pos = client.character.state.position;
+      if (
+        pos[0] >= cell.position[0] - cell.width / 2 &&
+        pos[0] <= cell.position[0] + cell.width / 2 &&
+        pos[2] >= cell.position[2] - cell.height / 2 &&
+        pos[2] <= cell.position[2] + cell.height / 2
+      ) {
+        inMapBounds = true;
+      }
+    });
+    const index = client.character.screenEffects.indexOf("OUTOFMAPBOUNDS");
+    if (!inMapBounds && (!client.isAdmin || !client.isDebugMode)) {
+      const damageInfo: DamageInfo = {
+        entity: "Server.OutOfMapBounds",
+        damage: 1000
+      };
+      this.sendAlert(client, `The radiation here seems to be dangerously high`);
+      client.character.damage(this, damageInfo);
+      if (index <= -1) {
+        client.character.screenEffects.push("OUTOFMAPBOUNDS");
+        this.addScreenEffect(client, this._screenEffects["OUTOFMAPBOUNDS"]);
+      }
+    } else {
+      if (index > -1) {
+        client.character.screenEffects.splice(index, 1);
+        this.removeScreenEffect(client, this._screenEffects["OUTOFMAPBOUNDS"]);
+      }
+    }
+  }
+
+  initHudIndicatorDataSource() {
+    hudIndicators.forEach((indicator: any) => {
+      this._hudIndicators[indicator.typeName] = {
+        id: indicator.ID,
+        typeName: indicator.typeName,
+        nameId: indicator.nameId,
+        descriptionId: indicator.descriptionId,
+        imageSetId: indicator.imageSetId
+      };
+    });
+  }
+
+  initScreenEffectDataSource() {
+    screenEffects.forEach((effect: any) => {
+      this._screenEffects[effect.typeName] = {
+        effectId: effect.id,
+        typeName: effect.typeName,
+        duration: effect.duration,
+        screenBrightness: effect.screenBrightness,
+        colorGradingFilename: effect.colorGradingFilename,
+        colorGrading: effect.colorGrading,
+        screenCover: effect.screenCover,
+        transparency: effect.transparency,
+        color: parseInt(effect.color, 16),
+        unknownDword3: effect?.unknownDword3 ?? 0,
+        unknownDword7: effect?.unknownDword7 ?? 0,
+        unknownDword16: effect?.unknownDword16 ?? 0,
+        unknownDword17: effect?.unknownDword17 ?? 0,
+        unknownDword18: effect?.unknownDword18 ?? 0,
+        unknownDword19: effect?.unknownDword19 ?? 0
+      };
+    });
+  }
+
+  createFairPlayInternalPacket(client: Client) {
+    // send fake packet for plugin to handle
+    const packet: H1z1ProtocolReadingFormat = {
+      name: "FairPlay.Internal",
+      flag: 0,
+      data: null
+    };
+    this.onZoneDataEvent(client, packet);
+  }
+
+  initClientEffectsDataSource() {
+    clientEffectsDataSource.forEach((clientEffect: any) => {
+      this._clientEffectsData[clientEffect.SERVER_EFFECT_ID] = {
+        id: clientEffect.ABILITY_ID,
+        typeName: clientEffect.TYPE_NAME,
+        animationName: clientEffect.STRING1
+      };
+    });
+  }
+
+  initModelsDataSource() {
+    models.forEach((model: any) => {
+      this._modelsData[model.ID] = {
+        id: model.ID,
+        fileName: model.MODEL_FILE_NAME,
+        materialType: model.MATERIAL_TYPE
+      };
+    });
+  }
+
+  initUseOptionsDataSource() {
+    itemUseOptionsDataSource.forEach((useOption: any) => {
+      this._itemUseOptions[useOption.ITEM_USE_OPTION_ID] = {
+        id: useOption.ITEM_USE_OPTION_ID,
+        typeName: useOption.TYPE_NAME,
+        animationId: useOption.INTERACTION_ANIMATION_ID
+      };
+    });
+  }
+
+  sendHudIndicators(client: Client) {
+    this.sendData(client, "Effect.RemoveUiIndicators", {
+      unknownData1: {
+        unknownQword1: client.character.characterId
+      },
+      unknownData2: {}
+    });
+    client.character.resourceHudIndicators.forEach(
+      (typeName: string, index) => {
+        const indicator = this._hudIndicators[typeName];
+        if (!indicator) {
+          // to help identifying the issue
+          console.log(`Unknown hud indicator: ${typeName} removing it`);
+          client.character.resourceHudIndicators.splice(index, 1);
+          return;
+        }
+        this.sendData(client, "Effect.AddUiIndicator", {
+          characterId: client.character.characterId,
+          hudElementGuid: this.generateGuid(),
+          unknownData1: {
+            hudElementId: indicator.nameId
+          },
+          hudElementData: {
+            nameId: indicator.nameId,
+            descriptionId: indicator.descriptionId,
+            imageSetId: indicator.imageSetId
+          },
+          unknownData3: {},
+          unknownData4: {},
+          unknownData5: {}
+        });
+      }
+    );
+    for (const a in client.character.hudIndicators) {
+      const indicator =
+        this._hudIndicators[client.character.hudIndicators[a].typeName];
+      this.sendData(client, "Effect.AddUiIndicator", {
+        characterId: client.character.characterId,
+        hudElementGuid: this.generateGuid(),
+        unknownData1: {
+          hudElementId: indicator.nameId
+        },
+        hudElementData: {
+          nameId: indicator.nameId,
+          descriptionId: indicator.descriptionId,
+          imageSetId: indicator.imageSetId
+        },
+        unknownData3: {},
+        unknownData4: {},
+        unknownData5: {}
+      });
+    }
+  }
+
+  addScreenEffect(client: Client, effect: ScreenEffect) {
+    this.sendData(client, "ScreenEffect.ApplyScreenEffect", effect);
+  }
+
+  removeScreenEffect(client: Client, effect: ScreenEffect) {
+    this.sendData(client, "ScreenEffect.RemoveScreenEffect", effect);
+  }
+
+  private _sendDataToAll<ZonePacket>(
+    packetName: h1z1PacketsType2016,
+    obj: ZonePacket
+  ) {
+    const data = this._protocol.pack(packetName, obj);
+    if (data) {
+      for (const a in this._clients) {
+        this.sendRawDataReliable(this._clients[a], data);
+      }
+    }
+  }
+
+  sendDataToAll<ZonePacket>(packetName: h1z1PacketsType2016, obj: ZonePacket) {
+    this._sendDataToAll(packetName, obj);
+  }
+  dropVehicleManager(client: Client, vehicleGuid: string) {
+    this.sendManagedObjectResponseControlPacket(client, {
+      control: false,
+      objectCharacterId: vehicleGuid
+    });
+    client.managedObjects.splice(
+      client.managedObjects.findIndex((e: string) => e === vehicleGuid),
+      1
+    );
+    delete this._vehicles[vehicleGuid]?.manager;
+  }
+  sendZonePopulationUpdate() {
+    let populationNumber = _.size(this._clients);
+    this._loginConnectionManager.sendData(
+      {
+        ...this._loginServerInfo,
+        // TODO: what a dirty hack
+        serverId: Infinity
+      } as any,
+      "UpdateZonePopulation",
+      { population: populationNumber }
+    );
+  }
+
+  private filterOutOfDistance(
+    element: BaseEntity,
+    playerPosition: Float32Array
+  ): boolean {
+    return !isPosInRadius(
+      element.npcRenderDistance || this.charactersRenderDistance,
+      playerPosition,
+      element.state.position
+    );
+  }
+  dismissVehicle(vehicleGuid: string) {
+    this.sendDataToAll<CharacterRemovePlayer>("Character.RemovePlayer", {
+      characterId: vehicleGuid
+    });
+    this.deleteEntity(vehicleGuid, this._vehicles);
+  }
+
+  /**
+   * Generates a new transientId and maps it to a provided characterId.
+   * @param characterId The characterId to map the transientId to.
+   */
+  getTransientId(characterId: string): number {
+    const generatedTransient = this._transientIdGenerator.next()
+      .value as number;
+    this._transientIds[generatedTransient] = characterId;
+    this._characterIds[characterId] = generatedTransient;
+    return generatedTransient;
+  }
+
+  /**
+   * Reloads all packet handlers, structures, and commands for the entire server.
+   * @param client The client that called the function.
+   */
+  reloadPackets(client: Client) {
+    this.reloadZonePacketHandlers();
+    this._protocol.reloadPacketDefinitions();
+    this.sendChatText(client, "[DEV] Packets reloaded", true);
+  }
+
+  /**
+   * Disconnects a client from the zone.
+   * @param client The client to be disconnected
+   */
+  timeoutClient(client: Client) {
+    if (!!this._clients[client.sessionId]) {
+      // if hasn't already deleted
+      debug(`Client (${client.soeClientId}) disconnected ( ping timeout )`);
+      this.deleteClient(client);
+    }
+  }
+
+  pSetImmediate = promisify(setImmediate);
+  pSetTimeout = promisify(setTimeout);
+
+  sendChatText(client: Client, message: string, clearChat?: boolean) {
+    this.chatManager.sendChatText(this, client, message, clearChat);
+  }
+  sendChatTextToAllOthers(client: Client, message: string, clearChat = false) {
+    this.chatManager.sendChatText(this, client, message, clearChat);
+  }
+  sendChatTextToAdmins(message: string, clearChat = false) {
+    this.chatManager.sendChatTextToAdmins(this, message, clearChat);
+  }
+  sendGlobalChatText(message: string, clearChat = false) {
+    this.chatManager.sendGlobalChatText(this, message, clearChat);
+  }
+  sendConsoleText(
+    client: Client,
+    message: string,
+    showConsole = false,
+    clearOutput = false
+  ) {
+    this.sendData<H1emuPrintToConsole>(client, "H1emu.PrintToConsole", {
+      message,
+      showConsole,
+      clearOutput
+    });
+  }
+  sendConsoleTextToAdmins(
+    message: string,
+    showConsole = false,
+    clearOutput = false
+  ) {
+    for (const a in this._clients) {
+      const client = this._clients[a];
+      if (client.isAdmin) {
+        this.sendData<H1emuPrintToConsole>(client, "H1emu.PrintToConsole", {
+          message,
+          showConsole,
+          clearOutput
+        });
+      }
+    }
+  }
+
+  playerNotFound(
+    client: Client,
+    inputString: string,
+    targetClient: string | Client | undefined
+  ) {
+    if (typeof targetClient == "string") {
+      this.sendChatText(
+        client,
+        `Could not find player "${inputString.toLowerCase()}", did you mean "${targetClient}"?`
+      );
+      return true;
+    }
+    return false;
+  }
+
+  getShaderParameterGroup(itemDefinitionId: number): Array<any> {
+    return (
+      this.dynamicappearance.SHADER_SEMANTIC_DEFINITIONS.find(
+        (definition: {
+          SHADER_PARAMETER_GROUP_ID: number;
+          SHADER_PARAMETER_GROUP: Array<{ SHADER_SEMANTIC_ID: number }>;
+        }) => {
+          return definition.SHADER_PARAMETER_GROUP_ID == itemDefinitionId;
+        }
+      )?.SHADER_PARAMETER_GROUP ?? []
+    );
+  }
+
+  getShaderGroupId(itemDefinitionId: number): number {
+    return (
+      this.dynamicappearance.ITEM_APPEARANCE_DEFINITIONS.filter(
+        (definition: {
+          ID: number;
+          ITEM_APPEARANCE_DATA: {
+            ID: number;
+            ITEM_ID: number;
+            MODEL_ID: number;
+            GENDER_ID: number;
+            SHADER_PARAMETER_GROUP_ID: number;
+          };
+        }) => {
+          return definition.ITEM_APPEARANCE_DATA.ITEM_ID == itemDefinitionId;
+        }
+      )[0]?.ITEM_APPEARANCE_DATA?.SHADER_PARAMETER_GROUP_ID ?? 0
+    );
+  }
+
+  deployParachute(client: Client, shaderGroupId: number) {
+    const characterId = this.generateGuid(),
+      vehicle = new Vehicle2016(
+        characterId,
+        this.getTransientId(characterId),
+        9374,
+        client.character.state.position,
+        client.character.state.rotation,
+        this,
+        getCurrentServerTimeWrapper().getTruncatedU32(),
+        VehicleIds.PARACHUTE,
+        shaderGroupId,
+        client.character.characterId
+      );
+    this.worldObjectManager.createVehicle(this, vehicle, true);
+    if (!this._vehicles[characterId]) {
+      return;
+    }
+
+    this.sendData<AddLightweightVehicle>(client, "AddLightweightVehicle", {
+      ...vehicle.pGetLightweightVehicle(),
+      unknownGuid1: this.generateGuid()
+    });
+    client.spawnedEntities.add(vehicle);
+
+    vehicle.onReadyCallback = (client) => {
+      this.sendData<VehicleAutoMount>(client, "Vehicle.AutoMount", {
+        guid: vehicle.characterId,
+        unknownBoolean1: true,
+        unknownDword1: 0
+      });
+    };
+  }
+
+  updateSpectatorMap() {
+    this.sendDataToAllAdmins("Spectator.AllSpectators", {
+      unknownDword1: 1,
+      unknownArray1: Object.values(this._clients).map((client) => ({
+        characterId: client.character.characterId,
+        characterName: client?.character?.name ?? "",
+        playerHeading: quat2heading(client.character.state.rotation),
+        playerX: client.character.state.position[0],
+        playerY: client.character.state.position[1],
+        playerZ: client.character.state.position[2],
+        unknownArray2: []
+      })),
+      unknownArray2: []
+    });
+  }
+
+  addToSyncTeleport(client: Client, position: Float32Array) {
+    this._syncTeleport[client.character.characterId] = false;
+    this.sendData<SynchronizedTeleportWaitingForPlayers>(
+      client,
+      "SynchronizedTeleport.WaitingForPlayers",
+      {}
+    );
+    this.sendData<ClientUpdateUpdateLocation>(
+      client,
+      "ClientUpdate.UpdateLocation",
+      {
+        position: position,
+        triggerLoadingScreen: true
+      }
+    );
+    client.character.state.position = position;
+  }
+
+  updateSyncTeleport(this: ZoneServer2016) {
+    const readyClients: Client[] = [];
+
+    // This is so some actions can hold players for some extra time if needed
+    // A little sidenote, if you want players to hold for 20 seconds. set it to 2 since the worldRoutine triggers every 10 seconds by default
+    if (this.blockSyncTeleportTicks > 0) {
+      this.blockSyncTeleportTicks--;
+      return;
+    }
+
+    for (const characterId in this._syncTeleport) {
+      const client = this.getClientByCharId(characterId);
+      if (!client) {
+        delete this._syncTeleport[characterId];
+        continue;
+      }
+
+      if (!this._syncTeleport[characterId]) {
+        return;
+      }
+      readyClients.push(client);
+    }
+
+    if (readyClients.length == 0) return;
+
+    this._syncTeleport = {};
+
+    readyClients.forEach((client) => {
+      this.sendData<SynchronizedTeleportPlayersReady>(
+        client,
+        "SynchronizedTeleport.PlayersReady",
+        {
+          cooldown: 5000
+        }
+      );
+    });
+
+    setTimeout(() => {
+      readyClients.forEach((client) => {
+        this.sendData<SynchronizedTeleportRelease>(
+          client,
+          "SynchronizedTeleport.Release",
+          {}
+        );
+      });
+    }, 5000);
+  }
+
+  isSurvival(): boolean {
+    return this.gameMode == GameModes.SURVIVAL;
+  }
+
+  isBattleRoyale(): boolean {
+    return this.gameMode > 0;
+  }
+}
+
+if (process.env.VSCODE_DEBUG === "true") {
+  const PackageSetting = require("../../../package.json");
+  process.env.H1Z1_SERVER_VERSION = PackageSetting.version;
+  new ZoneServer2016(
+    1117,
+    Buffer.from(DEFAULT_CRYPTO_KEY, "base64"),
+    process.env.MONGO_URL,
+    2
+  ).start();
+}

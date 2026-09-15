@@ -1,0 +1,1082 @@
+[
+  {
+    "id": 0,
+    "name": "Governor - pickup",
+    "vehicleId":2,
+    "position": [
+      2608,
+      47, 
+      2573,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -2.496251106262207
+  },
+  {
+    "id": 1,
+    "name": "Governor - offroader",
+    "vehicleId":1,
+    "position": [
+      2769.73,
+      86.69,
+      -2600.57,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -1.3737214803695679
+  },
+  {
+    "id": 2,
+    "name": "Hospital - offroader",
+    "vehicleId":1,
+    "position": [
+      1895.92,
+      93.69,
+      -2747.17,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -1.5567021369934082
+  },
+  {
+    "id": 3,
+    "name": "Hospital - police",
+    "vehicleId":3,
+    "position": [
+      1852.99,
+      93.69,
+      -2780.15,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 1.3145438432693481
+  },
+  {
+    "id": 4,
+    "name": "Hospital - pickup",
+    "vehicleId":2,
+    "position": [
+      1861.14,
+      93.69,
+      -2910.28,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 0.0013478784821927547
+  },
+  {
+    "id": 5,
+    "name": "Military - police",
+    "vehicleId":3,
+    "position": [
+      930.43,
+      14.00,
+      -2704.97,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -0.021372798830270767
+  },
+  {
+    "id": 6,
+    "name": "Military - offroader",
+    "vehicleId":1,
+    "position": [
+      705.24,
+      14.00,
+      -2704.81,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -0.0564357228577137
+  },
+  {
+    "id": 7,
+    "name": "Hemingway - offroader",
+    "vehicleId":1,
+    "position": [
+      -1900.63,
+      62.31,
+      -2144.57,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -3.07389760017395
+  },
+  {
+    "id": 8,
+    "name": "Runamokcamp - pickup",
+    "vehicleId":2,
+    "position": [
+      -2708.43,
+      8.44,
+      -3158.94,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -0.9000234007835388 
+  },
+  {
+    "id": 9,
+    "name": "Runamokcamp - offroader",
+    "vehicleId":1,
+    "position": [
+      -2854.71,
+      5.94,
+      -3125.09,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -0.26417505741119385 
+  },
+  {
+    "id": 10,
+    "name": "Runamokcamp - ATV",
+    "vehicleId": 5,
+    "position": [
+      -2508.67,
+      10.41,
+      -3258.36,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -0.25290870666503906 
+  },
+  {
+    "id": 11,
+    "name": "toxic - police",
+    "vehicleId":3,
+    "position": [
+      -3125.98,
+      27.00,
+      -2182.86,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 1.7251805067062378 
+  },
+  {
+    "id": 12,
+    "name": "toxic - offroader",
+    "vehicleId":1,
+    "position": [
+      -3126.39,
+      26.48,
+      -2219.41,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 0.42586711049079895 
+  },
+  {
+    "id": 13,
+    "name": "toxic - atv",
+    "vehicleId": 5,
+    "position": [
+      -3036.48,
+      38.61,
+      -2092.42,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -1.5667411088943481 
+  },
+  {
+    "id": 14,
+    "name": "wakehills - policecar",
+    "vehicleId":3,
+    "position": [
+      -3029.71,
+      69.85,
+      -1545.34,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -1.5753265619277954 
+  },
+  {
+    "id": 15,
+    "name": "darthmout - offroader",
+    "vehicleId":1,
+    "position": [
+      -3019.95,
+      52.00,
+      -734.24,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 1.7421735525131226 
+  },
+  {
+    "id": 16,
+    "name": "darthmout - policecar",
+    "vehicleId":3,
+    "position": [
+      -2593.40,
+      56.00,
+      -870.02,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -2.3658969402313232 
+  },
+  {
+    "id": 17,
+    "name": "darthmout - atv",
+    "vehicleId": 5,
+    "position": [
+      -2535.38,
+      43.56,
+      -1080.75,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 0.5080329775810242 
+  },
+  {
+    "id": 18,
+    "name": "Desoto - offroader",
+    "vehicleId":1,
+    "position": [
+      -2662.26,
+      108.81,
+      1047.30,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 2.71677827835083 
+  },
+  {
+    "id": 19,
+    "name": "e9 - offroader",
+    "vehicleId":1,
+    "position": [
+      -2865.51,
+      44.91,
+      -128.61,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -1.633109211921692 
+  },
+  {
+    "id": 20,
+    "name": "F9 - policecar",
+    "vehicleId":3,
+    "position": [
+      -2906.14,
+      43.59,
+      101.30,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 3.113840341567993 
+  },
+  {
+    "id": 21,
+    "name": "F9 - pickup",
+    "vehicleId":2,
+    "position": [
+      -2769.28,
+      47.24,
+      238.89,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -1.5699750185012817 
+  },
+  {
+    "id": 22,
+    "name": "crusant - atv",
+    "vehicleId": 5,
+    "position": [
+      -2638.67,
+      47.13,
+      2682.26,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -2.3083081245422363 
+  },
+  {
+    "id": 23,
+    "name": "cruasant - offroader",
+    "vehicleId":1,
+    "position": [
+      -2626.83,
+      49.16,
+      2810.80,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -2.2219200134277344 
+  },
+  {
+    "id": 24,
+    "name": "church - pickup",
+    "vehicleId":2,
+    "position": [
+      -1868.13,
+      53.03,
+      2825.86,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation":  1.5373637676239014 
+  },
+  {
+    "id": 25,
+    "name": "lonepine - offroader",
+    "vehicleId":1,
+    "position": [
+      -1135.76,
+      61.41,
+      2782.21,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 1.5856577157974243 
+  },
+  {
+    "id": 26,
+    "name": "lonepine - pickup",
+    "vehicleId":2,
+    "position": [
+      -875.95,
+      62.49,
+      2647.24,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 3.1297545433044434 
+  },
+  {
+    "id": 27,
+    "name": "bubbas - policecar",
+    "vehicleId":3,
+    "position": [
+      -483.18,
+      71.75,
+      2640.37,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 3.1006016731262207 
+  },
+  {
+    "id": 28,
+    "name": "cranberry - offroader",
+    "vehicleId":1,
+    "position": [
+      -1464.95,
+      72.52,
+      2062.12,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 1.5489298105239868 
+  },
+  {
+    "id": 29,
+    "name": "cranberry - pickup",
+    "vehicleId":2,
+    "position": [
+      -1222.75,
+      63.00,
+      2039.89,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 3.107703685760498 
+  },
+  {
+    "id": 30,
+    "name": "cranberry - atv",
+    "vehicleId": 5,
+    "position": [
+      -1134.11,
+      71.34,
+      1779.76,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -0.7969968318939209 
+  },
+  {
+    "id": 31,
+    "name": "cranberry - policecar",
+    "vehicleId":3,
+    "position": [
+      -1364.94,
+      71.37,
+      1794.88,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 1.5932954549789429 
+  },
+  {
+    "id": 32,
+    "name": "opfer - offroader",
+    "vehicleId":1,
+    "position": [
+      -1948.33,
+      72.09,
+      1226.15,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -0.8706812262535095 
+  },
+  {
+    "id": 33,
+    "name": "nexttoopfer - offroader",
+    "vehicleId":1,
+    "position": [
+      -2284.61,
+      50.88,
+      1230.88,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -0.5347860455513 
+  },
+  {
+    "id": 34,
+    "name": "nexttoopfer - pickup",
+    "vehicleId":2,
+    "position": [
+      -2015.59,
+      69.16,
+      -657.24,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -1.5784246921539307 
+  },
+  {
+    "id": 35,
+    "name": "radiotower - atv",
+    "vehicleId": 5,
+    "position": [
+      -1503.89,
+      354.00,
+      -842.50,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -0.14595001935958862  
+  },
+  {
+    "id": 36,
+    "name": "bumjick - pickup",
+    "vehicleId":2,
+    "position": [
+      -725.04,
+      15.29,
+      -1621.76,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -3.1384644508361816 
+  },
+  {
+    "id": 37,
+    "name": "villas - pickup",
+    "vehicleId":2,
+    "position": [
+      441.51,
+      111.52,
+      2875.02,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -3.105013132095337 
+  },
+  {
+    "id": 38,
+    "name": "villas - offroader",
+    "vehicleId":1,
+    "position": [
+      849.90,
+      77.88,
+      3229.32,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 2.3217878341674805 
+  },
+  {
+    "id": 39,
+    "name": "ranchito - atv",
+    "vehicleId": 5,
+    "position": [
+      1737.52,
+      31.94,
+      2692.37,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 1.517088532447815 
+  },
+  {
+    "id": 40,
+    "name": "ranchito - policecar",
+    "vehicleId":3,
+    "position": [
+      2121.70,
+      45.96,
+      2490.09,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 0.011980093084275723 
+  },
+  {
+    "id": 41,
+    "name": "ranchito - pickup",
+    "vehicleId":2,
+    "position": [
+      2110.50,
+      29.00,
+      2257.45,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 2.3496899604797363 
+  },
+  {
+    "id": 42,
+    "name": "nexttoranchito - pickup",
+    "vehicleId":2,
+    "position": [
+      2089.13,
+      36.00,
+      1428.64,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 3.0107674598693848 
+  },
+  {
+    "id": 43,
+    "name": "nexttoranchito - offroader",
+    "vehicleId":1,
+    "position": [
+      2217.85,
+      49.72,
+      754.99,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -3.125931739807129 
+  },
+  {
+    "id": 44,
+    "name": "nexttoranchito - atv",
+    "vehicleId": 5,
+    "position": [
+      1967.90,
+      45.31,
+      672.77,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 2.787020444869995 
+  },
+  {
+    "id": 45,
+    "name": "zimms - offroader",
+    "vehicleId":1,
+    "position": [
+      2214.90,
+      47.41,
+      -999.97,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -2.3587965965270996 
+  },
+  {
+    "id": 46,
+    "name": "pv/zimms - atv",
+    "vehicleId": 5,
+    "position": [
+      1232.62,
+      39.84,
+      -800.49,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 1.5296217203140259 
+  },
+  {
+    "id": 47,
+    "name": "pv - pickup",
+    "vehicleId":2,
+    "position": [
+      130.98,
+      31.34,
+      -1294.04,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -1.5706853866577148 
+  },
+  {
+    "id": 48,
+    "name": "PD - policecar",
+    "vehicleId":3,
+    "position": [
+      -222.04,
+      23.41,
+      -1133.48,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -0.03309280797839165 
+  },
+  {
+    "id": 49,
+    "name": "PD - offroader",
+    "vehicleId":1,
+    "position": [
+      -240.86,
+      23.41,
+      -1134.44,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -0.0042958674021065235 
+  },
+  {
+    "id": 50,
+    "name": "PVchurch - pickup",
+    "vehicleId":2,
+    "position": [
+      -380.27,
+      49.72,
+      -873.10,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 1.6081295013427734  
+  },
+  {
+    "id": 51,
+    "name": "PVJ - ATV",
+    "vehicleId": 5,
+    "position": [
+      145.36,
+      22.00,
+      -896.86,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -1.6043683290481567 
+  },
+  {
+    "id": 52,
+    "name": "PVL - offroader",
+    "vehicleId":1,
+    "position": [
+      209.13,
+      23.29,
+      -703.85,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -0.001600203337147832 
+  },
+  {
+    "id": 53,
+    "name": "PVL - pickup",
+    "vehicleId":2,
+    "position": [
+      93.00,
+      23.06,
+      -409.53,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 1.5650403499603271 
+  },
+  {
+    "id": 54,
+    "name": "Dam - policecar",
+    "vehicleId":3,
+    "position": [
+      -382.92,
+      47.66,
+      846.73,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -0.9858272671699524  
+  },
+  {
+    "id": 55,
+    "name": "Dam - offroader",
+    "vehicleId":1,
+    "position": [
+      -547.43,
+      40.15,
+      1181.46,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -2.3587965965270996 
+  },
+  {
+    "id": 56,
+    "name": "campsite - atv",
+    "vehicleId": 5,
+    "position": [
+      96.84,
+      26.44,
+      258.51,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": 2.503038167953491 
+  },
+  {
+    "id": 57,
+    "name": "campsite - atv1",
+    "vehicleId": 5,
+    "position": [
+      -368.12,
+      63.99,
+      1086.20,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -0.8162501454353333 
+  },
+  {
+    "id": 58,
+    "name": "campsite - atv2",
+    "vehicleId": 5,
+    "position": [
+      735.41,
+      16.69,
+      63.69,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -0.12202655524015427 
+  },
+  {
+    "id": 59,
+    "name": "campsite - atv3",
+    "vehicleId": 5,
+    "position": [
+      1428.68,
+      20.34,
+      664.66,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "orientation": -0.8532879948616028 
+  }  
+]

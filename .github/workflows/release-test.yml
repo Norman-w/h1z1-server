@@ -1,0 +1,31 @@
+name: Release tests
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  # build-docker-images:
+  #   name: Create docker images
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - name: Use Node.js 22.9.0
+  #       uses: actions/setup-node@v3
+  #       with:
+  #         node-version: 22.9.0
+  #     - uses: docker/setup-docker-action@v4
+  #     - run: npm i
+  #     - run: npm run build-docker-images
+
+  check-release-tag:
+    name: Check package version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      # Use this GitHub Action
+      - name: Check package version
+        uses: QuentinGruber/release-check-package-version-action@v1.0.0
+

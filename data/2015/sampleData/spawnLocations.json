@@ -1,0 +1,834 @@
+[
+  {
+    "id": 0,
+    "name": "Basic H1emu spawn",
+    "position": [
+      0,
+      20,
+      0,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 2,
+    "name": "pv pd",
+    "position": [
+      -234.79,
+      34.26,
+      -1139.05,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 3,
+    "name": "pv clock",
+    "position": [
+      -126.78,
+      24.91,
+      -1132.23,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 4,
+    "name": "Bed",
+    "position": [
+      1973.09,
+      47.7,
+      677.99,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 5,
+    "name": "Church",
+    "position": [
+      -395.18,
+      52.53,
+      -876.75,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 6,
+    "name": "Mountain",
+    "position": [
+      -1521.28,
+      358.5,
+      -834.23,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 7,
+    "name": "Zimms",
+    "position": [
+      2137.77,
+      74.89,
+      -1170.22,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 8,
+    "name": "Ranchito",
+    "position": [
+      2272.78,
+      43.54,
+      2206.17,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 9,
+    "name": "Bubba's",
+    "position": [
+      -404.69,
+      72.88,
+      2497.94,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 10,
+    "name": "PV farm",
+    "position": [
+      -69.46,
+      29.92,
+      -875.68,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 11,
+    "name": "North PV",
+    "position": [
+      602.91,
+      73.12,
+      -1301.5,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 12,
+    "name": "Woods",
+    "position": [
+      -762.56,
+      76.78,
+      410.13,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 13,
+    "name": "Lower Dam water",
+    "position": [
+      -410.47,
+      38.78,
+      952.96,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 14,
+    "name": "Close to Dam cabins",
+    "position": [
+      11.97,
+      50.78,
+      600.99,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 15,
+    "name": "North Lonepine",
+    "position": [
+      -660.09,
+      72.41,
+      2719.92,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 16,
+    "name": "South Lonepine",
+    "position": [
+      1203.72,
+      72.2,
+      2744.48,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 17,
+    "name": "Mountain",
+    "position": [
+      -1521.28,
+      358.5,
+      -834.23,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 18,
+    "name": "Woods2",
+    "position": [
+      -1622.92,
+      120.56,
+      3222.85,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 19,
+    "name": "I8 Church",
+    "position": [
+      -1961.87,
+      61.16,
+      2566.15,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 20,
+    "name": "Woods3",
+    "position": [
+      -2598.34,
+      51.04,
+      2489.91,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 21,
+    "name": "Woods4",
+    "position": [
+      -2876.95,
+      46.93,
+      2918.53,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 22,
+    "name": "South Road",
+    "position": [
+      -2844.18,
+      43.79,
+      1710.47,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 23,
+    "name": "Campsite",
+    "position": [
+      -2227.28,
+      66.46,
+      1315.27,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 24,
+    "name": "Cranberry Lake Cabins",
+    "position": [
+      -1902.14,
+      75.4,
+      1050.28,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 25,
+    "name": "Cranberry Lake",
+    "position": [
+      -1417.86,
+      70.27,
+      1421.89,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 26,
+    "name": "Cranberry Church",
+    "position": [
+      -1391.02,
+      72.75,
+      1874.06,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 27,
+    "name": "Cranberry Gas Station",
+    "position": [
+      -1112.14,
+      72.75,
+      1887.82,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 28,
+    "name": "Cranberry Houses",
+    "position": [
+      -1404.65,
+      72.66,
+      2116.78,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 29,
+    "name": "Woods5",
+    "position": [
+      1776.4,
+      47.23,
+      2018.61,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 30,
+    "name": "Woods/Big Hill",
+    "position": [
+      -2353.5,
+      79.69,
+      2248.13,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 31,
+    "name": "De Soto's",
+    "position": [
+      -2642.21,
+      110.5,
+      1052.35,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 32,
+    "name": "Spores Foodie Market",
+    "position": [
+      -2945.48,
+      47.51,
+      108.11,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 34,
+    "name": "North Dartmouth",
+    "position": [
+      -2484.67,
+      60.57,
+      -963.08,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 35,
+    "name": "South Wake Hills",
+    "position": [
+      -3235.35,
+      67.27,
+      -1516.31,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 36,
+    "name": "North Wake Hills",
+    "position": [
+      -2924.97,
+      60.58,
+      -1599.3,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 38,
+    "name": "C10 North Compound",
+    "position": [
+      -2815.66,
+      63.17,
+      -2165.65,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 39,
+    "name": "A10 Runamok Camp",
+    "position": [
+      -2938.5,
+      7.82,
+      -3086.55,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 40,
+    "name": "A9 Woods",
+    "position": [
+      -2272.62,
+      50.63,
+      -3258.43,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 41,
+    "name": "Hemingway's",
+    "position": [
+      -1827.53,
+      63.22,
+      -2117.55,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 42,
+    "name": "C7 Road",
+    "position": [
+      -910.05,
+      55.6,
+      -2372.14,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 43,
+    "name": "C6 Woods",
+    "position": [
+      -308.83,
+      39.25,
+      -1950.47,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 44,
+    "name": "PV Romero's",
+    "position": [
+      170.69,
+      32.99,
+      -1337.69,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 45,
+    "name": "PV North Gas station",
+    "position": [
+      554.6,
+      32.88,
+      -1182.06,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 46,
+    "name": "Military zone",
+    "position": [
+      782.14,
+      40.3,
+      -2455.47,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 47,
+    "name": "South Governor's Retreat",
+    "position": [
+      2473.02,
+      66.02,
+      -2571.82,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 48,
+    "name": "North Governor's Retreat",
+    "position": [
+      2959.54,
+      70.43,
+      -2419.08,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 49,
+    "name": "D2 Top road/compound",
+    "position": [
+      3231.28,
+      101.36,
+      -995.28,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 50,
+    "name": "F3 Houses",
+    "position": [
+      1841.9,
+      66.32,
+      -428.54,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 51,
+    "name": "F3 main Road/town",
+    "position": [
+      2209.49,
+      79.78,
+      -303.08,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 52,
+    "name": "F2 Woods",
+    "position": [
+      2842.64,
+      75.98,
+      811.27,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 53,
+    "name": "G3 Road",
+    "position": [
+      2138.95,
+      53.34,
+      1269.08,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  {
+    "id": 54,
+    "name": "H4 Dragon Lake",
+    "position": [
+      1151.55,
+      45.06,
+      1888.18,
+      1
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  }
+]

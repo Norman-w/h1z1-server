@@ -1,0 +1,801 @@
+[
+    {
+        "statId": 0,
+        "statName": "StatId.SwaySteadyMultiplier",
+        "statData": {
+            "statId": 0,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 1,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 1,
+        "statName": "StatId.MaxHp",
+        "statData": {
+            "statId": 1,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 2,
+        "statName": "StatId.MaxMovementSpeed",
+        "statData": {
+            "statId": 2,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 1,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 3,
+        "statName": "StatId.BackpedalSpeedModifier",
+        "statData": {
+            "statId": 3,
+            "statValue": {
+                "type": 1,
+                "value": {
+                    "base": 0.75,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 4,
+        "statName": "StatId.CrouchSpeedModifier",
+        "statData": {
+            "statId": 4,
+            "statValue": {
+                "type": 1,
+                "value": {
+                    "base": 0.7,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 5,
+        "statName": "StatId.SprintSpeedModifier",
+        "statData": {
+            "statId": 5,
+            "statValue": {
+                "type": 1,
+                "value": {
+                    "base": 1.4,
+                    "modifier": 0,
+                    "comment_old_value":  1.7
+                }
+            }
+        }
+    },
+    {
+        "statId": 6,
+        "statName": "StatId.SwimSpeedModifier",
+        "statData": {
+            "statId": 6,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 7,
+        "statName": "StatId.StrafeSpeedModifier",
+        "statData": {
+            "statId": 7,
+            "statValue": {
+                "type": 1,
+                "value": {
+                    "base": 0.75,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 9,
+        "statName": "StatId.BreathDrainRate",
+        "statData": {
+            "statId": 9,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 10,
+        "statName": "StatId.BreathInitialCost",
+        "statData": {
+            "statId": 10,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 11,
+        "statName": "StatId.BreathPenaltyDuration",
+        "statData": {
+            "statId": 11,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 1
+                }
+            }
+        }
+    },
+    {
+        "statId": 12,
+        "statName": "StatId.BreathPenaltySwayMultiplier",
+        "statData": {
+            "statId": 12,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 13,
+        "statName": "StatId.BreathRechargeDelay",
+        "statData": {
+            "statId": 13,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 14,
+        "statName": "StatId.BreathRechargeRate",
+        "statData": {
+            "statId": 14,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 15,
+        "statName": "StatId.CurrencyBuff",
+        "statData": {
+            "statId": 15,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 16,
+        "statName": "StatId.XpBuff",
+        "statData": {
+            "statId": 16,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 17,
+        "statName": "StatId.CurrencyCapAuraxium",
+        "statData": {
+            "statId": 17,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 18,
+        "statName": "StatId.CurrencyCapPolymers",
+        "statData": {
+            "statId": 18,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 19,
+        "statName": "StatId.CurrencyCapCatalysts",
+        "statData": {
+            "statId": 19,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 20,
+        "statName": "StatId.CurrencyCapAlloys",
+        "statData": {
+            "statId": 20,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 21,
+        "statName": "StatId.SprintAccelerationTime",
+        "statData": {
+            "statId": 21,
+            "statValue": {
+                "type": 1,
+                "value": {
+                    "base": 0.6,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 22,
+        "statName": "StatId.SprintDecelerationTime",
+        "statData": {
+            "statId": 22,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 23,
+        "statName": "StatId.WaistTwistLimit",
+        "statData": {
+            "statId": 23,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 24,
+        "statName": "StatId.ForwardAccelerationTime",
+        "statData": {
+            "statId": 24,
+            "statValue": {
+                "type": 1,
+                "value": {
+                    "base": 0.5,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 25,
+        "statName": "StatId.BackAccelerationTime",
+        "statData": {
+            "statId": 25,
+            "statValue": {
+                "type": 1,
+                "value": {
+                    "base": 0.5,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 26,
+        "statName": "StatId.StrafeAccelerationTime",
+        "statData": {
+            "statId": 26,
+            "statValue": {
+                "type": 1,
+                "value": {
+                    "base": 0.5,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 27,
+        "statName": "StatId.ForwardDecelerationTime",
+        "statData": {
+            "statId": 27,
+            "statValue": {
+                "type": 1,
+                "value": {
+                    "base": 0.2,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 28,
+        "statName": "StatId.BackDecelerationTime",
+        "statData": {
+            "statId": 28,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0.2,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 29,
+        "statName": "StatId.StrafeDecelerationTime",
+        "statData": {
+            "statId": 29,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0.2,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 32,
+        "statName": "StatId.SquadCurrencyBuff",
+        "statData": {
+            "statId": 32,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 33,
+        "statName": "StatId.SquadXpBuff",
+        "statData": {
+            "statId": 33,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 34,
+        "statName": "StatId.TurnRateMultiplier",
+        "statData": {
+            "statId": 34,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 1
+                }
+            }
+        }
+    },
+    {
+        "statId": 37,
+        "statName": "StatId.DeployInfoId",
+        "statData": {
+            "statId": 37,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 40,
+        "statName": "StatId.PassiveAcousticSensitivity",
+        "statData": {
+            "statId": 40,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 41,
+        "statName": "StatId.AggroAcousticSensitivity",
+        "statData": {
+            "statId": 41,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 42,
+        "statName": "StatId.PassiveVisualSensitivity",
+        "statData": {
+            "statId": 42,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 43,
+        "statName": "StatId.AggroVisualSensitivity",
+        "statData": {
+            "statId": 43,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 44,
+        "statName": "StatId.AggroThreshold",
+        "statData": {
+            "statId": 44,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 45,
+        "statName": "StatId.AggroDecayPerMillisecond",
+        "statData": {
+            "statId": 45,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 46,
+        "statName": "StatId.MinimumAggroIncidentValue",
+        "statData": {
+            "statId": 46,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 47,
+        "statName": "StatId.CameraShakeModifier",
+        "statData": {
+            "statId": 47,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 48,
+        "statName": "StatId.IffRange",
+        "statData": {
+            "statId": 48,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 49,
+        "statName": "StatId.FlinchModifier",
+        "statData": {
+            "statId": 49,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 50,
+        "statName": "StatId.AggroPassiveAcousticScalar",
+        "statData": {
+            "statId": 50,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 51,
+        "statName": "StatId.AggroPassiveVisualScalar",
+        "statData": {
+            "statId": 51,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 52,
+        "statName": "StatId.CriticalStaminaPercent",
+        "statData": {
+            "statId": 52,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0.1,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 53,
+        "statName": "StatId.CriticalStaminaSpeedModifier",
+        "statData": {
+            "statId": 53,
+            "statValue": {
+                "type": 1,
+                "value": {
+                    "base": 0.5,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 54,
+        "statName": "StatId.LowStaminaPercent",
+        "statData": {
+            "statId": 54,
+            "statValue": {
+                "type": 1,
+                "value": {
+                    "base": 15,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 55,
+        "statName": "StatId.LowStaminaSpeedModifier",
+        "statData": {
+            "statId": 55,
+            "statValue": {
+                "type": 1,
+                "value": {
+                    "base": 0.8,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 56,
+        "statName": "StatId.NominalStaminaPercent",
+        "statData": {
+            "statId": 56,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 57,
+        "statName": "StatId.NominalStaminaSpeedModifier",
+        "statData": {
+            "statId": 57,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 67,
+        "statName": "StatId.ProneSpeedModifier",
+        "statData": {
+            "statId": 67,
+            "statValue": {
+                "type": 1,
+                "value": {
+                    "base": 0.4,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 68,
+        "statName": "StatId.ProneTurnRateModifier",
+        "statData": {
+            "statId": 68,
+            "statValue": {
+                "type": 1,
+                "value": {
+                    "base": 0.2,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 84,
+        "statName": "StatId.ProneRollSpeedModifier",
+        "statData": {
+            "statId": 84,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 1,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 85,
+        "statName": "StatId.WaterSpeedModifier",
+        "statData": {
+            "statId": 85,
+            "statValue": {
+                "type": 1,
+                "value": {
+                    "base": 0.8,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 86,
+        "statName": "StatId.WalkSpeedModifier",
+        "statData": {
+            "statId": 86,
+            "statValue": {
+                "type": 1,
+                "value": {
+                    "base": 0.3,
+                    "modifier": 0
+                }
+            }
+        }
+    },
+    {
+        "statId": 89,
+        "statName": "StatId.RewardPointBuff",
+        "statData": {
+            "statId": 89,
+            "statValue": {
+                "type": 0,
+                "value": {
+                    "base": 0,
+                    "modifier": 0
+                }
+            }
+        }
+    }
+]

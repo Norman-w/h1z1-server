@@ -1,0 +1,15 @@
+{
+  "serverId": 1,
+  "creationDate": "0x0",
+  "lastLoginDate": "0x0",
+  "characterId": "",
+  "ownerId": "",
+  "characterName": "",
+  "actorModelId": 0,
+  "headActor": "",
+  "hairModel": "",
+  "gender": 0,
+  "isRespawning": false,
+  "position": [0, 0, 0, 1],
+  "rotation": [0, 0, 0, 1]
+}

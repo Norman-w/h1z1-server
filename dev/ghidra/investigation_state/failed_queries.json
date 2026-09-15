@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-03-21",
+  "purpose": "记录已尝试但无结果或失败的 Ghidra 查询，避免新 AI 接管时重复执行。每条包含工具名、参数、失败原因和建议替代方案。",
+  "entries": [
+    {
+      "tool": "PyGhidraCli（守护进程）",
+      "args": "并发或异常后 ScanMemoryPattern / QueryXref / FindListingPattern",
+      "date": "2026-03-21",
+      "result": "stderr 混入非 JSON 行 → `result parse error`；或 investigation 日志头与 script_stdout 内容错位（例如标用 ScanMemoryPattern 实为 DumpDecompile）",
+      "reason": "多 worker / 缓冲未隔离或 daemon 需重启",
+      "suggestion": "单条 CLI、间隔执行；重启 PyGhidra 持久工程；以独立 `DumpDecompile__*.log` 与 `fun_14053d4e0_enqueue_decompile_capture.json` 作交叉验证"
+    },
+    {
+      "tool": "FindString",
+      "args": "InAttack",
+      "date": "2026-03-19",
+      "result": "CLI 改进后仍失败（打印 Usage 行），且 data_strings.json 全文搜索也无命中",
+      "reason": "InAttack 字符串不在二进制的 .rdata 字符串表中。已确认 Npc_AttackSpeed/AttackRegion/HeadLookTarget 等其他控制参数在 data_strings.json 中存在。InAttack 是 MRN 文件内部的 ControlParameter，仅存在于 ThirdPersonZombiePhysicsX64.mrn 等 MRN 资源中，运行时由 MRN 加载器动态注册",
+      "suggestion": "不需要再搜索 InAttack 字符串。InAttack 由 MRN 图状态机自动设置，不由 gameplay 代码通过 +0x630 直接写入。攻击触发通过 FUN_14053aea0(virtual +0x848) 传递给动画控制器子对象"
+    },
+    {
+      "tool": "FindMemoryRefsByOffset",
+      "args": "0x1ae8 any 0x140500000 0x140600000",
+      "date": "2026-03-16",
+      "result": "仅命中 FUN_140535700 自身的写入点（0x14053572d），无下游消费者",
+      "reason": "在 case 0x30 邻近代码窗口内没有读者",
+      "suggestion": "窗口扩到 0x140000000..0x140500000 后开始出现跨类布局污染，需结合对象类型筛选"
+    },
+    {
+      "tool": "FindIndirectCallsByOffset",
+      "args": "0x848 0x140500000 0x140540000",
+      "date": "2026-03-16",
+      "result": "仅命中 FUN_140521700 的 MELEE_ATTACK 分支",
+      "reason": "在该窗口内只有 FUN_140521700 通过 +0x848 调用 MELEE_ATTACK 处理",
+      "suggestion": "可扩大窗口或直接对 +0x848 的具体实现做 DumpDecompile"
+    }
+  ]
+}
