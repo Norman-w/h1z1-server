@@ -517,6 +517,7 @@ export function createScreamer(
         from: [Transitions.Attack],
         to: Transitions.Attacking,
         EnterTransition: () => {
+          screamer.npc.stopMovement();
           screamer.npc.playAnimation(ScreamerAnimations.KnifeSlash);
           screamer.stateTimer = 0;
         }

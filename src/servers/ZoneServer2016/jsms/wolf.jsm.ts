@@ -379,6 +379,7 @@ export function createWolf(npc: Npc, server: ZoneServer2016): WolfInstance {
         from: [WolfTransitions.Attack],
         to: WolfTransitions.Attacking,
         EnterTransition: () => {
+          wolf.npc.stopMovement();
           wolf.npc.playAnimation(AnimalsAnimation.KnifeSlash);
           wolf.stateTimer = 0;
         }

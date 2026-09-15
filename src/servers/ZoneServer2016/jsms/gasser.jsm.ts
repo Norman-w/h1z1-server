@@ -727,6 +727,7 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
         from: [ZombieTransitions.Attack],
         to: ZombieTransitions.Attacking,
         EnterTransition: () => {
+          gasser.npc.stopMovement();
           gasser.npc.playAnimation(ZombieOneshotAnim.KnifeSlash);
           gasser.stateTimer = 0;
           gasser.lastAttackTime = 0;
@@ -737,6 +738,7 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
         from: [ZombieTransitions.Attack],
         to: ZombieTransitions.Attacking,
         EnterTransition: () => {
+          gasser.npc.stopMovement();
           gasser.npc.playAnimation(ZombieOneshotAnim.Spit);
           gasser.stateTimer = 0;
           gasser.lastAttackTime = 0;

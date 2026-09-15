@@ -677,6 +677,7 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
         from: [ZombieTransitions.Attack],
         to: ZombieTransitions.Attacking,
         EnterTransition: () => {
+          zombie.npc.stopMovement();
           zombie.npc.playAnimation(ZombieOneshotAnim.KnifeSlash);
           zombie.stateTimer = 0;
           zombie.lastAttackTime = 0;

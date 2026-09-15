@@ -325,6 +325,7 @@ export function createBear(npc: Npc, server: ZoneServer2016): BearInstance {
         from: [BearTransitions.Attack],
         to: BearTransitions.Attacking,
         EnterTransition: () => {
+          bear.npc.stopMovement();
           bear.npc.playAnimation(AnimalsAnimation.KnifeSlash);
           bear.stateTimer = 0;
         }
