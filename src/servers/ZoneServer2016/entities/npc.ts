@@ -16,11 +16,17 @@ import { ZoneServer2016 } from "../zoneserver";
 import { BaseFullCharacter } from "./basefullcharacter";
 import { ZoneClient2016 } from "../classes/zoneclient";
 import {
+  calculateNpcMotionSpeeds,
+  createNpcPositionUpdate,
   getCurrentServerTimeWrapper,
   getDistance,
   getDistanceSquared,
   logClientActionToMongo,
   metersToFeet
+} from "../../../utils/utils";
+import type {
+  NpcMotionSample,
+  NpcPositionUpdateMotion
 } from "../../../utils/utils";
 import { DB_COLLECTIONS, KILL_TYPE } from "../../../utils/enums";
 import {
@@ -41,6 +47,9 @@ import { Factions } from "../jsms/factions";
 import { spawnGasCloudAt } from "../jsms/gasser.jsm";
 
 export abstract class Npc extends BaseFullCharacter {
+  private static readonly STANCE_STANDING = 1024;
+  private static readonly STANCE_MOVE_STANDING_SPRINTING = 66565;
+
   health: number;
   npcRenderDistance = 100;
 
@@ -90,6 +99,8 @@ export abstract class Npc extends BaseFullCharacter {
   lookAtTarget: Float32Array | null = null;
   isSelected: boolean = false;
   variant: string = "";
+  /** Last position/time pair emitted in a PlayerUpdatePosition packet. */
+  private lastMotionSample?: NpcMotionSample;
 
   constructor(
     characterId: string,
@@ -507,6 +518,7 @@ export abstract class Npc extends BaseFullCharacter {
   }
 
   stopMovement() {
+    this.lastMotionSample = undefined;
     if (!this.navAgent) return;
     this.navAgent.resetMoveTarget();
   }
@@ -535,35 +547,55 @@ export abstract class Npc extends BaseFullCharacter {
 
     this.state.position = position;
 
-    let horizontalSpeed = horizontalDist;
-    let verticalSpeed = Math.abs(dy);
-    if (this.navAgent) {
+    const sequenceTime = getCurrentServerTimeWrapper().getTruncatedU32();
+    let horizontalSpeed: number;
+    let verticalSpeed: number;
+    if (this.lastMotionSample) {
+      ({ horizontalSpeed, verticalSpeed } = calculateNpcMotionSpeeds(
+        this.state.position,
+        sequenceTime,
+        this.lastMotionSample
+      ));
+    } else if (this.navAgent) {
       const vel = this.navAgent.velocity();
       horizontalSpeed = metersToFeet(Math.sqrt(vel.x * vel.x + vel.z * vel.z));
       verticalSpeed = metersToFeet(Math.abs(vel.y));
+    } else {
+      horizontalSpeed = 0;
+      verticalSpeed = 0;
     }
 
+    const motion: NpcPositionUpdateMotion = {
+      stance: Npc.STANCE_MOVE_STANDING_SPRINTING,
+      engineRPM: 0,
+      orientation,
+      frontTilt,
+      sideTilt,
+      angleChange,
+      verticalSpeed,
+      horizontalSpeed
+    };
     this.server.sendDataToAllWithSpawnedEntity(
       this.server._npcs,
       this.characterId,
       "PlayerUpdatePosition",
       {
         transientId: this.transientId,
-        positionUpdate: {
-          sequenceTime: getCurrentServerTimeWrapper().getTruncatedU32(),
-          position: this.state.position,
-          unknown3_int8: 0,
-          stance: 66565,
-          engineRPM: 0,
-          orientation,
-          frontTilt,
-          sideTilt,
-          angleChange,
-          verticalSpeed,
-          horizontalSpeed
-        }
+        positionUpdate: createNpcPositionUpdate(
+          this.state.position,
+          sequenceTime,
+          motion
+        )
       }
     );
+    this.lastMotionSample = {
+      sequenceTime,
+      position: [
+        this.state.position[0],
+        this.state.position[1],
+        this.state.position[2]
+      ]
+    };
   }
 
   /**
@@ -578,8 +610,6 @@ export abstract class Npc extends BaseFullCharacter {
   ) {
     const dx = targetPosition[0] - this.state.position[0];
     const dz = targetPosition[2] - this.state.position[2];
-    const dy = targetPosition[1] - this.state.position[1];
-    const horizontalDist = Math.sqrt(dx * dx + dz * dz);
     const targetOrientation = Math.atan2(dx, dz);
     const prevOrientation = this.state.yaw ?? targetOrientation;
     let angleChange = targetOrientation - prevOrientation;
@@ -590,32 +620,46 @@ export abstract class Npc extends BaseFullCharacter {
     }
     const orientation = prevOrientation + angleChange;
     this.state.yaw = orientation;
+
+    const dy = targetPosition[1] - this.state.position[1];
+    const horizontalDist = Math.sqrt(dx * dx + dz * dz);
     const frontTilt = Math.atan2(dy, horizontalDist);
     const sinO = Math.sin(orientation);
     const cosO = Math.cos(orientation);
     const lateralDist = dx * cosO - dz * sinO;
     const sideTilt = Math.atan2(lateralDist, horizontalDist);
 
+    const sequenceTime = getCurrentServerTimeWrapper().getTruncatedU32();
+    const motion: NpcPositionUpdateMotion = {
+      stance: Npc.STANCE_STANDING,
+      engineRPM: 0,
+      orientation,
+      frontTilt,
+      sideTilt,
+      angleChange,
+      verticalSpeed: 0,
+      horizontalSpeed: 0
+    };
     this.server.sendDataToAllWithSpawnedEntity(
       this.server._npcs,
       this.characterId,
       "PlayerUpdatePosition",
       {
         transientId: this.transientId,
-        positionUpdate: {
-          sequenceTime: getCurrentServerTimeWrapper().getTruncatedU32(),
-          position: this.state.position,
-          unknown3_int8: 0,
-          stance: 66565,
-          engineRPM: 0,
-          orientation,
-          frontTilt,
-          sideTilt,
-          angleChange,
-          verticalSpeed: 0,
-          horizontalSpeed: 0
-        }
+        positionUpdate: createNpcPositionUpdate(
+          this.state.position,
+          sequenceTime,
+          motion
+        )
       }
     );
+    this.lastMotionSample = {
+      sequenceTime,
+      position: [
+        this.state.position[0],
+        this.state.position[1],
+        this.state.position[2]
+      ]
+    };
   }
 }

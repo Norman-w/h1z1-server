@@ -848,6 +848,83 @@ export function createPositionUpdate(
   return obj;
 }
 
+/** The motion sample carried by a 2016 NPC PlayerUpdatePosition packet. */
+export interface NpcPositionUpdateMotion {
+  /** Standing locomotion stance used while the NPC is moving. */
+  stance: number;
+  engineRPM: number;
+  orientation: number;
+  frontTilt: number;
+  sideTilt: number;
+  angleChange: number;
+  verticalSpeed: number;
+  horizontalSpeed: number;
+}
+
+/** The last position/time pair handed to the NPC position packet sender. */
+export interface NpcMotionSample {
+  sequenceTime: number;
+  position: [number, number, number];
+}
+
+/**
+ * Converts a displacement between two position packets into the speed units
+ * used by the 2016 wire protocol.  The protocol's speed fields are feet/sec,
+ * while server and navigation positions are metres.  An invalid or wrapped
+ * timestamp intentionally produces a stopped sample instead of a spike.
+ */
+export function calculateNpcMotionSpeeds(
+  position: Float32Array,
+  sequenceTime: number,
+  previous?: NpcMotionSample
+): { horizontalSpeed: number; verticalSpeed: number } {
+  if (!previous || !Number.isInteger(sequenceTime)) {
+    return { horizontalSpeed: 0, verticalSpeed: 0 };
+  }
+
+  const elapsedMs = (sequenceTime - previous.sequenceTime) >>> 0;
+  if (elapsedMs === 0 || elapsedMs >= 0x80000000) {
+    return { horizontalSpeed: 0, verticalSpeed: 0 };
+  }
+
+  const seconds = elapsedMs / 1000;
+  const horizontalDistance = Math.hypot(
+    position[0] - previous.position[0],
+    position[2] - previous.position[2]
+  );
+  const verticalDistance = Math.abs(position[1] - previous.position[1]);
+  return {
+    horizontalSpeed: metersToFeet(horizontalDistance / seconds),
+    verticalSpeed: metersToFeet(verticalDistance / seconds)
+  };
+}
+
+/**
+ * Builds a complete NPC position sample.  Position packets are consumed by
+ * the client's locomotion graph, so moving and stationary samples must carry
+ * an explicit stance and all kinematic fields rather than reusing a previous
+ * frame's values.
+ */
+export function createNpcPositionUpdate(
+  position: Float32Array,
+  sequenceTime: number,
+  motion: NpcPositionUpdateMotion
+): positionUpdate {
+  return {
+    sequenceTime,
+    unknown3_int8: 0,
+    stance: motion.stance,
+    position: [position[0], position[1], position[2]],
+    engineRPM: motion.engineRPM,
+    orientation: motion.orientation,
+    frontTilt: motion.frontTilt,
+    sideTilt: motion.sideTilt,
+    angleChange: motion.angleChange,
+    verticalSpeed: motion.verticalSpeed,
+    horizontalSpeed: motion.horizontalSpeed
+  };
+}
+
 /**
  * Calculates the coordinates of the corners of a rectangle given the center point, angle, offset, and euler rotation.
  *
