@@ -120,6 +120,17 @@ export interface ZombieInstance extends JSM<ZombieEvents> {
   lastNoisePos: Float32Array | null;
   stateTimer: number;
   targetCharacterId: string | null;
+  /** Horizontal direction captured when the current melee swing starts. */
+  attackForward: [number, number] | null;
+  /** A Zombie001 swing may authorize one server-side contact at most once. */
+  attackDamageApplied: boolean;
+  /** Last sampled strike-envelope result for a coarse tick crossing contact. */
+  attackEnvelopeWasActive: boolean;
+  /** The exact stumble clip selected for this recovery state. */
+  stumbleAnimation?:
+    | ZombieOneshotAnim.StumbleA
+    | ZombieOneshotAnim.StumbleB
+    | ZombieOneshotAnim.StumbleC;
   corpseTargetId: string | null;
   isEatingCorpse: boolean;
   lastAttackTime: number;
@@ -153,10 +164,32 @@ function moveToward(
   npc: Npc,
   target: Float32Array,
   server: ZoneServer2016
-): void {
-  if (!npc.navAgent) return;
-  const navTarget = server.navManager.getClosestNavPointVec3(target);
-  npc.navAgent.requestMoveTarget(navTarget);
+): boolean {
+  if (!npc.navAgent) {
+    // Callers historically set agitation/locomotion before requesting a
+    // target.  A missing agent must therefore clear that intent itself or a
+    // zombie can advertise sprint while its position remains stationary.
+    npc.setLocomotionMode?.("walk");
+    npc.stopMovement();
+    return false;
+  }
+  try {
+    const navTarget = server.navManager.getClosestNavPointVec3(target);
+    if (npc.navAgent.requestMoveTarget(navTarget) === false) {
+      // Recast explicitly rejected the target; keep the client in a standing
+      // graph until a later AI tick can install a real path.
+      npc.setLocomotionMode?.("walk");
+      npc.stopMovement();
+      return false;
+    }
+  } catch {
+    // Projection can fail for an off-mesh/disconnected target.  Clear the
+    // previously published speed before returning the failure to the FSM.
+    npc.setLocomotionMode?.("walk");
+    npc.stopMovement();
+    return false;
+  }
+  return true;
 }
 
 function listenToSounds(zombie: ZombieInstance, sounds: Sound[]): Sound | null {
@@ -254,17 +287,78 @@ function getChaseTarget(zombie: ZombieInstance): {
 function applyDamageToTarget(zombie: ZombieInstance): void {
   if (!zombie.targetCharacterId) return;
   const character = zombie.server._characters[zombie.targetCharacterId];
-  if (character) {
+  if (character?.isAlive) {
     zombie.npc.applyDamage(zombie.targetCharacterId);
     return;
   }
   const targetNpc = zombie.server._npcs[zombie.targetCharacterId];
   if (targetNpc && targetNpc.isAlive) {
-    targetNpc.damage(zombie.server, {
+    const damageInfo = {
       entity: zombie.npc.characterId,
       damage: zombie.npc.npcMeleeDamage
-    });
+    };
+    // NPC-origin melee contacts use the same presentation-aware hook as
+    // player/projectile hits.  Calling damage() directly only changes health
+    // and leaves the victim's native locomotion/attack pose untouched.
+    if (typeof targetNpc.applyNpcMeleeHit === "function") {
+      targetNpc.applyNpcMeleeHit(zombie.server, damageInfo);
+    } else {
+      // Keep lightweight AI doubles compatible with the old health-only path.
+      targetNpc.damage(zombie.server, damageInfo);
+    }
   }
+}
+
+function getMeleeRange(zombie: ZombieInstance): number {
+  return zombie.npc.getMeleeAttackRange?.(2) ?? 2;
+}
+
+function getMeleeAttackDuration(zombie: ZombieInstance): number {
+  return zombie.npc.getMeleeAttackAnimationDuration?.(1) ?? 1;
+}
+
+/**
+ * The Stumble FSM must finish on the selected source clip, not on a generic
+ * five-second AI timeout.  Production Npc instances own an activeAnimation
+ * field; old lightweight fixtures do not, so retain their historical
+ * timeout fallback without treating an overridden `isAnimationActive()` as
+ * proof that a native clock is available.
+ */
+export function shouldFinishZombieStumble(zombie: ZombieInstance): boolean {
+  if (!Object.prototype.hasOwnProperty.call(zombie.npc, "activeAnimation")) {
+    return zombie.stateTimer >= 5;
+  }
+  const selected = zombie.stumbleAnimation;
+  if (!selected) return zombie.stateTimer >= 5;
+  const clipActive = zombie.npc.isAnimationActive?.(selected) ?? false;
+  return zombie.stateTimer >= 0.25 && !clipActive;
+}
+
+/**
+ * Recovery one-shots own the graph after an action state has logically
+ * finished.  Starting a patrol on the same tick as EatingDone/CoverEarsDone
+ * makes the server advertise locomotion while the client is still rendering
+ * the recovery pose, which is another form of post-action slide.
+ */
+function isZombieRecoveryAnimationActive(zombie: ZombieInstance): boolean {
+  const active = zombie.npc.getAnimationRuntimeState?.().activeAnimation;
+  return active === ZombieOneshotAnim.EatingDone ||
+    active === ZombieOneshotAnim.CoverEarsDone;
+}
+
+function getAttackForward(
+  npc: Npc,
+  targetPosition: Float32Array
+): [number, number] | null {
+  const yaw = npc.state.yaw;
+  if (Number.isFinite(yaw)) {
+    const forward: [number, number] = [Math.sin(yaw), Math.cos(yaw)];
+    if (Math.hypot(forward[0], forward[1]) > Number.EPSILON) return forward;
+  }
+  const dx = targetPosition[0] - npc.state.position[0];
+  const dz = targetPosition[2] - npc.state.position[2];
+  const length = Math.hypot(dx, dz);
+  return length > Number.EPSILON ? [dx / length, dz / length] : null;
 }
 
 function tickTimers(zombie: ZombieInstance, dt: number): void {
@@ -274,22 +368,51 @@ function tickTimers(zombie: ZombieInstance, dt: number): void {
 }
 
 function enterWander(zombie: ZombieInstance): void {
+  // Returning from chase/attack/investigation must clear the old desired
+  // velocity before advertising the normal walk graph.
+  zombie.npc.stopMovement();
   zombie.stateTimer = 0;
   zombie.agitation = AGITATION_INITIAL;
   zombie.targetCharacterId = null;
+  zombie.attackForward = null;
+  zombie.npc.setCombatAnimationMode?.(false);
+  zombie.npc.setLookAtCharacter?.(null);
+  zombie.npc.setLocomotionMode?.("walk");
+  // EatingDone/CoverEarsDone can still own the client graph when the FSM
+  // enters Wander.  Queue the persistent reset now so the expiry handoff
+  // cannot fall back to the old Eating/cover pose.
+  zombie.npc.setAnimation(ZombieLoopingAnim.Idle);
   zombie.npc.lookAtTarget = null;
   zombie.wanderOrigin = zombie.npc.state.position.slice() as Float32Array;
+  zombie.targetPos = null;
+  if (isZombieRecoveryAnimationActive(zombie)) {
+    // The next Wander tick will install a patrol after the recovery clock has
+    // expired.  Keep both the nav agent and the client gait stopped meanwhile.
+    zombie.npc.setSpeed(0);
+    return;
+  }
   const pt = pickPatrolPoint(zombie.server, zombie.wanderOrigin);
   if (pt) {
     zombie.targetPos = pt;
-    moveToward(zombie.npc, pt, zombie.server);
+    if (moveToward(zombie.npc, pt, zombie.server)) {
+      applyAgitation(zombie);
+    } else {
+      zombie.targetPos = null;
+      zombie.npc.setSpeed(0);
+    }
+  } else {
+    zombie.npc.setSpeed(0);
   }
 }
 
 function enterFeed(zombie: ZombieInstance): void {
   zombie.npc.stopMovement();
+  zombie.npc.setCombatAnimationMode?.(false);
+  zombie.npc.setLocomotionMode?.("walk");
   zombie.stateTimer = 0;
   zombie.targetCharacterId = null;
+  zombie.attackForward = null;
+  zombie.npc.setLookAtCharacter?.(null);
   zombie.npc.lookAtTarget = null;
   zombie.isEatingCorpse = false;
 }
@@ -309,7 +432,10 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
       [ZombieTransitions.Wander]: (dt: number) => {
         if (zombie.isCoveringEars) {
           zombie.coverEarsTimer += dt;
-          if (zombie.coverEarsTimer >= 3) {
+          const coverEarsClipActive =
+            zombie.npc.isAnimationActive?.(ZombieOneshotAnim.CoverEars) ??
+            false;
+          if (zombie.coverEarsTimer >= 3 && !coverEarsClipActive) {
             zombie.isCoveringEars = false;
             zombie.npc.playAnimation(ZombieOneshotAnim.CoverEarsDone);
             if (zombie.lastNoisePos) {
@@ -325,8 +451,14 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
           return;
         }
 
+        if (isZombieRecoveryAnimationActive(zombie)) {
+          zombie.npc.stopMovement();
+          zombie.npc.setLocomotionMode?.("walk");
+          zombie.npc.setSpeed(0);
+          return;
+        }
+
         tickTimers(zombie, dt);
-        applyAgitation(zombie);
 
         if (trySeePlayer(zombie)) return;
         if (trySmellCorpse(zombie)) return;
@@ -353,8 +485,22 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
           const pt = pickPatrolPoint(zombie.server, zombie.wanderOrigin);
           if (pt) {
             zombie.targetPos = pt;
-            moveToward(zombie.npc, pt, zombie.server);
+            if (!moveToward(zombie.npc, pt, zombie.server)) {
+              zombie.targetPos = null;
+              zombie.npc.setSpeed(0);
+            } else {
+              applyAgitation(zombie);
+            }
+          } else {
+            zombie.targetPos = null;
+            zombie.npc.stopMovement();
           }
+        } else {
+          // A positive ExpectedSpeed is valid only while the previously
+          // accepted Recast target is still active. New patrol targets use
+          // the guarded branch above so a rejected request cannot advertise
+          // a run-in-place frame.
+          applyAgitation(zombie);
         }
       },
 
@@ -375,7 +521,8 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
 
       [ZombieTransitions.Investigate]: (dt: number) => {
         tickTimers(zombie, dt);
-        applyAgitation(zombie);
+        zombie.npc.setCombatAnimationMode?.(false);
+        zombie.npc.setLocomotionMode?.("walk");
 
         if (trySeePlayer(zombie)) return;
         if (trySmellCorpse(zombie)) return;
@@ -393,6 +540,12 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
           return;
         }
 
+        if (zombie.targetPos != null) {
+          applyAgitation(zombie);
+        } else {
+          zombie.npc.setSpeed(0);
+        }
+
         const nearestSound = listenToSounds(zombie, zombie.server.sounds);
         if (nearestSound) {
           zombie.lastNoisePos = nearestSound.position;
@@ -401,20 +554,26 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
             return;
           }
           zombie.stateTimer = 0;
-          moveToward(zombie.npc, nearestSound.position, zombie.server);
+          zombie.targetPos = nearestSound.position;
+          if (!moveToward(zombie.npc, zombie.targetPos, zombie.server)) {
+            zombie.targetPos = null;
+            zombie.npc.setSpeed(0);
+          } else {
+            applyAgitation(zombie);
+          }
         }
       },
 
       [ZombieTransitions.Chase]: (dt: number) => {
         tickTimers(zombie, dt);
+        zombie.npc.setCombatAnimationMode?.(true);
+        zombie.npc.setLocomotionMode?.("sprint");
         const nearestSound = listenToSounds(zombie, zombie.server.sounds);
         if (nearestSound && shouldOverrideAction(nearestSound)) {
           zombie.lastNoisePos = nearestSound.position;
           zombie.event(ZombieEvents.HearNoise);
           return;
         }
-        applyAgitation(zombie);
-
         const chaseTarget = getChaseTarget(zombie);
         if (
           !chaseTarget ||
@@ -425,14 +584,20 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
           zombie.event(ZombieEvents.LostPlayer);
           return;
         }
+        // The position target drives server steering, while the GUID binding
+        // feeds the client's native head/turn branch.  Keeping both inputs in
+        // sync prevents a chase from using a stale/default animation target
+        // after a lightweight-to-full observer handoff.
+        zombie.npc.setLookAtCharacter?.(zombie.targetCharacterId);
 
         const chaseDist = getDistance2d(
           zombie.npc.state.position,
           chaseTarget.position
         );
+        const meleeRange = getMeleeRange(zombie);
         if (chaseDist > 50) {
           zombie.event(ZombieEvents.LostPlayer);
-        } else if (chaseDist < 2) {
+        } else if (chaseDist < meleeRange) {
           zombie.event(ZombieEvents.ReachPlayer);
         } else {
           if (trySmellCorpse(zombie)) return;
@@ -440,11 +605,17 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
             zombie.event(ZombieEvents.StartStumble);
             return;
           }
-          moveToward(zombie.npc, chaseTarget.position, zombie.server);
+          if (!moveToward(zombie.npc, chaseTarget.position, zombie.server)) {
+            zombie.npc.setSpeed(0);
+          } else {
+            applyAgitation(zombie);
+          }
         }
       },
 
       [ZombieTransitions.Stumble]: (dt: number) => {
+        zombie.npc.setCombatAnimationMode?.(false);
+        zombie.npc.setLocomotionMode?.("walk");
         const nearestSound = listenToSounds(zombie, zombie.server.sounds);
         if (nearestSound && shouldOverrideAction(nearestSound)) {
           zombie.lastNoisePos = nearestSound.position;
@@ -452,21 +623,20 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
           return;
         }
         zombie.stateTimer += dt;
-        if (zombie.stateTimer >= 5) {
+        if (shouldFinishZombieStumble(zombie)) {
           zombie.event(ZombieEvents.StumbleTimeout);
         }
       },
 
       [ZombieTransitions.Attack]: (dt: number) => {
         tickTimers(zombie, dt);
+        zombie.npc.setCombatAnimationMode?.(true);
         const nearestSound = listenToSounds(zombie, zombie.server.sounds);
         if (nearestSound && shouldOverrideAction(nearestSound)) {
           zombie.lastNoisePos = nearestSound.position;
           zombie.event(ZombieEvents.HearNoise);
           return;
         }
-        applyAgitation(zombie);
-
         const attackTarget = getChaseTarget(zombie);
         if (!attackTarget || !attackTarget.isAlive) {
           if (zombie.hunger >= 30) {
@@ -480,50 +650,150 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
           zombie.event(ZombieEvents.LostPlayer);
           return;
         }
+        zombie.npc.setLookAtCharacter?.(zombie.targetCharacterId);
         zombie.npc.lookAtTarget = attackTarget.position;
-        moveToward(zombie.npc, attackTarget.position, zombie.server);
+        // Range is only the outer reach.  Turn in place while waiting for the
+        // target to enter the configured weapon strike envelope so a slash
+        // cannot begin beside the player.
+        zombie.npc.lookAt(attackTarget.position, dt);
         const attackDist = getDistance(
           zombie.npc.state.position,
           attackTarget.position
         );
-        if (attackDist >= 2) {
-          zombie.event(ZombieEvents.PlayerBacked);
-        } else if (zombie.lastAttackTime > 2) {
-          zombie.event(ZombieEvents.StartAttacking);
+        const meleeRange = getMeleeRange(zombie);
+        if (attackDist >= meleeRange) {
+          // Only the closing branch may advertise a non-zero chase speed.
+          // Once inside the strike envelope, stopMovement() below owns the
+          // zero-speed edge for the attack graph; applying agitation before
+          // that call would alternate ExpectedSpeed between run and zero on
+          // every AI tick and reintroduce the visible pre-swing slide.
+          zombie.npc.setLocomotionMode?.("sprint");
+          if (moveToward(zombie.npc, attackTarget.position, zombie.server)) {
+            applyAgitation(zombie);
+            zombie.event(ZombieEvents.PlayerBacked);
+          } else {
+            zombie.npc.setSpeed(0);
+          }
+        } else {
+          // Combat idle is the state immediately before the slash.  Do not
+          // leave the sprint intent/nav target active while the strike timer
+          // is waiting, otherwise the client can slide into the hit pose.
+          zombie.npc.setLocomotionMode?.("walk");
+          zombie.npc.stopMovement();
+          const inStrikeEnvelope =
+            zombie.npc.isMeleeTargetInEnvelope?.(attackTarget.position) ?? true;
+          const unobstructed =
+            zombie.npc.hasMeleeLineOfSight?.(attackTarget.position) ?? true;
+          if (zombie.lastAttackTime > 2 && inStrikeEnvelope && unobstructed)
+            zombie.event(ZombieEvents.StartAttacking);
         }
       },
 
       [ZombieTransitions.Attacking]: (dt: number) => {
+        const stateTimerBefore = zombie.stateTimer;
         zombie.hunger = Math.min(100, zombie.hunger + dt * 2);
-        zombie.stateTimer += dt * 2;
+        zombie.stateTimer += dt;
         zombie.lastAttackTime += dt;
-        const nearestSound = listenToSounds(zombie, zombie.server.sounds);
-        if (nearestSound && shouldOverrideAction(nearestSound)) {
-          zombie.lastNoisePos = nearestSound.position;
-          zombie.event(ZombieEvents.HearNoise);
-          return;
-        }
+        zombie.npc.setCombatAnimationMode?.(true);
+
+        // KnifeSlash is an in-flight one-shot.  A high-priority sound may
+        // change the next decision, but it must not pre-empt this state and
+        // install a new nav target while the swing is still in its contact
+        // window.  The completed action returns to Attack, where the next
+        // tick can consume the sound normally.
 
         const attackTarget = getChaseTarget(zombie);
-        if (attackTarget) {
-          zombie.npc.lookAt(attackTarget.position, dt);
+
+        if (attackTarget && zombie.targetCharacterId) {
+          zombie.npc.setLookAtCharacter?.(zombie.targetCharacterId);
         }
 
-        if (zombie.stateTimer >= 2) {
-          if (attackTarget) {
+        const attackDuration = getMeleeAttackDuration(zombie);
+        const contactWindow = zombie.npc.getMeleeContactWindow?.();
+        const contactStart = contactWindow
+          ? attackDuration * contactWindow.startFraction
+          : attackDuration;
+        const contactEnd = contactWindow
+          ? attackDuration * contactWindow.endFraction
+          : attackDuration;
+        // The server state timer is only an authorization window.  The
+        // client-facing KnifeSlash one-shot must still be live when that
+        // window is sampled; a reaction that replaced it cancels this swing.
+        const attackClipState = zombie.npc.isAnimationActive?.(
+          ZombieOneshotAnim.KnifeSlash
+        );
+        // SwingContact is a discrete native event.  A server tick can jump
+        // across it, so authorize the interval when the sample crosses the
+        // recovered window, but never after the one-shot has ended.
+        const contactActive =
+          (attackClipState ?? true) &&
+          stateTimerBefore < attackDuration &&
+          stateTimerBefore <= contactEnd &&
+          zombie.stateTimer >= contactStart;
+        if (!zombie.attackDamageApplied && contactActive) {
+          if (
+            attackTarget?.isAlive &&
+            !attackTarget.isVanished &&
+            !attackTarget.isHidden
+          ) {
             const attackDist = getDistance(
               zombie.npc.state.position,
               attackTarget.position
             );
+            const meleeRange = getMeleeRange(zombie);
             const facingTarget = isFacingTarget(
               zombie.npc.state.position,
               zombie.npc.state.yaw ?? 0,
               attackTarget.position
             );
-            if (attackDist <= 2 && facingTarget) {
+            const inStrikeEnvelope =
+              zombie.npc.isMeleeTargetInEnvelope?.(
+                attackTarget.position,
+                zombie.npc.state.position,
+                zombie.attackForward ?? undefined
+              ) ??
+              (attackDist <= meleeRange && facingTarget);
+            const unobstructed =
+              zombie.npc.hasMeleeLineOfSight?.(attackTarget.position) ?? true;
+            const crossedContactEnd =
+              stateTimerBefore < contactEnd && zombie.stateTimer > contactEnd;
+            if (
+              inStrikeEnvelope &&
+              unobstructed &&
+              (!crossedContactEnd || zombie.attackEnvelopeWasActive)
+            ) {
               applyDamageToTarget(zombie);
+              zombie.attackDamageApplied = true;
             }
+            zombie.attackEnvelopeWasActive = inStrikeEnvelope;
+          } else {
+            zombie.attackEnvelopeWasActive = false;
           }
+        } else if (attackTarget?.isAlive) {
+          const attackDist = getDistance(
+            zombie.npc.state.position,
+            attackTarget.position
+          );
+          const meleeRange = getMeleeRange(zombie);
+          const facingTarget = isFacingTarget(
+            zombie.npc.state.position,
+            zombie.npc.state.yaw ?? 0,
+            attackTarget.position
+          );
+          zombie.attackEnvelopeWasActive =
+            zombie.npc.isMeleeTargetInEnvelope?.(
+              attackTarget.position,
+              zombie.npc.state.position,
+              zombie.attackForward ?? undefined
+            ) ?? (attackDist <= meleeRange && facingTarget);
+        } else {
+          zombie.attackEnvelopeWasActive = false;
+        }
+
+        if (
+          zombie.stateTimer >= attackDuration &&
+          !(attackClipState ?? false)
+        ) {
           zombie.event(ZombieEvents.DoneAttacking);
         }
       },
@@ -531,13 +801,14 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
       [ZombieTransitions.Feed]: (dt: number) => {
         zombie.stateTimer += dt;
         zombie.lastAttackTime += dt;
+        zombie.npc.setCombatAnimationMode?.(false);
+        zombie.npc.setLocomotionMode?.("walk");
         const nearestSound = listenToSounds(zombie, zombie.server.sounds);
         if (nearestSound && shouldOverrideAction(nearestSound)) {
           zombie.lastNoisePos = nearestSound.position;
           zombie.event(ZombieEvents.HearNoise);
           return;
         }
-        applyAgitation(zombie);
 
         if (zombie.corpseTargetId) {
           const corpse = zombie.server._characters[zombie.corpseTargetId];
@@ -553,8 +824,16 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
               corpse.state.position
             );
             if (dist > 2) {
+              // Feeding is an action state, but the approach to a corpse is
+              // still locomotion.  Re-apply the agitation speed only on this
+              // branch; once the zombie reaches the corpse, ExpectedSpeed
+              // must stay zero while Eating owns the pose.
               zombie.npc.lookAtTarget = corpse.state.position;
-              moveToward(zombie.npc, corpse.state.position, zombie.server);
+              if (moveToward(zombie.npc, corpse.state.position, zombie.server)) {
+                applyAgitation(zombie);
+              } else {
+                zombie.npc.setSpeed(0);
+              }
               return;
             }
             zombie.npc.lookAtTarget = null;
@@ -563,6 +842,10 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
         }
 
         if (!zombie.isEatingCorpse) {
+          // No corpse approach is active now.  Keep the action boundary
+          // stationary so a previous patrol/chase speed cannot leak into the
+          // eating animation or its first standing sample.
+          zombie.npc.setSpeed(0);
           // wait for the nav agent to fully decelerate before starting the anim
           const vel = zombie.npc.navAgent?.velocity();
           const speed = vel ? Math.sqrt(vel.x * vel.x + vel.z * vel.z) : 0;
@@ -570,6 +853,11 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
           zombie.npc.setAnimation(ZombieLoopingAnim.Eating);
           zombie.isEatingCorpse = true;
           zombie.stateTimer = 0;
+        } else {
+          // Keep ExpectedSpeed zero for every subsequent eating tick.  The
+          // old code called applyAgitation() unconditionally above, which
+          // advertised walk speed while the nav target was already stopped.
+          zombie.npc.setSpeed(0);
         }
 
         zombie.hunger = Math.max(0, zombie.hunger - dt * 15);
@@ -597,13 +885,22 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
         to: ZombieTransitions.Investigate,
         EnterTransition: () => {
           zombie.stateTimer = 0;
+          zombie.npc.setLocomotionMode?.("walk");
           zombie.targetCharacterId = null;
+          zombie.attackForward = null;
           zombie.corpseTargetId = null;
           zombie.isEatingCorpse = false;
+          zombie.npc.setLookAtCharacter?.(null);
           zombie.npc.lookAtTarget = null;
           zombie.targetPos = zombie.lastNoisePos;
-          if (zombie.targetPos)
-            moveToward(zombie.npc, zombie.targetPos, zombie.server);
+          if (zombie.targetPos) {
+            if (!moveToward(zombie.npc, zombie.targetPos, zombie.server)) {
+              zombie.targetPos = null;
+              zombie.npc.setSpeed(0);
+            } else {
+              applyAgitation(zombie);
+            }
+          }
         }
       },
       {
@@ -616,6 +913,19 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
         to: ZombieTransitions.Chase,
         EnterTransition: () => {
           zombie.npc.lookAtTarget = null;
+          // The pathfinding broadcaster runs independently of the FSM timer.
+          // Publish the complete chase hand-off here, not on the next tick, so
+          // a first movement sample cannot carry the previous walk stance or
+          // zero/ambient speed into the sprint graph.
+          zombie.npc.setCombatAnimationMode?.(true);
+          zombie.npc.setLocomotionMode?.("sprint");
+          const chaseTarget = getChaseTarget(zombie);
+          if (chaseTarget) {
+            zombie.npc.setLookAtCharacter?.(zombie.targetCharacterId);
+            if (moveToward(zombie.npc, chaseTarget.position, zombie.server)) {
+              applyAgitation(zombie);
+            }
+          }
         }
       },
       {
@@ -640,6 +950,8 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
         from: [ZombieTransitions.Chase],
         to: ZombieTransitions.Attack,
         EnterTransition: () => {
+          zombie.npc.stopMovement();
+          zombie.npc.setLocomotionMode?.("walk");
           zombie.lastAttackTime = 2;
         }
       },
@@ -649,15 +961,20 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
         to: ZombieTransitions.Stumble,
         EnterTransition: () => {
           zombie.npc.stopMovement();
+          zombie.npc.setLocomotionMode?.("walk");
           zombie.stateTimer = 0;
-          const anims = [
+          const anims: Array<
+            | ZombieOneshotAnim.StumbleA
+            | ZombieOneshotAnim.StumbleB
+            | ZombieOneshotAnim.StumbleC
+          > = [
             ZombieOneshotAnim.StumbleA,
             ZombieOneshotAnim.StumbleB,
             ZombieOneshotAnim.StumbleC
           ];
-          zombie.npc.playAnimation(
-            anims[Math.floor(Math.random() * anims.length)]
-          );
+          const selected = anims[Math.floor(Math.random() * anims.length)];
+          zombie.stumbleAnimation = selected;
+          zombie.npc.playAnimation(selected);
         }
       },
       {
@@ -666,9 +983,14 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
         to: ZombieTransitions.Chase,
         EnterTransition: () => {
           zombie.stateTimer = 0;
+          zombie.stumbleAnimation = undefined;
+          zombie.npc.setCombatAnimationMode?.(true);
+          zombie.npc.setLocomotionMode?.("sprint");
           const chaseTarget = getChaseTarget(zombie);
           if (chaseTarget) {
-            moveToward(zombie.npc, chaseTarget.position, zombie.server);
+            if (moveToward(zombie.npc, chaseTarget.position, zombie.server)) {
+              applyAgitation(zombie);
+            }
           }
         }
       },
@@ -677,6 +999,14 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
         from: [ZombieTransitions.Attack],
         to: ZombieTransitions.Attacking,
         EnterTransition: () => {
+          zombie.npc.stopMovement();
+          zombie.npc.setLocomotionMode?.("walk");
+          const target = getChaseTarget(zombie);
+          zombie.attackForward = target
+            ? getAttackForward(zombie.npc, target.position)
+            : null;
+          zombie.attackDamageApplied = false;
+          zombie.attackEnvelopeWasActive = false;
           zombie.npc.playAnimation(ZombieOneshotAnim.KnifeSlash);
           zombie.stateTimer = 0;
           zombie.lastAttackTime = 0;
@@ -687,6 +1017,15 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
         from: [ZombieTransitions.Attacking],
         to: ZombieTransitions.Attack,
         EnterTransition: () => {
+          zombie.attackForward = null;
+          zombie.attackDamageApplied = false;
+          zombie.attackEnvelopeWasActive = false;
+          // The shared KnifeSlash one-shot owns the client pose until its
+          // native clock expires.  Once the Attacking state is allowed to
+          // finish, explicitly hand existing observers back to the persistent
+          // idle loop; late observers already receive the same reset through
+          // Npc's animation runtime state.
+          zombie.npc.setAnimation(ZombieLoopingAnim.Idle);
           zombie.lastAttackTime = 2;
         }
       },
@@ -706,6 +1045,16 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
         to: ZombieTransitions.Chase,
         EnterTransition: () => {
           zombie.npc.lookAtTarget = null;
+          zombie.npc.setLookAtCharacter?.(null);
+          zombie.npc.setCombatAnimationMode?.(true);
+          zombie.npc.setLocomotionMode?.("sprint");
+          const chaseTarget = getChaseTarget(zombie);
+          if (chaseTarget) {
+            zombie.npc.setLookAtCharacter?.(zombie.targetCharacterId);
+            if (moveToward(zombie.npc, chaseTarget.position, zombie.server)) {
+              applyAgitation(zombie);
+            }
+          }
         }
       },
       {
@@ -740,6 +1089,7 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
           zombie.isCoveringEars = true;
           zombie.coverEarsTimer = 0;
           zombie.targetCharacterId = null;
+          zombie.npc.setLookAtCharacter?.(null);
           zombie.npc.lookAtTarget = null;
           zombie.wanderOrigin =
             zombie.npc.state.position.slice() as Float32Array;
@@ -755,16 +1105,35 @@ export function createZombie(npc: Npc, server: ZoneServer2016): ZombieInstance {
   zombie.id = npc.characterId;
   zombie.npc = npc;
   zombie.server = server;
+  // The FSM is created before the first observer is converted from the
+  // lightweight representation.  Prime the persistent loop now so the
+  // initial spawn and the full-data replay both have a real reset clip rather
+  // than relying on a later state transition to manufacture Idle.
+  zombie.npc.initializeAnimation?.(ZombieLoopingAnim.Idle);
   zombie.hunger = 0;
   zombie.agitation = AGITATION_INITIAL;
+  // The initial patrol target is requested before the first AI interval. Do
+  // not advertise walk speed until Recast accepts that first target; a failed
+  // spawn/mesh projection must remain a standing graph state.
+  zombie.npc.setLocomotionMode?.("walk");
   zombie.wanderOrigin = npc.state.position.slice() as Float32Array;
   const initialPatrol = pickPatrolPoint(server, npc.state.position);
   zombie.targetPos = initialPatrol;
   if (initialPatrol) {
-    moveToward(npc, initialPatrol, server);
+    if (moveToward(npc, initialPatrol, server)) {
+      applyAgitation(zombie);
+    } else {
+      zombie.targetPos = null;
+      npc.setSpeed(0);
+    }
+  } else {
+    npc.setSpeed(0);
   }
   zombie.lastNoisePos = null;
   zombie.targetCharacterId = null;
+  zombie.attackForward = null;
+  zombie.attackDamageApplied = false;
+  zombie.attackEnvelopeWasActive = false;
   zombie.corpseTargetId = null;
   zombie.isEatingCorpse = false;
   zombie.stateTimer = 0;

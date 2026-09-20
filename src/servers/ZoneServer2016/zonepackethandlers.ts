@@ -174,6 +174,10 @@ import { BaseItem } from "./classes/baseItem";
 import { Collection } from "mongodb";
 import { ItemObject } from "./entities/itemobject";
 import { ExplosiveEntity } from "./entities/explosiveentity";
+import {
+  isSequenceTimeAtOrAfter,
+  resolveMountedCharacterPosition
+} from "../../utils/mountedPosition";
 
 function getStanceFlags(num: number): StanceFlags {
   function getBit(bin: string, bit: number) {
@@ -1286,6 +1290,23 @@ export class ZonePacketHandlers {
   ) {
     // Early exit if no data or transientId is missing
     const packetData = packet.data;
+    // The development replay is deliberately observational.  Forward the
+    // exact packet object before any of the historical early exits so the
+    // recorder can distinguish "no packet", "flags=0", and a normal NPC
+    // packet without changing the production vehicle/ownership path.  A
+    // diagnostic failure must never turn into a gameplay failure.
+    const devHttpServer = (server as ZoneServer2016 & {
+      _devHttpServer?: {
+        observeTestNpcIngress?: (client: Client, packetData: unknown) => void;
+      };
+    })._devHttpServer;
+    if (devHttpServer?.observeTestNpcIngress) {
+      try {
+        devHttpServer.observeTestNpcIngress(client, packetData);
+      } catch {
+        // Diagnostics are best-effort and must not bypass the existing gates.
+      }
+    }
     if (!packetData || packetData.transientId == undefined) {
       console.log("TransientId error detected", packet);
       return;
@@ -1385,9 +1406,18 @@ export class ZonePacketHandlers {
       vehicle.getPassengerList().forEach((passengerId) => {
         const passenger = server._characters[passengerId];
         if (passenger) {
-          passenger.state.position = positionUpdate.position;
+          const mountedPosition = resolveMountedCharacterPosition(
+            passenger.positionUpdate?.position,
+            passenger.positionUpdate?.sequenceTime,
+            positionUpdate.position,
+            positionUpdate.sequenceTime
+          );
+          passenger.state.position = mountedPosition.position;
+          passenger.lastMountedPositionSource = mountedPosition.source;
+          passenger.lastMountedPositionSequenceTime =
+            mountedPosition.sequenceTime ?? undefined;
           const c = server.getClientByCharId(passengerId);
-          if (c) c.startLoc = positionUpdate.position[1];
+          if (c) c.startLoc = mountedPosition.position[1];
         } else {
           vehicle.removePassenger(passengerId);
         }
@@ -1406,6 +1436,7 @@ export class ZonePacketHandlers {
         time: positionUpdate.sequenceTime
       };
       vehicle.positionUpdate.position = fixedPosUpdate;
+      vehicle.positionUpdate.sequenceTime = positionUpdate.sequenceTime;
 
       // Stop HUD timer if player moved
       if (
@@ -1638,7 +1669,41 @@ export class ZonePacketHandlers {
           });
         }, 1500);
       }
-      client.character.state.position = position;
+      const mountedVehicleId = client.vehicle?.mountedVehicle;
+      const mountedVehicle = mountedVehicleId
+        ? server._vehicles?.[mountedVehicleId]
+        : undefined;
+      if (mountedVehicleId && mountedVehicle?.state?.position) {
+        // A managed vehicle packet can arrive before a delayed passenger
+        // packet.  Do not let that stale passenger sample move the target
+        // back to an old seat position: the native animal seek/attack path
+        // must use the newest world point available for the mounted player.
+        const vehiclePosition = mountedVehicle.state.position;
+        const vehicleSequenceTime = mountedVehicle.oldPos?.time;
+        const mountedPosition = resolveMountedCharacterPosition(
+          position,
+          sequenceTime,
+          vehiclePosition,
+          vehicleSequenceTime
+        );
+        const playerSampleIsCurrent =
+          mountedPosition.source === "player-update" &&
+          isSequenceTimeAtOrAfter(sequenceTime, vehicleSequenceTime);
+        if (playerSampleIsCurrent || mountedPosition.source === "vehicle-root") {
+          client.character.state.position = mountedPosition.position;
+          client.character.lastMountedPositionSource = mountedPosition.source;
+          client.character.lastMountedPositionSequenceTime =
+            mountedPosition.sequenceTime ?? undefined;
+        }
+      } else if (mountedVehicleId) {
+        client.character.state.position = position;
+        client.character.lastMountedPositionSource = "player-update";
+        client.character.lastMountedPositionSequenceTime = sequenceTime;
+      } else {
+        client.character.state.position = position;
+        client.character.lastMountedPositionSource = undefined;
+        client.character.lastMountedPositionSequenceTime = undefined;
+      }
 
       // Check if player stepped on an armed landmine
       if (server.explosiveManager.explosiveEntities.size > 0) {

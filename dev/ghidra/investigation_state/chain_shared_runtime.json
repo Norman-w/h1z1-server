@@ -1,0 +1,355 @@
+{
+  "schemaVersion": 1,
+  "language": "zh-CN",
+  "updatedAt": "2026-03-16",
+  "scope": "共享 effect/runtime 处理：ProcessEffects 批处理器、逐实体 effect tick、空间/变换/姿态状态块提取与同步、共享行为门控与 type-9 事件提交。",
+  "resourceAnchors": [
+    "ZombieMale_Skin_01.adr -> AnimationNetwork fileName=ThirdPersonZombiePhysics.mrn, animSetName=Zombie001",
+    "ZombieFemale_Skin_01.adr -> AnimationNetwork fileName=ThirdPersonZombiePhysics.mrn, animSetName=Zombie001Female",
+    "客户端解包资源实际文件名带平台后缀：ThirdPersonZombiePhysicsX64.mrn / ThirdPersonZombie_AnimationX64.mrn / ThirdPersonZombieAIX64.mrn；ADR 中的无后缀名当前可视为运行时资源别名",
+    "ThirdPersonZombiePhysicsX64.mrn 可见 Attack_Grapple / AttackMove_Ping/Pong / AttackStand_Ping/Pong / Attack_Walker / Attack_Runner / Spit / GrappleLoop / Bite 等状态与动画名",
+    "ThirdPersonZombieAIX64.mrn 与 ThirdPersonZombie_AnimationX64.mrn 都可见 Idle_Locomotion / DeathOrDormant / Feeding / Flinch / Attacks 等图状态，以及 InAttack / NPC_AttackSpeed / AttackRegion / HeadLookTarget / DeathType 等控制参数名"
+  ],
+  "functions": [
+    {
+      "address": "FUN_140722d90",
+      "guessedName": "ProcessEffectsPendingEntityQueue",
+      "guessedNameConfidence": 0.8,
+      "purpose": "共享 manager 侧的待处理实体消费函数。它会在 `param_1 + 0x1140` 锁保护下遍历 `manager+0x1128` 挂起链，对每个实体调用 `FUN_1404e5e60(entity, deltaTicks)`；若实体的 `virtual +0x1f0` 返回 false，就把该实体从 `+0x1128/+0x1130` 双向链表中摘除并递减 `+0x1138`。函数内部 profiling 字符串直接写着 `ProcessEffects`，因此当前最像共享 effect/runtime 更新批处理器，而不是角色专属动画控制器。",
+      "purposeConfidence": 0.93,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "manager*",
+          "guessedPurpose": "共享 effect/update manager；持有待处理实体队列与 profiling 统计缓存。",
+          "confidence": 0.89
+        },
+        {
+          "index": 1,
+          "type": "ulonglong",
+          "guessedPurpose": "时间步/增量 tick；随后会传给 `FUN_1404e5e60`。",
+          "confidence": 0.81
+        }
+      ],
+      "relations": [
+        "读取并消费 `FUN_14071af10` 挂入的 `manager+0x1128/+0x1130` 待处理链",
+        "对每个实体调用 `FUN_1404e5e60(entity, deltaTicks)`",
+        "若实体 `virtual +0x1f0` 返回 false，则把它从队列中摘除并递减 `manager+0x1138`",
+        "caller `0x14043c624` 来自一个全局 tick/manager 函数，调用形状为 `(*(param_1 + 0x38860))->FUN_140722d90(delta)`",
+        "函数内 profiling 文案为 `>>> ProcessEffects profiling started <<<` / `complete`，强烈支持这是共享 effect/runtime 批处理器"
+      ]
+    },
+    {
+      "address": "FUN_1404e5e60",
+      "guessedName": "TickEntityEffectRuntimeAndInvokeLateHooks",
+      "guessedNameConfidence": 0.7,
+      "purpose": "共享 effect/runtime 家族里的逐实体处理函数。它先把 `deltaTicks` 转成浮点时间步，调用 `entity[0xbe]` 指向的子对象虚表 `+0x8`，再尝试调用该子对象 `+0x31` 链上的另一个 `+0x8`；之后经 `entity->virtual +0x58` 取回一个相关对象，并在 `FUN_1414458b0` gate 成立时触发 `entity->virtual +0x250`，同时在全局标志允许时调用 `entity->virtual +0x248`。结合 `FindIndirectCallsByOffset 0x250` 的 66 个全程序命中与 `FindIndirectCallsByOffset 0x248` 的 38 个全程序命中，这更像广泛复用的 late-update / runtime hook 接口，而不是直接切换僵尸追击/攻击动画状态机。",
+      "purposeConfidence": 0.92,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "entity*",
+          "guessedPurpose": "被 `ProcessEffects` 队列消费的实体。",
+          "confidence": 0.92
+        },
+        {
+          "index": 1,
+          "type": "int",
+          "guessedPurpose": "时间步/增量 tick；会乘以全局比例常量转成浮点。",
+          "confidence": 0.87
+        }
+      ],
+      "relations": [
+        "由 `FUN_140722d90` 在处理 `manager+0x1128` 挂起队列时逐实体调用",
+        "也被 `FUN_1407232e0` 通过 `param_1+0x1930` 上的单实体路径直接复用，说明它不是队列专属逻辑，而是共享的逐实体 effect/runtime tick",
+        "先推进 `entity[0xbe]` 子对象及其 `+0x31` 链上对象，强烈偏向共享 effect/runtime 子系统",
+        "`FUN_1414458b0(obj)` gate 只检查 `obj+0x489/+0x48c/+0x398` 组合状态，随后才触发 `entity->virtual +0x250`；其中 `FindMemoryRefsByOffset 0x489 any 0x141400000 0x141500000` 与 `0x48c` 的范围扫描都强烈聚集在 `0x14143...~0x14145...` 同一家对象方法簇，说明前两者确实像该对象家族内部的状态位字节",
+        "若全局 `DAT_142b19780 + 0x3b770` 未置位，则还会调用 `entity->virtual +0x248`",
+        "`FindIndirectCallsByOffset 0x250` 在全程序命中 66 处，进一步证明 `virtual +0x250` 属于广泛复用的对象接口槽，而非 case 0x30 / 僵尸专属动画槽",
+        "`FUN_14051dfb0` 里也存在 `FUN_14052a690(plVar1)` 之后直接调用 `plVar1->virtual +0x250` 的路径，且该处并不经过 `FUN_1414458b0` gate；这进一步支持 `+0x250` 更像共享 refresh/late-hook，而不是特定条件下的动画开关",
+        "`FindIndirectCallsByOffset 0x248` 在全程序命中 38 处，说明相邻的 `virtual +0x248` 同样属于共享接口族，而不是 case 0x30 独有后段",
+        "相比之下，`FindMemoryRefsByOffset 0x398 any 0x141400000 0x141500000` 命中很多，但其中已出现明显不同语义（例如 `0x1414d46c3/0x1414d681c/0x1414d886c` 一带把 `+0x398` 当 float 用）；因此 `obj+0x398` 不能脱离 `FUN_1414458b0` 的本地对象家族语境裸追，只能保守记为该 gate 所依赖的一个非空指针/句柄位",
+        "目前仍未出现明确 MRN/角色动画图结构，故应继续把它归在共享 late-update/effect runtime 一侧"
+      ]
+    },
+    {
+      "address": "FUN_1407232e0",
+      "guessedName": "ProcessSingleBoundEntityThroughEffectRuntime",
+      "guessedNameConfidence": 0.73,
+      "purpose": "共享 effect/runtime 侧的单实体包装路径。当前可见它会从 `param_1+0x1930` 取出一个绑定实体/对象，构造一个本地树/集合包装并经该对象 `virtual +0x58` 取回相关对象后，再调用 `FUN_1404e5e60(*(param_1+0x1930), delta)`。这说明 `FUN_1404e5e60` 不是仅服务于 manager 挂起队列，也可被单对象 owner 直接复用。",
+      "purposeConfidence": 0.84,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "longlong",
+          "guessedPurpose": "持有 `+0x1930` 绑定实体/对象的 owner/runtime 容器。",
+          "confidence": 0.71
+        },
+        {
+          "index": 1,
+          "type": "undefined4",
+          "guessedPurpose": "时间步/增量 tick，最终会传给 `FUN_1404e5e60`。",
+          "confidence": 0.79
+        }
+      ],
+      "relations": [
+        "在 `param_1+0x1930 != 0` 时工作，并于 `0x14072365c` 调用 `FUN_1404e5e60(*(param_1+0x1930), delta)`",
+        "说明 `FUN_1404e5e60` 是共享逐实体 effect/runtime tick，而非仅属于 `FUN_140722d90` 队列消费器",
+        "调用前会构造一个本地树/集合包装，并经 `(*(boundEntity)->virtual +0x58)` 取得相关对象参与前置检查/取值",
+        "当前仍未看到明确 MRN/角色动画图结构，故更应把它归在共享 runtime owner -> bound entity 更新通道"
+      ]
+    },
+    {
+      "address": "FUN_1404e4c10",
+      "guessedName": "DispatchIntoSharedEffectRuntimeSubinterface",
+      "guessedNameConfidence": 0.67,
+      "purpose": "根据传入对象和回退宿主，选择一个目标对象并调用其虚表 `+0x10`。结合多个 caller（ProcessCompositeEffectAtLocation、terrain decal、runtime terrain 一带），当前更像共享的 effect/runtime 子接口分发器，而不是角色主动画控制入口。",
+      "purposeConfidence": 0.8,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "longlong*",
+          "guessedPurpose": "默认宿主或回退对象。",
+          "confidence": 0.49
+        },
+        {
+          "index": 1,
+          "type": "undefined4",
+          "guessedPurpose": "模式/类型标志。",
+          "confidence": 0.34
+        },
+        {
+          "index": 2,
+          "type": "longlong*",
+          "guessedPurpose": "优先使用的目标对象；若其 `+0x50` 路径不满足，再回退到宿主。",
+          "confidence": 0.55
+        }
+      ],
+      "relations": [
+        "被 FUN_1404e4c90 调用",
+        "caller 覆盖 composite effect / terrain decal / runtime terrain 路径",
+        "当前应降级为 effect/runtime 侧资料"
+      ]
+    },
+    {
+      "address": "FUN_14053b1d0",
+      "guessedName": "ApplyStateLikeValueThroughShared58_78Gate",
+      "guessedNameConfidence": 0.62,
+      "purpose": "一条共享的状态值/模式值应用辅助函数。它先通过 `entity->virtual +0x78` 取一个对象并对结果运行 `FUN_1414458b0` gate；若 gate 失败，则直接把传入的 `param_2` 写到 `entity+0x1d1c`。若 gate 成功，则继续通过 `entity->virtual +0x58` 取另一个相关对象后再做后续处理。结合 caller `FUN_14052a460` 传入 `entity+0x1d18` 的模式值来看，这更像 shared state/mode apply helper，而不是直接角色动画图入口；同时，`FUN_1414458b0` 所看的 `+0x489/+0x48c` 当前已能较稳地归入同一家对象状态位，但 `+0x398` 仍需限制在本地对象语境内理解。",
+      "purposeConfidence": 0.79,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "entity*",
+          "guessedPurpose": "持有 `+0x1d18/+0x1d1c` 状态字段并暴露 `virtual +0x58/+0x78` 的实体对象。",
+          "confidence": 0.82
+        },
+        {
+          "index": 1,
+          "type": "int",
+          "guessedPurpose": "待应用的状态/模式值；caller `FUN_14052a460` 传入 `entity+0x1d18`。",
+          "confidence": 0.73
+        }
+      ],
+      "relations": [
+        "被 `FUN_14052a460` 调用，传参形状为 `FUN_14053b1d0(entity, *(int *)(entity + 0x1d18))`",
+        "也被 `FUN_140511840` 内部 callsite `0x140512e90` 调用，说明它既出现在共享 runtime 路径，也出现在 dispatcher case 家族中",
+        "前段通过 `entity->virtual +0x78` 取对象并执行 `FUN_1414458b0` gate；后段再通过 `entity->virtual +0x58` 取相关对象继续处理",
+        "与 `FUN_1404e5e60` 共享 `virtual +0x58` / `FUN_1414458b0` 对象访问模板，但它本身不直接调用 `virtual +0x248/+0x250`",
+        "当前更应归类为 shared state/mode helper，而不是 case 0x30 的最终动画执行器"
+      ]
+    },
+    {
+      "address": "FUN_14052a460",
+      "guessedName": "UpdateEntityStateModeAndPending6d0Event",
+      "guessedNameConfidence": 0.65,
+      "purpose": "共享实体状态更新辅助函数。若 `entity+0x3a3 > 0`，它会通过 `entity->virtual +0x58` 取一个相关对象并检查 `*(obj + 0x28) & 2`；条件满足时，用 `entity+0x1d18` 作为参数调用 `FUN_14053b1d0`。随后它还会处理 `entity+0x1ae4` 挂起值：清零该字段，构造一份来自 `entity+0xc6` 的上下文，并调用实体虚表 `+0x6d0`。这条形状更像共享状态/事件推进与挂起值投递，而非直接动画图驱动。",
+      "purposeConfidence": 0.82,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "entity*",
+          "guessedPurpose": "持有 `+0x3a3/+0x1d18/+0x1ae4` 等共享状态字段的实体对象。",
+          "confidence": 0.84
+        }
+      ],
+      "relations": [
+        "caller `0x14051eb51` 说明它属于与 `FUN_14051dfb0` 相邻的共享状态更新路径",
+        "在 `entity+0x3a3 > 0` 且 `(*(entity->virtual +0x58)()->+0x28 & 2) != 0` 时调用 `FUN_14053b1d0(entity, *(int *)(entity+0x1d18))`",
+        "随后若 `entity+0x1ae4 != 0`，则清零该字段并调用实体虚表 `+0x6d0` 处理一条挂起值/事件；在当前窄窗 `0x140500000..0x140540000` 内，`FindIndirectCallsByOffset 0x6d0` 只命中 `FUN_14052a460` 与 `FUN_14053bbd0` 两处，说明这条槽位比 `+0x248/+0x250` 收敛得多",
+        "使用 `entity+0xc6` 上下文对象的虚表 `+0x68` 取出附加上下文传给 `+0x6d0`",
+        "当前仍更像共享 state/event helper，而不是 MRN 或僵尸攻击动画的直接入口"
+      ]
+    },
+    {
+      "address": "FUN_14053bbd0",
+      "guessedName": "DispatchPending1ae4ValueThroughVirtual6d0",
+      "guessedNameConfidence": 0.74,
+      "purpose": "共享挂起状态/事件派发辅助函数。当前可见它会先通过 `entity->virtual +0x58` 取得相关对象，从该对象提取一组 4 dword 和两个附加值，经 `FUN_14144ec60` 写入/同步到 `param_1[0x214]` 指向的对象；随后若 `entity+0x1ae4` 非零，就把该 4-byte 值写入本地 `local_e8[0]`，取出 `entity+0xc6` 的上下文对象，并调用实体虚表 `+0x6d0(entity, &local_e8[0], context)`。这更像共享 pending-state / event notify 槽，而不是角色动画图入口。",
+      "purposeConfidence": 0.87,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "entity*",
+          "guessedPurpose": "持有 `+0x1ae4` 挂起值、`+0xc6` 上下文和 `+0x214/+0x215` 相关对象指针的实体。",
+          "confidence": 0.84
+        }
+      ],
+      "relations": [
+        "在窄窗 `0x140500000..0x140540000` 中，是仅有的两个 `virtual +0x6d0` caller 之一（另一个是 `FUN_14052a460`）",
+        "前段复用 `entity->virtual +0x58` 对象访问模板，并调用 `FUN_141443390 / FUN_1414431d0 / FUN_14144ec60` 从相关对象抽取并同步一组小状态块；其中这组数据当前更像空间/变换/姿态信息，而不是动画事件名或 MRN 节点名",
+        "若 `entity+0x1ae4 != 0`，则执行 `entity->virtual +0x6d0(entity, &pendingValue, (**(entity+0xc6)+0x68)(...))`；这里的 payload 当前只见一个 4-byte 值与一个上下文对象",
+        "被 `0x14053b398 / 0x14051d1f5 / 0x14051dec4 / 0x1406e2ed6 / 0x140513376` 等路径调用，说明它是共享状态/事件派发 helper",
+        "当前更接近 shared pending event notify，而不是僵尸追击/攻击动画的直接驱动槽"
+      ]
+    },
+    {
+      "address": "FUN_141443390",
+      "guessedName": "BuildWorldTransformLikeVector4FromObject",
+      "guessedNameConfidence": 0.78,
+      "purpose": "从 `virtual +0x58` 返回对象里抽取一组 4-float 变换/位置样数据。函数会先经 `param_1+0x330` 的子对象虚表 `+0x18` 取一块源数据，再结合 `param_1+0x3e0`（若存在）或 `param_1+0x330` 本体上的另一块 4-float 数据，并减去两组全局常量基准，最后输出 4 个 float。当前更像世界坐标/变换向量或姿态偏移块，而不是动画事件。",
+      "purposeConfidence": 0.9,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "object*",
+          "guessedPurpose": "`entity->virtual +0x58` 返回的相关对象；持有 `+0x330/+0x3e0` 变换样子对象。",
+          "confidence": 0.83
+        },
+        {
+          "index": 1,
+          "type": "float[4]*",
+          "guessedPurpose": "接收 4-float 输出向量的缓冲区。",
+          "confidence": 0.94
+        }
+      ],
+      "relations": [
+        "被 `FUN_14053bbd0` 等多条路径调用，用于从 `virtual +0x58` 返回对象中提取一组 4-float 小状态块",
+        "读取 `param_1+0x330` 与可选的 `param_1+0x3e0` 子对象，并组合两组 4-float 值后减去全局基准常量",
+        "输出形状是明确的 4 个 float，因此当前更像空间/变换/姿态数据，而不是行为名、动作标签或 MRN 状态名"
+      ]
+    },
+    {
+      "address": "FUN_1414431d0",
+      "guessedName": "CopyTwoQwordsFromObject330Sample",
+      "guessedNameConfidence": 0.66,
+      "purpose": "从 `param_1+0x330` 子对象采样一块 16-byte 数据并原样复制出来。函数先调用 `(*(param_1+0x330)->virtual +0x18)()` 取得源块，再经 `FUN_1403e9d50` 处理后把两个 qword 复制到输出缓冲。当前更像与变换/姿态样本配套的紧凑 16-byte 数据，而不是高层动画事件。",
+      "purposeConfidence": 0.82,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "object*",
+          "guessedPurpose": "`entity->virtual +0x58` 返回的相关对象；其 `+0x330` 子对象提供采样源。",
+          "confidence": 0.79
+        },
+        {
+          "index": 1,
+          "type": "uint64[2]*",
+          "guessedPurpose": "接收复制出的 16-byte 小状态块。",
+          "confidence": 0.85
+        }
+      ],
+      "relations": [
+        "被 `FUN_14053bbd0` 与 `FUN_14051e0d0/0x14051e0e6` 等路径调用",
+        "前段固定读取 `param_1+0x330` 子对象的 `virtual +0x18` 返回值，再经 `FUN_1403e9d50` 取得两个 qword",
+        "当前应与 `FUN_141443390` 一起理解为 `virtual +0x58` 返回对象的小状态块提取器，而不是动画事件解析器"
+      ]
+    },
+    {
+      "address": "FUN_14144ec60",
+      "guessedName": "ComposeTransformBlockIntoStateCarrier",
+      "guessedNameConfidence": 0.72,
+      "purpose": "把来自 `virtual +0x58` 返回对象的小状态块组合进一个更大的 float 矩阵/载体里。函数先清空一片 4x4 float 风格的临时缓冲，再调用 `FUN_14046c5d0` 初始化；若 `param_1[0x73]` 存在，则读取 `+0x618`、`param_1+0x7e/+0x7f` 和 `param_1+0x3f4` 等浮点字段，配合多组全局常量构造/变换整片矩阵样数据。当前明显偏向空间/姿态/变换构造，而不是直接动画事件派发。",
+      "purposeConfidence": 0.88,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "object*",
+          "guessedPurpose": "`entity->virtual +0x58` 返回的相关对象；持有变换和尺度样字段。",
+          "confidence": 0.8
+        },
+        {
+          "index": 1,
+          "type": "stateCarrier*",
+          "guessedPurpose": "被写入的小状态/载体对象。",
+          "confidence": 0.46
+        },
+        {
+          "index": 2,
+          "type": "floatBlockLike*",
+          "guessedPurpose": "输入或参考的小状态块；会与本地矩阵样缓冲一起参与组合。",
+          "confidence": 0.42
+        }
+      ],
+      "relations": [
+        "被 `FUN_14053bbd0`、`FUN_14051e158` 等多条路径调用",
+        "前段清空 4x4 float 风格临时缓冲并调用 `FUN_14046c5d0` 初始化",
+        "读取 `param_1[0x73] + 0x618`、`param_1+0x7e/+0x7f/+0x3f4` 等 float 字段，并与多组全局常量矩阵相乘/组合",
+        "当前更像空间/姿态/变换状态块组合器，而不是 MRN/动画事件分发器"
+      ]
+    },
+    {
+      "address": "FUN_1403d1930",
+      "guessedName": "ConsumeHighStateFlagBeforeSharedActionDispatch",
+      "guessedNameConfidence": 0.46,
+      "purpose": "这是当前第一处已确认读取 `entity+0x8cd` 高位（`0x80`）的共享玩法/控制逻辑。函数在一段面向对象/目标的复杂分支里，若 `FUN_1404e4f40(plVar11)` 为真，或当前玩家/宿主对象 `lVar12` 的 `+0x8cd` 含高位（`0x7f < byte`），就把 `local_d8` 设为 `4` 并调用 `FUN_1404a5dc0(*(longlong *)(param_1 + 0x314a8) + 0x969b8,param_2)`。它说明 `FUN_140535700` 写下的 `0x80` 并非无消费者，但当前看到的仍是更早层的共享行为门控，而不是 MRN 入口。",
+      "purposeConfidence": 0.61,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "controller/context*",
+          "guessedPurpose": "持有 `+0x38860/+0x38970/+0x314a8` 等大块运行时上下文的宿主。",
+          "confidence": 0.42
+        },
+        {
+          "index": 1,
+          "type": "target/entity-handle*",
+          "guessedPurpose": "被复制到 `local_140` 并传给 `FUN_14042a970`、`FUN_1404a5dc0` 的目标句柄。",
+          "confidence": 0.49
+        },
+        {
+          "index": 2,
+          "type": "float*",
+          "guessedPurpose": "当前片段未直接使用，可能是位置/方向参数。",
+          "confidence": 0.14
+        },
+        {
+          "index": 3,
+          "type": "char/bool",
+          "guessedPurpose": "参与 Shift/输入分支的门控位。",
+          "confidence": 0.28
+        }
+      ],
+      "relations": [
+        "已解析的两条代码调用路径分别来自 `FUN_1403e8e60` 与 `FUN_140b1b3a0`，说明它不属于 case 0x30 本地 helper，而是更上层的共享玩法/控制逻辑",
+        "`FUN_1403e8e60` 会先用 `FUN_14071f150(*(param_1+0x38860), targetHandle)` 找目标对象，再取 `FUN_14047e410(*(param_1+0x388a8))` 的当前对象数据，随后调用本函数；若 `param_1+0x38de9` 为真还会继续走 `FUN_1404676a0(...)`",
+        "`FUN_140b1b3a0` 则在 `FUN_140d7d290()==1` 时，从 `DAT_142b19780` 出发构造 `local_38 = FUN_140b20d10(param_1,1)`，再以 `param_4=1` 调本函数，说明这条 `0x80` 读取路径至少跨两条共享上层流程复用",
+        "函数内部会先通过 `FUN_14071e830(*(param_1+0x38860))` 取回一个对象，再在命中分支里测试 `0x7f < *(byte *)(lVar12 + 0x8cd)`",
+        "该高位测试与 `FUN_1404e4f40(plVar11)` 并列；任一成立都会把 `local_d8 = 4` 并触发 `FUN_1404a5dc0(...)`",
+        "而 `FUN_1404a5dc0` 本体只是 `*(param_1+8)=*param_2` 的微型写槽函数；该槽现已确认由 `FUN_1404a5bd0` 读取并转换成两条 type=9 共享消息，因此当前更像‘允许把目标句柄塞进共享上下文槽’的前置门控，还没有证据显示它已直接进入 MRN/攻击动画图"
+      ]
+    },
+    {
+      "address": "FUN_1404a5bd0",
+      "guessedName": "ConsumeQueuedTargetAndEmitSharedType9Events",
+      "guessedNameConfidence": 0.63,
+      "purpose": "这是 `FUN_1403d1930` 写入目标槽后的首个明确消费者。函数从 `this+8` 取出挂起的目标句柄，经 `FUN_14071f150(DAT_142b19b38,&local_68)` 解析出目标对象；若全局当前对象与目标都存在，就先通过 `FUN_14035e360` 发一条 type=9/subtype=0x15 共享消息，再调用 `FUN_1404676a0` 发一条携带目标 `+0x1d0` 的 type=9/subtype=7 消息，最后把 `this+8` 清成 `DAT_142b1dda0`。整体形状很像一次性消费挂起目标并向共享总线提交控制/交互事件。",
+      "purposeConfidence": 0.73,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "queued-target event object*",
+          "guessedPurpose": "小对象本体；`+8` 字段保存待消费的目标句柄，处理完成后会被清空。",
+          "confidence": 0.78
+        }
+      ],
+      "relations": [
+        "其 `this+8` 字段由 `FUN_1404a5dc0` 写入；而 `FUN_1404a5dc0` 在当前链路中由 `FUN_1403d1930` 触发",
+        "内部先发一条 type=9/subtype=0x15 共享消息，再调用 `FUN_1404676a0` 发 type=9/subtype=7 消息",
+        "`FUN_1404676a0` 会把目标 `*(param_2 + 0x1d0)` 填入消息体，说明这里传递的不是单纯标志位，而是具体目标/附属句柄",
+        "消费完成后会把 `this+8` 清成 `DAT_142b1dda0`，表现出典型的一次性挂起槽/延迟消费对象形态",
+        "其发出的 type=9/subtype=0x15 与 type=9/subtype=7 消息随后会被 `FUN_14035e360 / FUN_14035e080` 序列化，并经 `FUN_14063c180 -> FUN_14162dcc0` 进入 `Gateway::ExternalPackets::PacketTunnelPacketFromExternalConnection` 风格的外连包路径；因此这条线当前更像共享交互/控制包提交，而不是直接动画/MRN 控制"
+      ]
+    }
+  ]
+}

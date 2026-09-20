@@ -267,6 +267,8 @@ import { RandomEventsManager } from "./managers/randomeventsmanager";
 import { ExplosionManager } from "./managers/explosionmanager";
 import { AiManager } from "./managers/explosivemanager";
 import { AirdropManager } from "./managers/airdropmanager";
+import { AnimalTestHarness } from "./managers/animaltestharness";
+import { DevHttpServerLite } from "./managers/devhttpserver-lite";
 //import { TaskManager } from "./managers/tasksmanager";
 
 const spawnLocations2 = PluginManager.loadServerData(
@@ -511,6 +513,9 @@ export class ZoneServer2016 extends EventEmitter {
   playTimeManager: PlayTimeManager;
   explosiveManager: AiManager;
   airdropManager: AirdropManager;
+  readonly animalTestHarness: AnimalTestHarness;
+  private devHttpServer?: DevHttpServerLite;
+  private readonly devHttpPort: number;
 
   _ready: boolean = false;
 
@@ -616,7 +621,8 @@ export class ZoneServer2016 extends EventEmitter {
     mongoAddress = "",
     worldId?: number,
     internalServerPort?: number,
-    protocol: string = "ClientProtocol_1080"
+    protocol: string = "ClientProtocol_1080",
+    devHttpPort?: number
   ) {
     super();
     this._clientProtocol = protocol;
@@ -624,6 +630,10 @@ export class ZoneServer2016 extends EventEmitter {
     this._packetHandlers = new ZonePacketHandlers();
     this._mongoAddress = mongoAddress;
     this._worldId = worldId || 0;
+    this.devHttpPort =
+      typeof devHttpPort === "number" && devHttpPort > 0
+        ? devHttpPort
+        : Number(process.env.DEV_HTTP_PORT ?? 0) || 0;
     this._protocol = new H1Z1Protocol(this._clientProtocol);
     this.worldObjectManager = new WorldObjectManager();
     this.voiceChatManager = new VoiceChatManager();
@@ -643,6 +653,7 @@ export class ZoneServer2016 extends EventEmitter {
     this.commandHandler = new CommandHandler();
     this.playTimeManager = new PlayTimeManager();
     this.explosiveManager = new AiManager(this);
+    this.animalTestHarness = new AnimalTestHarness(this);
     this.airdropManager = new AirdropManager(this);
     this.navManager = new NavManager();
     this.challengeManager = new ChallengeManager(this);
@@ -1115,6 +1126,8 @@ export class ZoneServer2016 extends EventEmitter {
   }
 
   async stop() {
+    this.devHttpServer?.stop();
+    this.devHttpServer = undefined;
     clearInterval(this.recastRoutine);
     clearInterval(this.challengePositionCheckInterval);
     clearInterval(this.aiTickRoutine);
@@ -2582,6 +2595,10 @@ export class ZoneServer2016 extends EventEmitter {
   async start(): Promise<void> {
     debug("Starting server");
     debug(`Protocol used : ${this._protocol.protocolName}`);
+    if (this.devHttpPort > 0 && !this.devHttpServer) {
+      this.devHttpServer = new DevHttpServerLite(this, this.devHttpPort);
+      this.devHttpServer.start();
+    }
     if (!this.hookManager.checkHook("OnServerInit")) return;
     if (!(await this.hookManager.checkAsyncHook("OnServerInit"))) return;
 
@@ -5406,12 +5423,11 @@ export class ZoneServer2016 extends EventEmitter {
         }
         if (object instanceof Npc) {
           object.updateEquipment(this);
-          if (object.currentAnimation) {
-            this.sendData(client, "Character.PlayAnimation", {
-              characterId: object.characterId,
-              animationName: object.currentAnimation
-            });
+          const animationPacket = object.getCurrentAnimationPacket();
+          if (animationPacket) {
+            this.sendData(client, "Character.PlayAnimation", animationPacket);
           }
+          object.sendInitialLocomotionState(client);
           return;
         }
       }
@@ -6675,6 +6691,8 @@ export class ZoneServer2016 extends EventEmitter {
     }
 
     client.vehicle.mountedVehicle = "";
+    client.character.lastMountedPositionSource = undefined;
+    client.character.lastMountedPositionSequenceTime = undefined;
     this.sendData<VehicleOccupy>(client, "Vehicle.Occupy", {
       guid: "",
       characterId: client.character.characterId,
@@ -11194,12 +11212,31 @@ export class ZoneServer2016 extends EventEmitter {
     for (const k in this._npcs) {
       const npc = this._npcs[k];
       if (npc.navAgent) {
+        // stopMovement() is an authoritative action boundary.  Recast may
+        // still expose an interpolated position for a frame after its target
+        // and velocity are reset; publishing that residual sample makes an
+        // attacking NPC slide while its expected speed is already zero.
+        if (npc.isPathfindingMovementSuppressed) continue;
         const navPos = npc.navAgent.interpolatedPosition;
         const gamePos = NavManager.navToGame(navPos);
-        if (
-          gamePos[0] != npc.state.position[0] ||
-          gamePos[2] != npc.state.position[2]
-        ) {
+        // `/ztest slope` deliberately keeps a test animal's replicated
+        // origin above/below the crowd surface while Recast still solves the
+        // horizontal path on that surface.  Production NPCs leave this
+        // offset undefined, so their Y remains the native navmesh sample.
+        if (Number.isFinite(npc.testHarnessVerticalOffset)) {
+          gamePos[1] += npc.testHarnessVerticalOffset as number;
+        }
+        // NPC locomotion is a three-dimensional stream.  Checking only X/Z
+        // drops legitimate ground-height changes on slopes, stairs and
+        // navmesh links, while exact float comparisons turn interpolation
+        // noise into zero-displacement packets.  Use one small squared
+        // displacement gate for all three axes so vertical motion reaches
+        // the same authoritative PlayerUpdatePosition path as horizontal
+        // motion without flooding the client with sub-millimetre jitter.
+        const dx = gamePos[0] - npc.state.position[0];
+        const dy = gamePos[1] - npc.state.position[1];
+        const dz = gamePos[2] - npc.state.position[2];
+        if (dx * dx + dy * dy + dz * dz > 1e-8) {
           npc.goTo(gamePos);
         }
       }

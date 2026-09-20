@@ -14,7 +14,8 @@
 import { ZoneServer2016 } from "../zoneserver";
 import { ZoneClient2016 } from "../classes/zoneclient";
 import { Items, MaterialTypes, NpcIds, StringIds } from "../models/enums";
-import { Npc } from "./npc";
+import { ANIMAL_NATIVE_LOCOMOTION_PROFILE, Npc } from "./npc";
+import { ANIMAL_PROFILE_IDS } from "./animalprofiles";
 import { createRabbit } from "../jsms/rabbit.jsm";
 import { Factions } from "../jsms/factions";
 
@@ -40,6 +41,25 @@ export class Rabbit extends Npc {
     this.health = 1500;
     this.materialType = MaterialTypes.FLESH;
     this.npcMeleeDamage = 0;
+    this.nativeMeleeCapability = "passive";
+    this.profileId = ANIMAL_PROFILE_IDS.RABBIT;
+    this.nativeLocomotionProfile = ANIMAL_NATIVE_LOCOMOTION_PROFILE;
+    // Preserve the persistent spawn reset even when AI is disabled and the
+    // optional rabbit FSM is not constructed.
+    this.initializeAnimation("Idle");
+    // Rabbit is passive in the current server FSM.  Preserve the native clip
+    // timing for diagnostics and any later attack-capability implementation.
+    this.nativeMeleeAnimationDurationMs = 2333;
+    this.nativeMeleeAnimationSource = "Animals_Rabbit001_Attack";
+    // AnimalsX64 exposes Rabbit001 Flinch as the resource-side candidate for
+    // the shared MeleeFlinch event (39 frames).
+    this.nativeMeleeFlinchAnimationDurationMs = 1300;
+    // Recorded for the shared AnimalsPhysics contract even though Rabbit is
+    // passive and never enters the melee FSM.
+    this.meleeContactWindow = {
+      startFraction: 0.214286,
+      endFraction: 0.785714
+    };
     this.npcId = NpcIds.RABBIT;
     this.faction = Factions.PASSIVE;
     this.nameId = StringIds.RABBIT;

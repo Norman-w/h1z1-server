@@ -22,6 +22,10 @@ import {
   statSchema
 } from "../../../packets/ClientProtocol/ClientProtocol_1080/shared";
 import { PacketStructures } from "types/packetStructure";
+import {
+  packAnimationRequest2016,
+  readAnimationRequest2016
+} from "../../../utils/characterAnimationRequestWire2016";
 
 export const characterPackets: PacketStructures = [
   ["Character.None", 0x0f00, {}],
@@ -289,7 +293,7 @@ export const characterPackets: PacketStructures = [
           type: "uint64string",
           defaultValue: "0"
         },
-        { name: "speed", type: "uint32", defaultValue: 0 }
+        { name: "speed", type: "float", defaultValue: 0 }
       ]
     }
   ],
@@ -690,6 +694,20 @@ export const characterPackets: PacketStructures = [
     }
   ],
   [
+    "Character.MemberStatus",
+    0x0f2b,
+    {
+      fields: [
+        {
+          name: "characterId",
+          type: "uint64string",
+          defaultValue: "0x0000000000000000"
+        },
+        { name: "unknownByte1", type: "uint8", defaultValue: 0 }
+      ]
+    }
+  ],
+  [
     "Character.SeekTarget",
     0x0f26,
     {
@@ -704,15 +722,17 @@ export const characterPackets: PacketStructures = [
           type: "uint64string",
           defaultValue: "0x0000000000000000"
         },
-        { name: "initSpeed", type: "float", defaultValue: 1 },
-        { name: "acceleration", type: "float", defaultValue: 1 },
+        { name: "initSpeed", type: "float", defaultValue: 90 },
+        { name: "acceleration", type: "float", defaultValue: 10 },
         { name: "speed", type: "float", defaultValue: 1 },
-        { name: "turn", type: "float", defaultValue: 1 },
-        { name: "yRot", type: "float", defaultValue: 1 },
+        { name: "unknown8", type: "float", defaultValue: 0 },
+        { name: "yRot", type: "float", defaultValue: 0 },
         {
+          // Historical name: the native seek constructor consumes a direction,
+          // using atan2(x, z), not a quaternion. w is zero for a direction.
           name: "rotation",
           type: "floatvector4",
-          defaultValue: [0, 0, 0, 1]
+          defaultValue: [0, 0, 1, 0]
         }
       ]
     }
@@ -747,20 +767,6 @@ export const characterPackets: PacketStructures = [
   ],
   ["Character.LaunchProjectile", 0x0f29, {}],
   ["Character.SetSynchronizedAnimations", 0x0f2a, {}],
-  [
-    "Character.MemberStatus",
-    0x0f2b,
-    {
-      fields: [
-        {
-          name: "characterId",
-          type: "uint64string",
-          defaultValue: "0x0000000000000000"
-        },
-        { name: "unknownByte1", type: "uint8", defaultValue: 0 }
-      ]
-    }
-  ],
   [
     "Character.KnockedOut",
     0x0f2c,
@@ -1031,6 +1037,7 @@ export const characterPackets: PacketStructures = [
     "Character.UpdateStat",
     0x0f40,
     {
+      // Client registry confirms opcode 0x0f40 is cCharacterPacketIdUpdateStat.
       fields: [
         { name: "characterId", type: "uint64string", defaultValue: "0" },
         {
@@ -1048,22 +1055,20 @@ export const characterPackets: PacketStructures = [
     "Character.AnimationRequest",
     0x0f41,
     {
+      // Working compatibility name, not an established native registered name.
+      // Fixed client constructor1404F2EF0 identifies subtype41; NonPriorityCharacters is42.
+      // Parser1404EC650 ->140365820 reads the normal 2B opcode +8B GUID once,
+      // then140352740 reads the compact token. The custom field owns only the tail.
+      // Correct bytes do NOT establish a valid Spawn message/map or a completion ACK.
+      // No defaults: the former incomplete uint32/vector prefix must fail explicitly.
       fields: [
         { name: "characterId", type: "uint64string", defaultValue: "0" },
-        // TODO: sub_140352740
-        { name: "unknownDword1", type: "uint32", defaultValue: 0 },
         {
-          name: "unknownFloatVector1",
-          type: "floatvector4",
-          defaultValue: [0, 0, 0, 0]
-        },
-        {
-          name: "unknownFloatVector2",
-          type: "floatvector4",
-          defaultValue: [0, 0, 0, 0]
-        },
-        { name: "unknownDword2", type: "uint32", defaultValue: 0 }
-        // TODO: More data
+          name: "animation",
+          type: "custom",
+          parser: readAnimationRequest2016,
+          packer: packAnimationRequest2016
+        }
       ]
     }
   ],
@@ -1186,7 +1191,7 @@ export const characterPackets: PacketStructures = [
     {
       fields: [
         { name: "characterId", type: "uint64string", defaultValue: "" },
-        { name: "unknownDword1", type: "uint32", defaultValue: 0 }
+        { name: "unknownDword1", type: "float", defaultValue: 0 }
       ]
     }
   ],

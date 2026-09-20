@@ -1614,7 +1614,9 @@ function packFullNPCRemoteWeaponsData(obj: any) {
   ];
 
   if (!obj.isVehicle) {
-    return DataSchema.pack([], {}).data;
+    // The native 0xdb reader always consumes this length-prefixed blob, even
+    // for an NPC without remote weapons. Omitting its length shifts the tail.
+    return Buffer.alloc(4);
   }
   return DataSchema.pack(remoteWeaponsSchema, { remoteWeapons: obj }).data;
 }
@@ -2970,11 +2972,46 @@ export const passengerSchema: PacketFields = [
   { name: "unknownByte1", type: "uint8", defaultValue: 0 }
 ];
 
-export function pack2ByteLengthString(string: string) {
-  const data = Buffer.alloc(string.length + 2);
-  data.writeUInt16LE(string.length, 0);
-  data.write(string, 2, string.length, "utf8");
-  return data;
+export function pack2ByteLengthString(string: string): Buffer;
+export function pack2ByteLengthString(
+  data: Buffer,
+  offset: number
+): { value: string; length: number };
+export function pack2ByteLengthString(
+  valueOrData: string | Buffer,
+  offset?: number
+): Buffer | { value: string; length: number } {
+  // DataSchema uses the same custom function as the packer and parser.  The
+  // old implementation only handled the packer call, so parsing any packet
+  // that used Character.PlayAnimation (or attached-object animationName)
+  // threw a TypeError before the fields after the string could be decoded.
+  if (typeof valueOrData === "string") {
+    const byteLength = Buffer.byteLength(valueOrData, "utf8");
+    if (byteLength > 0xffff) {
+      throw new RangeError("2-byte length string exceeds 65535 bytes");
+    }
+    const data = Buffer.alloc(byteLength + 2);
+    data.writeUInt16LE(byteLength, 0);
+    data.write(valueOrData, 2, byteLength, "utf8");
+    return data;
+  }
+
+  if (!Number.isInteger(offset) || (offset as number) < 0) {
+    throw new RangeError("2-byte length string parser requires a valid offset");
+  }
+  const start = offset as number;
+  if (start + 2 > valueOrData.length) {
+    throw new RangeError("2-byte length string is missing its length prefix");
+  }
+  const byteLength = valueOrData.readUInt16LE(start);
+  const end = start + 2 + byteLength;
+  if (end > valueOrData.length) {
+    throw new RangeError("2-byte length string exceeds the input buffer");
+  }
+  return {
+    value: valueOrData.toString("utf8", start + 2, end),
+    length: byteLength + 2
+  };
   /*
     {
       name: "string",

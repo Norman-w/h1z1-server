@@ -527,7 +527,11 @@ function createNpcPlan(
         if (blocked) continue;
 
         const spawnChanceRoll = Math.floor(Math.random() * 100) + 1;
-        if (spawnChanceRoll > chanceNpc) continue;
+        const spawnChance =
+          spawnerType.actorDefinition === "NPCSpawner_Rabbit001.adr"
+            ? chanceRabbit
+            : chanceNpc;
+        if (spawnChanceRoll > spawnChance) continue;
 
         const models = [...baseModels];
         const screamerChanceRoll = Math.floor(Math.random() * 1000) + 1;

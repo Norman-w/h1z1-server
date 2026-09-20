@@ -1,0 +1,1597 @@
+{
+  "schemaVersion": 1,
+  "language": "zh-CN",
+  "updatedAt": "2026-03-21",
+  "states6SchemaToCase9WireBridge_20260321": {
+    "status": "schema-verified-in-repo",
+    "what": "**H1EMU `Character.UpdateCharacterState`**：完整包为 `[opcode 2B][characterId 8B][states1..7 7B][placeholder 1B][gameTime 4B]`，总长 **22B**。**客户端 case9 `FUN_1404f1080`** 从完整包首读取 A0,A1,Q0,Q1,T0；其中 Q1/T0 正好覆盖 schema 尾。",
+    "bridge": "不存在生产 bridge：**Q1**(8B) ← `pack[10..17]`（states1..7 + placeholder）；**T0** ← `pack[18..21]`（gameTime，u32 LE）。追加 10B 得到 32B 会触发 parser 的剩余长度失败。",
+    "states6Offsets": "**states6** 为 charId 后第 **6** 个状态字节 ⇒ 在 **全长 pack** 内 **绝对偏移 15**；**hidesHeat(bit2)→0x04**，**nearDeath(bit3)→0x08**（与 `ClientProtocol_1080/character.ts` 一致）。",
+    "implementation": [
+      "`tools/verify-states6-pack.ts` — `npx tsx tools/verify-states6-pack.ts`",
+      "DevHttp `GET /api/npcs/ucs-case9-from-h1emu?hidesHeat=1&...`；`GET /api/npcs/set-state-raw-hex` 响应内 **`case9Bridge`**"
+    ],
+    "animationGapReminder": "**`FUN_14053fde0` 读 `entity+0x8cf`** 与 **case9 队列写的 `entity+0x35b`** 经 **`FUN_1404ff870`/`entity+0xa3`** 的链 **仍待闭合**（见 `open-questions.md` #2）；本桥接只解决 **「schema 语义 → 22B wire 形状」**，**不**单独保证 **NPC 立即进 combat MRN**。"
+  },
+  "mainlineAdmission_20260321_zh": {
+    "README_goal": "dev/README.md：**僵尸正常追人并攻击（带动画）**；**网包 ↔ MRN** 双向确认。",
+    "mistake_zh": "**承认追偏**：把 **`14163d5a0`/角色创建/`6350d0`/`6364d0`/Login tunnel** 与 **`526310` tick/ UCS 落地链** 当成 **同等主线** 深挖，**偏离** 上述 README。**错在优先级**，与用户无关。",
+    "mainlineP1_zh": "**优先跟**：`511840` 分发 → UCS/case9/`4f1080`… → **`91ee40` → `526310`** → `4e2ee0` → **`4e5a70`/属性调度** →（**re-6：MRN/resource 锚**）→ 动画表现链路。",
+    "deprioritizedP2_zh": "**默认不跟**（除非你要做登录/出向隧道对齐）：**`14162dcc0`/`dba0`/`142b31b00`/`14063d5a0`/`14163d5a0`/`6350d0`/`6364d0`**。**`sessionContinue_round4/5` 等仍为岔路存档**，**勿当僵尸主线续写**。",
+    "tooling_zh": "**PyGhidra**：间歇 `result parse error` 时需 **重启守护**；本条 JSON 更新时 **`QueryXref to 526310` 曾成功**（以当次 log 为准）。"
+  },
+  "re6_morphemeActorDefMrnOffsets_20260321": {
+    "context_zh": "**MRN → 网包** 上沿：**资源/ADR 解析** 与 **运行时 entity 偏移** 的 **硬锚**（非 opcode 本身）。解包里的 **`ThirdPerson{Zombie}…mrn` 字面在 `.text` 定义串里 0 命中**（仅指标/工具串 **`DeathMetrics.ZombiesKilled`** 含 `zombie`）；**AnimationNetwork / Morpheme** 类串 **有 xref**。",
+    "stringSweeps": {
+      "findStringThirdPersonZombie_log": "dev/ghidra/analysis/output/FindString__ThirdPersonZombie__20260320_180653_362.log（0 hit）",
+      "findStringZombie001_log": "dev/ghidra/analysis/output/FindString__Zombie001__20260320_180656_631.log（0 hit）",
+      "findStringZombie_log": "dev/ghidra/analysis/output/FindString__Zombie__20260320_180711_972.log（`DeathMetrics.ZombiesKilled` @1420548f0）",
+      "findStringAnimationNetwork_log": "dev/ghidra/analysis/output/FindString__AnimationNetwork__20260320_180718_595.log（4：Morpheme/AnimationNetwork 定义资源名）"
+    },
+    "FUN_141474990_parseActorDefinitionXml": {
+      "dumpResolveLog": "dev/ghidra/analysis/output/DumpDecompile__0x141474990__resolve__20260320_180738_535.log",
+      "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__0x141474990__20260320_180738_815.log",
+      "guessedName": "ParseActorDefinitionXmlToRuntimeLayout",
+      "guessedNameConfidence": 0.78,
+      "purpose_zh": "**走 `3213d0`/`325c70` XML 路径** 解析 **ActorRuntime**：含 **`ActorRuntime`/`EffectDefs`/`CollisionType`/`AnimationNetwork`** 等节点。命中 **`AnimationNetwork`** 时 **`FUN_140734630(doc,\"fileName\", *param_1+0x620)`**、**`…\"animSetName\", *param_1+0x970)`** —— 与 **`resource-mrn-anchors.md` ADR 里 `<AnimationNetwork fileName=… animSetName=…/>`** **逐项对应**（**`*param_1`** = **解析输出体内的 actor/定义基址**）。**`CollisionType`** 支路写 **`*( *param_1 + 0x968)`**。另：**`TerrainObjectMetadata`** 使用 **`*param_1+0xa70`**。",
+      "purposeConfidence": 0.82,
+      "mrnFileNameOffsetBytes": "0x620",
+      "animSetNameOffsetBytes": "0x970"
+    },
+    "FUN_141468b70_loadActorDefinitionBody": {
+      "searchCall474990_log": "dev/ghidra/analysis/output/SearchDecompile__0x141468b70__474990__15__20260320_180802_981.log",
+      "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__0x141468b70__20260320_180803_196.log",
+      "guessedName": "LoadOrInstantiateActorDefinitionFromBuffer",
+      "guessedNameConfidence": 0.55,
+      "purpose_zh": "**`dataSize` 检查**后 **`141473a40`** 准备 **`local_2c0`**，**`FUN_141474990(local_2c0, *(param_2+8))`** 解析 **ActorDefinition** 原始缓冲；失败 **`ActorDefinition %s failed to parse`**。成功则 **`*(param_1+0xaf8)=param_3`** 等。**三处入边皆 DATA** — 典型的 **虚表/工厂调度**。**尚未**钉到 **`511840`/spawn 包**。",
+      "purposeConfidence": 0.58
+    },
+    "FUN_141467f30_DeepAssetHelperString": {
+      "locateLog": "dev/ghidra/analysis/output/LocateAddress__0x141467f95__20260320_180737_730.log",
+      "note_zh": "串 **`DeepAssetHelper::MorphemeAnimationNetworkDefinitionAsset`** 引用点；与 **`MorphemeAnimationNetworkDefinition(Asset)`** 族同属 **资源类型 RTTI/日志**，**供后续** `QueryXref` **追 loader**。"
+    },
+    "nextSteps_zh": "**①** 对 **`entity spawn` / `CreateActor`** 类函数 **`FindMemoryRefsByOffset 0x620` load**（或 **0x970**）看谁 **读 MRN 路径** 再 **进 Morpheme runtime**。**②** 与 **`4ff870`/`53fde0`** 的 **entity 是否同一 `*param_1` 对象模型** 需 **类型恢复/交叉**。**③** **UCS 写入字段** 与 **+0x620 串句柄** 是否 **同一条 entity** — 仍待对表。"
+  },
+  "investigationDirectionAndCallChains_20260321_zh": {
+    "whichWay": "**(A) 主线**（README）：**落地消费 + 属性/MRN** — **`526310`/`91ee40`、`4e5a70`、`511840`/UCS**。**(B) 岔路**（已追过头）：**Login/角色创建/出向 tunnel** — **`6364d0`/`6350d0`/`142b31b00`/`dcc0`/`14163d5a0`**。**MRN 名/订阅** 在 **(A)+re-6**，**不在 (B)**。",
+    "chainA_netParsedToEntityTick_zh": [
+      "**（概念起点）服务器/网关收包 → 解析器（如 `511840` 大分发、UCS/`4f1080` 等）** — **把 wire 解成 entity 上字段、队列项、临时 buffer**。",
+      "**`FUN_14091ee40(entity)`** — **每帧/tick 包装**：顺带清 **`entity+0x4b64`** 一类门闩，然后 **调 `526310`**。",
+      "**`FUN_140526310`** — **消费与 `0x1170` 相邻的出队/合并逻辑**：典型 **`entity+0x35b`** 位域与链上节点 **OR/AND** 合并；在条件满足时 **`4e2ee0` → `4e5a70`**，把 **DWORD 等载荷推进 **属性/调度图**（`entity+0x5f0` 相关）。**判断**：这是 **“解析结果已在内存里，本帧把它 apply 到游戏对象”**，**不是**在组新网包。",
+      "**下游** — **`4e5a70`/`3b5410` 族** 等继续挂 **延迟属性/GameEvent**（`profiledFunctions` 里 0x9c0 调度）；与 **出向 Tunnel** 无直接关系。"
+    ],
+    "chainB_appToNetworkCharacterCreateAndTunnel_zh": [
+      "**（业务入口）`FUN_14163d5a0`** — **`PacketCharacterCreateRequest` 族**：**`313f70` 把 **`param_2` 缓冲并入可变 `Array`**；按 **`*(this+8)`** 走 **`1416350d0`（二进制 tunnel 支路）** 或 **`141634370`（JSON `ServerId`/`Payload` 支路）**。**CODE 上游**：**`14072fe9d`**（**`72fd10`**：先 **`72a6a0` 往 8192 块里写字段**）或 **`14163d8b4`**（**`d6b0`**：名字+句柄拼进 `Array` 再进 **`14163d5a0`**）。",
+      "**`FUN_1416350d0`** — **若 `DAT_142b31b00==0`**：栈上 **嵌一套 `SoeUtil::Array<8192>` + 指针自嵌**；**否则** **`FUN_14063d5a0(DAT)`** 从 **全局池**摘 **8192 tunnel 块**（**勿与 `14163d5a0` 混淆**）。再 **`6364d0`：按 1B+8B+len+Blob 写环形缓冲**。",
+      "**`(*params->vtable+0xa0)(this, ptr, len, 1, -2)`** — **把组好的 tunnel 字节交给 **网关/连接对象** 的虚发送（具体符号待恢复）。**",
+      "**收尾** — **与 `dcc0` 同型**：栈块 **`bf90`/`d0fb84(0x2038)`**；池块 **`63e360(DAT_142b31b00, blk)`**。**",
+      "**平行：`FUN_14162dcc0`（defer → Tunnel 外联包）** — **`63bf90`/`63c180`** 路径上 **组 `PacketTunnelPacketFromExternalConnection` + 8KiB**，**尾 `db20`/`dba0`**（加密 **`1415f8e70` → `65aff0` DataQueue）。**判断**：这是 **第二条出向骨干**，与角色创建共用 **`30d520`/`142b31b00`/`63d5a0(池)`** 基建。"
+    ],
+    "continueWorkNote_zh": "**主线下一步**（非 Login）：**re-6 MRN 锚**；**`526310`→`4e5a70` 与动画/NPC 路径对接**；**511840 case ↔ entity 字段**。**岔路 `142b31b00`/648…** 仅当用户点名再做。"
+  },
+  "sessionContinue_20260320_round5_zh": [
+    "**`FUN_1416364d0` + `FUN_141639030`**（**`DumpDecompile resolve` → `…164804_899` / `…164815_229`**）：**`param_2` 为 **指向 8192 Tunnel/Array 头指针的 `longlong*`**（同 **`dcc0` 的 `local_2060` 语义**）。**两段 `30d520`**：① **`param_1+8` 低字节**（`CONCAT71`/`char`）② **`*(QWORD *)(param_1+0x10)` 共 8B**；游标 **`plVar1[0x406]`**，余量算式同 **`+0x405`** vs **`*(inner+0x10)`**。**尾调 `9030(param_2, param_1+0x18)`**：**`+0x10` = `uint` 长**，**`+8` = 数据指针** — 先写入 **至多 4B 的该长度字段**，若 **`len>0`** 再 **`30d520` 拷 Blob**，**`min(len, ringFree)`**。**无魔法** — **固定头 1+8 + 长度前缀 + 变长体** 写入 **`6350d0` 的 `local_2048` 块。**",
+    "**`FUN_14163d6b0`**（**`DescribeAddress 14163d8b4`** + **`DumpDecompile …164458_129`**）：**`param_2` 测长 → `Array<0>` 动态扩容 → `d11e20` 拷 C 串 → `FUN_14163d5a0(param_1,&local_50,&local_60)`** — **第二路** 进 **角色创建包**（**`72fd10`** 走 **`72a6a0` 栈**；**`d6b0`** 走 **「裸名+句柄」**）。",
+    "**`FUN_1416350d0`**（**`…164441_616`**）：**`DAT_142b31b00`** 门控 **`63d5a0` vs 栈 `local_2040`**；**`FUN_1416364d0(param_2,&local_2048)`** 组 payload；**`(*param_1->vtable+0xa0)(…, ppuVar4, len, 1, 0xfe)`** 发出；**池归还** 同 **`dcc0`**。",
+    "**`FUN_141634370`**（**`…164442_596`**）：**JSON/XML**：**`3212f0`/`325b10`**；**`638870` 键 ServerId**；**`639a10` 键 Payload**；**`StringFixed<8192>` + `3236d0`**；**`(*vtable+0x88)`** 送 **整包**（**`CharacterCreateRequest` 串** 在 **`142ab6910`**）。",
+    "**`14163d5a0` → `313f70`（Listing 钉）**：**`14163d617`** **`LEA RCX,[RSP+0x40]`**；**`14163d61c`** **`CALL 140313f70`** — **`RDX`/`R8D`** 自 **`param_2`**；**反编译多出的 `param_4`/`0xfe`** 为 **第 4/5 参（`R9`/栈）** — **与 Ghidra 仅三形参的 `313f70` 签名不一致 = 需改函数原型** log：**`DescribeAddress__0x14163d610__…164527_429`**。"
+  ],
+  "sessionContinue_20260320_round4_zh": [
+    "**`14163d5a0` vs `14063d5a0`（钉死：同名异质）**：**`14163d5a0`** — **`Login::ExternalPackets::PacketCharacterCreateRequest::vftable`**，`local_38=5`，**`313f70` 把 `param_2` 缓冲拷进 `Array<0>`**，再按 **`*(param_1+8)`** 分 **`1416350d0`** / **`141634370`(…`CharacterCreateRequest`)**；**CODE 调点**：**`14072fe9d`**（**`72fd10` 尾**）+ **`14163d8b4`**。log：**`…163630_680`**。**`14063d5a0`** = **8192 池** **`FUN_14063d5a0(poolMgr)`**（**`…163631_436`**）。",
+    "**`FUN_14072a6a0`**（**`…163631_042`**）：向 **`param_2` 所指 Tunnel/8192 块** 顺序 **`30d520`**：**1B**（`*param_1`）+ 多枚 **4B**（**`param_1[1..3]`**）+ **`467e80(*param_2, param_1+4)`** 嵌段 + **`param_1[10]`/`[0xb]`** + **`72a890(param_1+0xc,…)`** — **wire 小端拼包**。**（反编译里 `14163d5a0` 调 `313f70` 显 **5 实参** — **与 `313f70` 三参签名不一致**，**以 Listing 为准**。）**",
+    "**`14204b0a0`（`ReadPointers …163630_202`）**：**非** Tunnel 主 vtbl — **首槽 `30c9a0`**，邻 **`30d1b0`/`dee0`/`f250`**，混 **rdata 串** **`FATAL`/`WARNING`/`DEBUG`** 与 **MSVC `FuncInfo`** — **`63cb70` Listing 写 `*inner=14204b0a0`** = **日志/诊断 facet**（或 **SOE 错误上下文内嵌头**）。"
+  ],
+  "sessionContinue_20260320_round3_daemonRestart_zh": [
+    "**`FUN_14063cb70`**（**`…161335_411`** + **`DescribeAddress 14063cba5`**）：**Tunnel/8192 块的就位构造器** — 与 **`dcc0` 栈布局** 同款：**`+0x406`/`+0x407`**、`Array` vftable、**`param_1[1]=param_1+2`**。**Listing `14063cbbf`**：**`MOV RCX,[142b31b00]`** → **`TEST`** → **`CALL 63d5a0`**（**反编译漏 `RCX` 实参** — **池句柄首参**）。**`DAT==0`**：**`*param_1=param_1+1`**（嵌套自包含）；**否则**：**`*param_1=63d5a0()` 返回值**。**仅 DATA 入边**（`143e56a70`/`14264b8b8`）— **ctor/工厂表**。",
+    "**`FUN_14072`**：`14072fd10`（**`…161335_848`**）— **`param_1+8` 与 `+0x2bf` 门控**；栈组 **`SoeUtil::Array<8192>`** + **`63d5a0`** vs **局部 `&local_2080`**；**`72a6a0`填包**；**`14163d5a0`**（非 **`14063d5a0`**）**投递**；收尾 **`142b31b00==0` → `bf90`+`d0fb84(0x2038)`** 否则 **`63e360`** — **与 `14162dcc0` 对称**。",
+    "**窄扫 `142b31b00`**（**`140600000..140900000`**，**`…161353_461.log`**）：仍 **12 条全 `MOV RCX,[imm]` LOAD**，**无字面 STORE** — **全局写点** 仍在 **未扫区 / `.data` crt / 间接 MOV**。"
+  ],
+  "sessionContinue_20260320_round2_zh": [
+    "**`142b31b00` Listing 宽扫**（**`…161024_154.log`**）：**12 条**皆为 **`MOV RCX,qword ptr [0x142b31b00]`（LOAD）** — 含 **`14063cbbf`（`FUN_14063cb70`）**、**`14063d023`**、**`14072cd00`/`72cf80`/`72d1d0`/`72d400`/`72fd10`** 等；**扫 ~5.2M 条指令后 timeout**，**未发现 `MOV [0x142b31b00],…` 字面**。**`QueryXref from 142b31b00`**：**0**（**Ghidra 不标 data 写**）。**写入** 可能为 **`RIP` 相对**、**寄存器间接** 或 ** ctor 在未扫区** — **待 GUI Ref / 窄域 `FindListingPattern`**。",
+    "**`FUN_1415f96b0`**：**`DumpDecompile …250`**（**`…160826_604.log`**）仍 **102 行**；**加密失败**：**`vtbl +0x20` 非 1** → **`*(param_3+0x10)=0`** + **`FUN_1402bab70(…,\"PacketUtils::WrapPacket - Failed to encrypt data (%d).\",iVar2)`**。",
+    "**`FUN_140313f70`**（**`…160826_929.log`**）：**向 `SoeUtil::Array` 风格对象追加**：**`param_1[2]+param_3`** 超 **`+0x14` 容量** 则 **`(*vptr+8)` 扩容** + **`d11e20` memmove** + **`(*vptr+0x10)` 释旧**；末 **`d11e20(dest= data+len, src=param_2, …)`** 写入并 **`param_1[2]+=param_3`**。",
+    "**`142ae8588`**：**`DescribeAddress`**（**`…160827_263.log`**）仍 **BSS 首字节未类型化** — **Stub 数据区** 待 **符号/`Create Struct`**。"
+  ],
+  "sessionContinue_20260320_zh": [
+    "**`DAT_142b31b00`**：36×READ；**`FUN_14063d000`** — 释放 **Tunnel/8192 块**：**`==0`** → **`30bf90`+`d0fb84(0x2038)`**；否则 **`63e360(DAT_142b31b00, blk, …)`** 还池（与 **`63d5a0` 取块** 对偶）。log：**`DescribeAddress__0x14063d023__…160627_277.log`**，**`QueryXref__to__0x142b31b00__…160602_987.log`**。",
+    "**Heavy encrypt**：**`1415f8e70`** 仅在 **`*(gateway+0xd30)!=0`** 时调 **`1415f96b0(..., keyCtx, 1)`**；否则返 **false**（与 **`dba0` 失败分支** 一致）。**`1415f96b0`**：`param_4==0` 路径写 **SOE 魔术 QWORD** **`0x62d0e3ef56d9433a`**、**`0xbc20ed3abcb2cc08`**（及配对 **`0x43df12c5434d33f8` 邻域校验**），组 **8KiB `Array`** 再 **`30fea0`/`30d520`/`313f70`**；`param_4!=0` 走 **`param_5` vtbl `+0x30`/`+0x20`**。log：**`…160614_768`**、**`…160627_618`**。",
+    "**`dba0` XREF**：除 **`dcc0` 尾**外，**text `14063bf4b`/`14063bf5a`** 为 **`JMP 14162dba0`**（**Ghidra 未归入命名函数体** — **尾合并/thunk**）。",
+    "**`LAB_1402ecd10`**：**`LEA RAX,[0x142ae8588]`** — **`ReadPointers 142ae8588`** 多为 **BSS/未确权**；仍与 **`142046c58` `+0x38`** 指针对照。**`1420469a8`**：**`ScanMemoryPattern` 裸 qword 仍 0**（**`…160614_474.log`**）。"
+  ],
+  "pyghidraCli": {
+    "status": "✅ 多数命令可用；⚠️ 间歇 `result parse error`（约 **161036** 后 **`DumpDecompile`/`DescribeAddress`** 复现）— **宜重启守护或单条重试**。",
+    "priorFailure_zh": "曾出现 stderr 混入 / 守护串台；历史：`DumpDecompile__0x14162dcc0__1__60__155230_798`、`FindListingPattern___0x18__…155217_719`。"
+  },
+  "purpose": "**对齐 dev/README.md 僵尸/MRN/网包主线**：钉 **`FUN_140526310`（0x1170 相关落地）** 与 **`FUN_14091ee40`**；联动 **`re-track-update-character-state-chain.md`**、`open-questions.md`。**Login/出向 tunnel（14163…）为岔路**，见 **`mainlineAdmission_20260321_zh`**。",
+  "documentationStyleNote": "目标仍是 **僵尸/客户端状态 → 包/MRN** 全链；未改方向。前几轮此 JSON 侧重 **xref/vtable/钉调用图**；**假想函数名、置信度、参数用途** 与 **`chain_entity_apply_family.json` 的 `functions[]`** 同 schema，见下 **`profiledFunctions`**（逐批补全，可与该文件交叉引用）。",
+  "recentSessionHighlights_zh": [
+    "**`FUN_14162dcc0`（✅ 全量反编译）**：栈上组 **`Gateway::ExternalPackets::PacketTunnelPacketFromExternalConnection::vftable`** + **`SoeUtil::Array<u8,8192,1>`**（`local_2058`）；**`DAT_142b31b00==0`** 用局部 **`local_2060` 指针**；否则 **`FUN_14063d5a0()`** 取池块。**`param_4<<5|6`** 首写 + **`param_2`** 第二段走 **`FUN_14030d520`**；**`+0x405`/`+0x406`** 与 **`63b9f0` 里 `plVar12[0x406]`** 同一环形写盘语义。**尾**：**`param_6==0` → `FUN_14162db20`**；否则 **`FUN_14162dba0`**。log：**`DumpDecompile__0x14162dcc0__1__120__20260320_155630_502.log`**。",
+    "**`FUN_14063bf90` → `dcc0`（✅ Describe + 反编译）**：两路直调 **`14162dcc0`**：**`14063bfd4`**（`iVar1<2` 分支 **`param_6=0`**）、**`14063c012`**（**`iVar1==2`** **`param_5=param_6=1`**）。实参来自 defer 包：**`*(+0x8)` 通道**、**`*(+0x18)` 上 payload 指针/长**、**`*(+0x2050)`**、**`+0x10` 状态枚举**。",
+    "**`63b9f0` 钉 Listing（`FindIndirectCallsByOffset 0x18`）**：**`14063ba6e`** **`CALL qword ptr [RDX+0x18]`**；**`14063bb50`** **`CALL qword ptr [RAX+0x18]`** — 对应反编译 **`vptr+8`** / **`vptr+0x18`**。log：**`…155705_184.log`**。",
+    "**`FUN_14165aff0`**：**`DataQueue::Insert`** — 内存链表 **`+0x68`/`+0x70`/`+0x78`** 或 **`param_1+0xa8>=1`** 时 **spill 磁盘**（日志串 **`diskQueueFilePath`** / **`338010`**）。log：**`…155630_911.log`**。",
+    "**`FUN_14162dba0`**：**`uVar3=0x2050`** + **`1415f8e70`（heavy encrypt）** 失败则 **`14165c7e0` 报错**；成功则 **`14165aff0(param_1+0x1ad, …)`**。log：**`…155649_859.log`**。",
+    "**`63b9f0` 第二虚调 `vptr+0x18`（反编译）**：**`…154823_475.log`** 行 33；**`0x2050` `bc80`→返空** 跳过 **`4690c0`**；**`1420dd210` `+0x20`→`63b710`** 已记。",
+    "**`FUN_14063b9f0` 队列 drain**：**`63c180` 线程命中后、`14162dcc0` 之前** **`CALL 63b9f0`**（**`14063c1a7`**）。**反编译** 在扫 **`param_1+0x18`** 时调 **`(**(* *DAT_142b19b98)+0x48)(…)`** — **与尾部同一 `vptr+0x48` → `4690c0`…**。**错线程**：**`63b590`（`*=1420dd210`）+`63b820`** 入同一 **`+0x18`** 链。**`ReadPointers 1420dd210`**：**`1420dd218`=vtbl+8→`63bf90`**（**同表第二槽**）。**`FindListingPattern` `.text` 裸址串 0**。**",
+    "**PlayClient 同步发路径（钉死）**：**`FUN_14063c180`** Listing 为 **`CALL [vptr+0x48]`**；**`1420469a8+0x48` → `FUN_1404690c0`**；**`+0x180` → `FUN_1403dd800` → `63cc10` → `63b470` → `14162c9f0` + `14162d1e0`**；**`63c2a0`**。**`14162dcc0`**：**`63c180` 尾** + **`63bf90`**。**`63bf90`**：**defer 包 vtbl `1420dd210` 槽+8**（**`1420dd218`**），**`63b590` 写入**。**`1424be298`（EGA）** 与 **`1420dd6e0`（信封）** 分族。**`14162d140` → `1415f3ea0`**。**裸 qword/`ListingPattern` 搜 `1420469a8` 0** — **装表仍待 ctor/RTTI**。",
+    "**与 §526310 / Tick 链关系**：本节主要补齐 **`DAT_142b19b98` / 网关投递** 证据，供 **`91ee40` → `526310`** 并行的 **客户端全局/指标 → 发包** 对照；**非** 推翻既有 **0x1170 / UCS** 结论。"
+  ],
+  "FUN_140526310": {
+    "entryVa": "140526310",
+    "queryXrefTo": {
+      "command": "PyGhidraCli QueryXref to 0x140526310",
+      "log": "dev/ghidra/analysis/output/QueryXref__to__0x140526310__20260320_085818_381.log",
+      "refCount": 5,
+      "refs": [
+        { "from": "143e47068", "type": "DATA" },
+        { "from": "14261fea8", "type": "DATA" },
+        { "from": "14091ee6d", "type": "UNCONDITIONAL_CALL", "note": "唯一 CODE 入边；位于 FUN_14091ee40 体内" },
+        { "from": "1420c2560", "type": "DATA" },
+        { "from": "1420eb820", "type": "DATA" }
+      ]
+    },
+    "notes": [
+      "`SearchDecompile 0x140526310` 搜字面 `0xa3`：无命中（与本函数不直接读写 entity+0xa3 一致）。",
+      "与 **FUN_1404ff870**（读 entity+0xa3 → 0x8cf）并行：`FUN_140526310` 主写 **0x35b**。",
+      "2026-03-21：`DumpDecompile 1..250` 钉 **合并式**：`local_108 = (param_1[0x35b] | *(ulonglong *)(piVar11+2)) & ~*(ulonglong *)(piVar11+4)` → **`param_1[0x35b]=local_108`**（`piVar11` 为 `param_1[0x22f]` 链上节点）；**不包含对 entity+0xa3 DWORD 的赋值**。",
+      "2026-03-21：**`QueryXref to 1404e2ee0`** 含 **`1405266df`**；`SearchDecompile … 4e2ee0`：`cVar15==0`（Ghidra 显示为与 NUL 字符比较）时 **`local_res20[0]=(undefined4)param_1[0x353]`** → **`FUN_1404e2ee0(param_1,local_res20)`**。`param_1` 为 **`longlong*`** → **DWORD 取自 entity 字节偏置 `0x353*8=0x1a98`**，与 **`511840` case0x18 写入的 `0x1d2c`** **同源进 `1414e5a70`（经 `*(entity+0x5f0)`）** — **0x1170 排出与 case0x18 属性应用在此汇合**。"
+    ],
+    "dispatch1414e5a70Via4e2ee0": {
+      "searchDecompileLog": "dev/ghidra/analysis/output/SearchDecompile__0x140526310__4e2ee0__20__20260320_132933_795.log",
+      "decompileLineApprox": 156,
+      "guard": "`cVar15 == 0`（反编译字符 NUL；同段上文 `else if` 与 `0x35b` 位域消费相关）",
+      "dwordSource": "`param_1[0x353]` → **entity +0x1a98**（以 `longlong*` 计）",
+      "call": "`FUN_1404e2ee0(param_1,local_res20)` → `FUN_1404e2e70(*(entity+0x5f0),…)` → **`FUN_1414e5a70`**",
+      "queryXref4e2ee0": "dev/ghidra/analysis/output/QueryXref__to__1404e2ee0__20260320_132927_390.log"
+    },
+    "queueMergeDecompile": {
+      "command": "PyGhidraCli DumpDecompile 0x140526310 1 250",
+      "log": "dev/ghidra/analysis/output/DumpDecompile__0x140526310__1__250__20260320_130422_881.log"
+    }
+  },
+  "FUN_1404eb0f0_enqueue1170": {
+    "entryVa": "1404eb0f0",
+    "role": "`FUN_14053d4e0` 内 **`CALL 1404eb0f0(param_1+0x1170, …)`**：向 **0x1170** 头结点挂队列元；非 0xa3 写入者。",
+    "queryXrefTo": {
+      "command": "PyGhidraCli QueryXref to 0x1404eb0f0",
+      "log": "dev/ghidra/analysis/output/QueryXref__to__0x1404eb0f0__20260320_130406_543.log",
+      "refs": [
+        { "from": "14053d54f", "type": "UNCONDITIONAL_CALL" },
+        { "from": "143e44020", "type": "DATA" }
+      ]
+    },
+    "decompile": {
+      "command": "PyGhidraCli DumpDecompile 0x1404eb0f0 1 180",
+      "log": "dev/ghidra/analysis/output/DumpDecompile__0x1404eb0f0__1__180__20260320_130409_686.log",
+      "totalLines": 33,
+      "search0xa3": {
+        "command": "PyGhidraCli SearchDecompile 0x1404eb0f0 0xa3 12",
+        "log": "dev/ghidra/analysis/output/SearchDecompile__0x1404eb0f0__0xa3__12__20260320_130408_114.log",
+        "hits": 0
+      },
+      "semanticsShort": "虚表 +0x10 分配 puVar2；*puVar2=*param_2；*(puVar2+2/4/6)=param_3/4/5；链表挂 param_1[2]；param_1[3] 计数 +1。"
+    }
+  },
+  "FUN_14091ee40": {
+    "entryVa": "14091ee40",
+    "role": "tick 薄包装：可选 `entity+0x4b64` 门控 → `FUN_14046ab00(DAT_142b19780)` → `FUN_140526310(entity)`",
+    "dumpDecompile": {
+      "command": "PyGhidraCli DumpDecompile 0x14091ee40 1 80",
+      "log": "dev/ghidra/analysis/output/DumpDecompile__0x14091ee40__1__80__20260320_085830_839.log",
+      "totalLines": 12
+    },
+    "queryXrefTo": {
+      "command": "PyGhidraCli QueryXref to 0x14091ee40",
+      "log": "dev/ghidra/analysis/output/QueryXref__to__0x14091ee40__20260320_085830_226.log",
+      "refCount": 3,
+      "refs": [
+        { "from": "143e89710", "type": "DATA" },
+        { "from": "14214e6f8", "type": "DATA" },
+        { "from": "1421519c8", "type": "DATA" }
+      ],
+      "implication": "无直接 CALL/CODE 入边 → 由虚表/数据槽调度（与 0x1170 drain 在每帧路径上的假设一致）。"
+    }
+  },
+  "branchCalleesFrom526310_20260321": {
+    "purpose": "`FUN_140526310` 在 `0x35b` bit0 翻转等条件下调用；与 **0x8cf 簇 / 4ff870 / 0xa3** 关系梳理。",
+    "FUN_140533cf0": {
+      "entryVa": "140533cf0",
+      "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x140533cf0__1__220__20260320_130800_734.log",
+      "lines": 88,
+      "search8cfLiteral": "0（反编译用 `0x8ce`/`0x8d7` 偏置，不含 `8cf` 字符串）",
+      "writes": [
+        "`(byte *)((longlong)param_1 + … + 0x8d7)` 按 `param_3` 分组清/置位",
+        "`(byte *)(param_1 + 0x8ce)` bit0 与上一块联动"
+      ],
+      "tailCall": "FUN_14047e350(lVar7, ~(byte)(param_1+0x8ce) & 1)",
+      "note": "与 `open-questions` / round-6 的 **entity+0x8ca~0x8d7** 状态带一致；**非**直接写 `0x8cf` 字面，但与 **`FUN_14053fde0` 读者**同内存邻域。"
+    },
+    "FUN_1404e2ee0": {
+      "entryVa": "1404e2ee0",
+      "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1404e2ee0__1__220__20260320_130802_248.log",
+      "lines": 11,
+      "body": "`FUN_1404e2e70(*(longlong *)(param_1+0x5f0), stack=*param_2)` — `param_2` 来自 `526310` 栈 `local_res20`（UCS Q0 一类 DWORD）。"
+    },
+    "FUN_1404e2e70": {
+      "entryVa": "1404e2e70",
+      "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1404e2e70__1__180__20260320_130819_233.log",
+      "lines": 17,
+      "body": "`FUN_1414e5a70(param_1,0,4,local_res8,0)` 及可选 `*(param_1+0x188)` 上同样写 4 字节 — 属性/同步扇区，非直接 `4ff870`。"
+    },
+    "FUN_14053aea0": {
+      "entryVa": "14053aea0",
+      "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14053aea0__1__200__20260320_130806_778.log",
+      "lines": 48,
+      "search4ff870": "dev/ghidra/analysis/output/SearchDecompile__0x14053aea0__4ff870__8__20260320_130816_255.log → 0 hits",
+      "search0xa3": "dev/ghidra/analysis/output/SearchDecompile__0x14053aea0__0xa3__10__20260320_130817_755.log → 0 hits",
+      "note": "子对象 `-0x30` 上 **+0x60**、`param_1[4]` 上 **+0xb0→+0x40**、`FUN_1405341b0`、`FUN_14053af90`、**+0x5b8→+0xe8**；**不直接出现** `4ff870`/`0xa3` 文本，动画/MRN 侧仍经虚表下传。"
+    }
+  },
+  "followUpCallees_round2_20260321": {
+    "FUN_1414e5a70": {
+      "entryVa": "1414e5a70",
+      "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1414e5a70__1__200__20260320_132841_448.log",
+      "describeLog": "dev/ghidra/analysis/output/DescribeAddress__0x1414e5a70__20260320_132841_792.log",
+      "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__1414e5a70__20260320_132841_500.log",
+      "queryXrefToRefresh_20260320": "dev/ghidra/analysis/output/QueryXref__to__0x1414e5a70__20260320_172133_309.log",
+      "queryXrefToRefCount": 6,
+      "queryXrefToCodeSites_zh": "**CODE**：`1404e2e9f`、`1404e2ec8`（**`4e2e70` 体内**）；**`141856490`、`1418564b8`。** **DATA**：`143f3ab90`、`1428e99c0`。**",
+      "lines": 38,
+      "search4ff870_0xa3": "0 hits",
+      "semantics": "**32 桶开放链**：`head = param_1[(*param_4 & 0x1f) + 6]`；沿 **`node+0x30`** 走链，要求 **`*(uint*)(node+0x38)==*param_4`** 且 **`*(uint*)(node+0x70)==*param_4`**；命中则 **`(**(code**)(*param_1+0x10))(param_1,param_2,node,param_3,param_5)`**。前后 **`FUN_14032f270/32f360(param_1+0x28)`**（`param_1` 为 **`longlong*`** → 锁在 **对象字节 +0x140**）。**`4e2e70`** 传入 **`param_2=0, param_3=4, param_5=0`**，`param_4` 指向栈上 UCS/事务 DWORD。",
+      "codeCallers": [
+        "1404e2e9f/1404e2ec8（`FUN_1404e2e70`）",
+        "141856490/1418564b8（`FUN_141856450`，反编译可能对首呼缺参 — 以 Listing 为准）"
+      ],
+      "vtableSlot0x10Concrete": {
+        "vptrRdata": "142065bc8（`FUN_14039c2a0` 写入 `*(obj+0)`）",
+        "handlerVa": "1414e5730",
+        "handlerNameGuess": "ProxiedObject::OnPropertyNode / hash 桶挂靠 + 向子对象转投",
+        "readPointersLog": "dev/ghidra/analysis/output/ReadPointers__0x142065bc8__24__20260320_133140_623.log",
+        "rttiStringsNearby": "`ProxiedObject` @142065bf8、`ProxiedCharacter` @142065c38（数据段邻接 vtable）",
+        "handlerDumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1414e5730__1__150__20260320_133146_335.log",
+        "handlerQueryXrefLog": "dev/ghidra/analysis/output/QueryXref__to__1414e5730__20260320_133146_404.log",
+        "handlerSemantics": "`FUN_1414e5730`：`32f270/32f360(this+0x140)`；若需则将 `param_3`（node）挂入 `this+0x30+(hash*8)` 桶；最后 `CALL (*(*(this+8))+0x10)(*(this+8),…,param_3,param_4,…)`。**第二层 `+0x10` 已钉为 `FUN_1413b6820`**（见 `childObject_0x9c0_secondVtPlus10_20260321`）。"
+      },
+      "parallelGameEventHandler_1414e58a0": {
+        "entryVa": "1414e58a0",
+        "vtableSlotVa": "142065bf0",
+        "vtableAnchorReadPointersLog": "dev/ghidra/analysis/output/ReadPointers__0x142065bc8__24__20260320_133140_623.log",
+        "vtableOffsetFromBc8": "+0x28（`142065bc8+0x28 == 142065bf0` → **`FUN_1414e58a0`**）",
+        "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1414e58a0__1__180__20260320_140805_102.log",
+        "semantics": "与 **`1414e5730` 同构**：`FUN_14032f270/360(this+0x140)`；**`param_3` 入 hash 桶**；**`plVar3 = *(this+8)`** = **entity 下挂的 `0x9c0` 子调度**；按 **`param_4` 位与 `DAT_1420728cc`** 分支：**`(*(*plVar3+0x10))(…)`**（**`1413b6820` 树/堆路径**）或 **`FUN_1414e5290(plVar3,…)`**（**GameEvent 入队**）；体内 **`1414e59a5` / `1414e5a34`** 等处 **多次 `CALL 1414e5290`**。"
+      },
+      "siblingListMutate": {
+        "FUN_1414e5d30": {
+          "entryVa": "1414e5d30",
+          "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1414e5d30__1__100__20260320_132920_534.log",
+          "role": "按 **`*(uint*)(node+0x38)&0x1f`** 定位 **`param_1+4..`** 桶头（与 **`5a70` 的 `+6` 桶** 差一个基址约定 — **`5dc0` 传 `param_1+0x10`**），从链中 **摘除 `node`**（`+0x30` 链表，`+0x40/+0x48` 双向修补，`+0x18` 计数）。"
+        },
+        "FUN_1414e5dc0": {
+          "entryVa": "1414e5dc0",
+          "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1414e5dc0__1__120__20260320_132911_005.log",
+          "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__1414e5dc0__20260320_132911_065.log",
+          "role": "**带锁** `param_1+0x140`：在 **`5d30`** 摘链后对 **`*(param_1+8)`** 子对象做虚 **`+0x18`**，对 **`param_2` 本体** 虚 **`+0x30` / `+0x20`** — **property 节点卸载/同步**一族，与 **`5a70` 投递**配套。"
+        }
+      }
+    },
+    "FUN_14047e350": {
+      "entryVa": "14047e350",
+      "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14047e350__1__200__20260320_131801_333.log",
+      "lines": 18,
+      "search8cf": "0 hits（小对象 `param_1+5` 位与 `+0xd0`/`+0xd8` 虚调，非 entity 基址）",
+      "callerContext": "自 `FUN_140533cf0` 末尾传入，第一实参为 **异类指针 `lVar7`**，非 `FUN_140533cf0` 的 entity `param_1`。",
+      "semantics": "`+0xd8` 门控后改 `*(byte *)(param_1+5)` bit1，再 **`+0xd0`** 通知；可能与 **子控制器** 同步有关。"
+    },
+    "FUN_1405341b0": {
+      "entryVa": "1405341b0",
+      "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1405341b0__1__180__20260320_131807_866.log",
+      "lines": 94,
+      "search4ff870_0xa3": "0 hits",
+      "semantics": "切 **`entity+0x11a` bit7**；`FUN_141447a00` 事件 id **`0xa50fb00`/`0xe15cf27`**；多次 **`+0x630`** 写 **图参**（`DAT_142b24898`/`142b24640` 等）；维护 **`param_1[0x131]`**。与 **`4ff870` 内调用的 `FUN_1405341b0` 第二实参**（见 vtable_anchors）同属一族 helper。"
+    },
+    "FUN_14053af90": {
+      "entryVa": "14053af90",
+      "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14053af90__1__180__20260320_131809_347.log",
+      "lines": 60,
+      "search4ff870_0xa3": "0 hits",
+      "semantics": "排空 **`param_1+0xad8`** 链表；**`*(byte *)(param_1+0x8cb) |= 4`**（与 **0x8cf 簇**同带）；`FUN_14050fb30` + 子对象 **`+0x278`**；可选清 **`param_1+f70`**。"
+    }
+  },
+  "followUp_round3_20260321": {
+    "FUN_14050fb30": {
+      "entryVa": "14050fb30",
+      "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__0x14050fb30__20260320_131934_576.log",
+      "refCount": 23,
+      "callersNote": "含 `14053af90`、`140533c6c`、`1405346bd` 等；**高频取子对象**。无 `4ff870` 字面。",
+      "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14050fb30__1__260__20260320_131936_231.log",
+      "semantics": "`FUN_14050fbc0(param_1+0xfc0,…)`：自 **entity+0xfc0** 块取 **`+0x20` 指针**（ refcount，见 `FUN_14050fbc0`）；返回句柄给 **`53af90` → `+0x278`** 等。"
+    },
+    "FUN_14050fbc0": {
+      "entryVa": "14050fbc0",
+      "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14050fbc0__1__200__20260320_131947_656.log",
+      "semantics": "`*out = *(param_1+0x20)` + 对 `*(ptr+8)` 的 **refcount +1**。"
+    },
+    "FUN_141856450": {
+      "entryVa": "141856450",
+      "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x141856450__1__30__20260320_131957_849.log",
+      "listingEvidence": "`DescribeAddress 0x141856490`：`MOV RBX,RCX` @141856489 后 **`CALL 1414e5a70` @141856490**，第二处 @1418564a8 带 `LEA R9,[RSP+0x60]` — **首呼亦为完整 Win64 ABI**，非无参。",
+      "note": "与 **`FUN_1404e2e70`** 同族的 **`FUN_1414e5a70` 薄封装**（`QueryXref to 1414e5a70` 含本函数与 **`1404e2e70`**）。",
+      "describeLog": "dev/ghidra/analysis/output/DescribeAddress__0x141856490__20260320_132053_062.log"
+    },
+    "FUN_140511840_case0x18_to_4e2ee0": {
+      "dispatcher": "FUN_140511840",
+      "switchCaseHex": "0x18",
+      "callVa": "1405143b0",
+      "searchLog": "dev/ghidra/analysis/output/SearchDecompile__0x140511840__4e2ee0__15__20260320_132154_444.log",
+      "guard": "`local_f38==0` 且 **`*(int *)((longlong)entity+0x1d2c) != 0`**",
+      "effect": "**`FUN_1404e2ee0(entity, &local_1628)`**，`local_1628` 来自 **`entity+0x1d2c`** — **不经 case9/0x1170** 即进 **`1414e5a70` 链**。",
+      "entityPlus1d2cWriter": {
+        "searchDecompile1d2c": "dev/ghidra/analysis/output/SearchDecompile__0x140511840__1d2c__10__20260320_132326_428.log",
+        "decompileLine": "同 `case 0x18`：**`*(undefined4 *)(entity+0x1d2c) = *FUN_140529a90(...)`**（反编译 ~1086 行）",
+        "storeScan": "dev/ghidra/analysis/output/FindMemoryRefsByOffset__0x1d2c__store__0x140500000__0x140520000__20260320_132328_761.log",
+        "listingStore": "140514462 `MOV dword ptr [R14+0x1d2c],EAX`",
+        "FUN_140529a90": {
+          "entryVa": "140529a90",
+          "describeLog": "dev/ghidra/analysis/output/DescribeAddress__0x140529a90__20260320_132408_640.log",
+          "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__140529a90__20260320_132411_516.log",
+          "call511840SearchLog": "dev/ghidra/analysis/output/SearchDecompile__0x140511840__529a90__25__20260320_132420_982.log",
+          "call511840Snippet": "`FUN_140529a90(param_1,local_1598,local_1620+1,plVar10)` → **`*(entity+0x1d2c)=*return`**（`plVar10=3f5cd0(DAT_142b195d8,&local_1624)`，虚表 `+0x10` 门控）",
+          "returnSemantics": "函数 **`return param_2`**；成功路径末尾 **` *param_2 = *param_3`**。",
+          "idSource": "若 **` *param_3==0`**：`LOCK` 递增 **`(int*)(param_1[0xbe]+0x134)`**（`0xbe*8=0x5f0`）并 **` *param_3 = old+1`**；否则复用已有 `*param_3`。",
+          "sideEffects": "`FUN_140516db0(param_1+0x5ab)` 取块并填入 `param_3/param_4/param_5/…` 与可选 `param_9` 扩展；遍历 **`param_4+0xf0`** 链表按 `+0x18` case 调 `50d1xx/50cexx` 一族并 **`1418351d0`**；**`FUN_14071af10(DAT_142b19b38,param_1)`** — 与 **`chain_entity_apply_family.json`** 中 proxied-character 登记一致。",
+          "interpretation": "`0x1d2c` 更像本 entity 的 property/应用批次代数或事务 id，供后续 `4e2ee0`→`1414e5a70` 消费；非 `0xa3`/动画专用字面。"
+        }
+      }
+    },
+    "FUN_14053d580_digest": {
+      "entryVa": "14053d580",
+      "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14053d580__1__200__20260320_132155_977.log",
+      "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__0x14053d580__20260320_132157_213.log",
+      "role": "`526310` 多次 **CALL**；门控 **`0x8c9`&4、`0x1ad8` bit12、`(entity+800)` 虚 `+0xa8`**； toggles **`0x8d5` bit5**；**`7d7530`/`7d7db0`** + **`DAT_142b19780+0x38a98`**。**无 `0xa3` 字面**。",
+      "FUN_1407d7530_note": "dev/ghidra/analysis/output/DumpDecompile__0x1407d7530__1__120__20260320_132330_228.log — 哈希注册 + **`EventBar:SetupBar`** 旁路，偏 UI/事件条，非 NPC 动画核心。"
+    }
+  },
+  "entityField_0x5f0_proxiedObjectChain_20260321": {
+    "purpose": "钉 **`entity+0x5f0`** 指针的 **构造、主 vtable、`1414e5a70` 命中后的 `+0x10` 实函数**，并与 **`chain_entity_apply_family.json`** 中 **ProxiedCharacter / +0x5f0** 叙述对齐。",
+    "entityStoreScan": {
+      "command": "PyGhidraCli FindMemoryRefsByOffset 0x5f0 store 0x140400000 0x140600000",
+      "log": "dev/ghidra/analysis/output/FindMemoryRefsByOffset__0x5f0__store__0x140400000__0x140600000__20260320_133118_896.log",
+      "entityFieldHit": "`1404e4b56` **`MOV qword ptr [RBX+0x5f0],RAX`** @ **`FUN_1404e4a50`**（RBX=entity）；其余多为 **`[RBP+0x5f0]` 栈帧假阳性**。"
+    },
+    "FUN_1404e4a50": {
+      "entryVa": "1404e4a50",
+      "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1404e4a50__1__120__20260320_133125_731.log",
+      "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__1404e4a50__20260320_133125_779.log",
+      "role": "实体部件初始化：释放/清 **`0x5a0`** 旧 refcount 对象；构造 **`0x5f0`**、**`0x5e0`** 等字段；**`0x5f0`** ← **`FUN_14039c2a0(FUN_1402fc0f0(400), DAT_142b19ca8)`**。"
+    },
+    "FUN_14039c2a0": {
+      "entryVa": "14039c2a0",
+      "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14039c2a0__1__80__20260320_133132_288.log",
+      "describeLog": "dev/ghidra/analysis/output/DescribeAddress__0x14039c2a0__20260320_133132_588.log",
+      "layout": "**`*param_1 = &PTR_FUN_142065bc8`**；**`param_1[1]`** ← **`FUN_1413b5410(alloc 0x9c0,…)`**；**`param_1[0x31]`** ← **`FUN_14039c480(alloc 400,…)`**（字节偏移 **`0x188`**，与 **`FUN_1404e2e70`** 第二路 **`*(obj+0x188)`** 再调 **`1414e5a70`** 一致）。"
+    },
+    "FUN_1404e2ee0": {
+      "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1404e2ee0__1__40__20260320_133122_190.log",
+      "load": "**`FUN_1404e2e70( *(undefined8*)(entity+0x5f0), … )`**"
+    },
+    "childObject_0x9c0_secondVtPlus10_20260321": {
+      "purpose": "Proxied 根对象 this+8 指向 FUN_1413b5410 分配的 0x9c0 子块；1414e5730 末尾对 child 做第二层 vtable+0x10 调用。",
+      "FUN_1413b5410": {
+        "entryVa": "1413b5410",
+        "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1413b5410__1__200__20260320_133530_110.log",
+        "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__1413b5410__20260320_133530_164.log",
+        "init": "`*param_1=&PTR_FUN_142467c80`；`32ee90(param_1+1,4000,0)` 清零；`param_1[0xd]=&PTR_FUN_142467c60`（字节 +0x68）；`141343840(param_1+0x31)`；`*(uint*)(obj+0x9b4)=param_2`。",
+        "sizeBytes": 2496,
+        "sizeNote": "0x9c0"
+      },
+      "vtable142467c80": {
+        "readPointersLog": "dev/ghidra/analysis/output/ReadPointers__0x142467c80__28__20260320_133539_734.log",
+        "slotPlus10": "1413b6820 (`FUN_1413b6820`)",
+        "slotPlus0": "1413b57c0",
+        "slotPlus8": "1413b69c0"
+      },
+      "FUN_1413b6820": {
+        "entryVa": "1413b6820",
+        "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1413b6820__1__200__20260320_133546_264.log",
+        "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__1413b6820__20260320_133546_323.log",
+        "semantics": "`32f270/32f360(this+8)`；以 `param_2`（float，主路径多为 0）为键在 `*(param_3+0x20)` 上 BST 插入；`141344df0(this+0x188)` 池取节点；`1413b5d20/1413b5ef0/1413b5bc0` 维护堆+树；收尾 `piVar7[0xe] |= param_4`（`4e2e70` 常量 4）。",
+        "search4ff870": "dev/ghidra/analysis/output/SearchDecompile__0x1413b6820__4ff870__8__20260320_133707_158.log → 0 hits"
+      },
+      "schedulerSupportingCallees": {
+        "FUN_1413b5bc0": {
+          "entryVa": "1413b5bc0",
+          "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1413b5bc0__1__120__20260320_133702_038.log",
+          "role": "BST 再平衡（`+0x28` 红黑/伸展标记；**`FUN_1413b67a0/67e0`** 旋转枢轴）。",
+          "search4ff870": "dev/ghidra/analysis/output/SearchDecompile__0x1413b5bc0__4ff870__8__20260320_133707_616.log → 0 hits"
+        },
+        "FUN_1413b5ef0": {
+          "entryVa": "1413b5ef0",
+          "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1413b5ef0__1__120__20260320_133702_371.log",
+          "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__1413b5ef0__20260320_133711_946.log",
+          "role": "以节点 **`+4` float** 为键的 **二叉堆** `sift-up/down`（`**(param_1+8)`** 指针数组，`param_1+0x10` 为堆大小）。"
+        },
+        "FUN_141344df0": {
+          "entryVa": "141344df0",
+          "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x141344df0__1__80__20260320_133702_683.log",
+          "role": "`this+0x188` **空闲块栈** `pop`（`**(param_1+0x10)`** 链）；可能与 **`141345310`** 统计桶联动。"
+        }
+      },
+      "vtableSlotPlus8_timeAdvance": {
+        "FUN_1413b69c0": {
+          "entryVa": "1413b69c0",
+          "vtable": "**`142467c80` +0x8**（与 **`1413b6820` 同对象）",
+          "dumpLogHead": "dev/ghidra/analysis/output/DumpDecompile__0x1413b69c0__1__100__20260320_133716_832.log",
+          "dumpLogTail": "dev/ghidra/analysis/output/DumpDecompile__0x1413b69c0__95__180__20260320_133723_602.log",
+          "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__1413b69c0__20260320_133723_673.log",
+          "semantics": "`param_2 += *(float*)(this+0x136)` 累积时间；**min-heap** 到期时 **`(***plVar4)(plVar4, dt)`**；再 **`(*(*plVar4+0x8))(plVar4,…, *(uint*)(current+0x38))`**；非主线程 **`TlsGetValue(DAT_143c6b590)!=1`** 时 **`1414260a0(..., FUN_1413b5950/5980, payload)`** 延迟；-loop 至堆空或时间不够；可再调 **`(*(*this+0x20))(this,…)`** 收尾。"
+        },
+        "FUN_1414e5410_wrapper": {
+          "entryVa": "1414e5410",
+          "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1414e5410__1__80__20260320_133734_497.log",
+          "describeLog": "dev/ghidra/analysis/output/DescribeAddress__0x1414e5410__20260320_133734_129.log",
+          "otherVtable": "`ReadPointers 0x142065b90`：**slot+8** 为本函数；邻 **`GameEvent`** 串（**非** `142467c80` 主调度 vtable）— `dev/ghidra/analysis/output/ReadPointers__0x142065b90__24__20260320_133739_968.log`",
+          "semantics": "Listing：`MOV R9B,1` → **`CALL 1413b69c0`**（Ghidra 反编译常丢参）；随后若 **`DAT_1420728cc <= *(this+0x9b0)`** 则 **`FUN_1414e5320(this)`**。"
+        },
+        "codeXrefIntoAdvance": "`1414e541c` — `LocateAddress`：`FUN_1414e5410` @ `dev/ghidra/analysis/output/LocateAddress__0x1414e541c__20260320_133728_913.log`"
+      },
+      "vtableSlotPlus18_teardown": {
+        "FUN_1413b6330": {
+          "entryVa": "1413b6330",
+          "vtable": "**`142467c80` +0x18**",
+          "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1413b6330__1__100__20260320_133716_505.log",
+          "semantics": "从 **`param_2+0x20`** BST 摘叶；若节点在堆数组则 **`1413b5ef0` 修复**；**`1413b60c0`** 清树链；**`141345550(this+0x188, node)`** 归还池；碰 **`this+0x9b8`** 当前戳时清零。"
+        }
+      },
+      "postThresholdFlush_FUN_1414e5320": {
+        "entryVa": "1414e5320",
+        "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1414e5320__1__150__20260320_134108_327.log",
+        "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__1414e5320__20260320_134108_394.log",
+        "search4ff870Log": "dev/ghidra/analysis/output/SearchDecompile__0x1414e5320__4ff870__8__20260320_134118_317.log",
+        "search4ff870Hits": 0,
+        "caller": "`FUN_1414e5410` → `CALL 1414e543a`（阈值分支，见 wrapper 小节）",
+        "listingEvidenceLog": "dev/ghidra/analysis/output/DescribeAddress__0x1414e5350__20260320_135150_373.log",
+        "embeddedFacetAtByte0x9c0": "Listing：`LEA RBX,[RCX+0x9c0]`；**RBX** = **`0x9c0` 调度块** 尾嵌套 facet 的 **this**（反编译 `param_1+0x138`）。**`[RBX+8]`/`+0x9c8`** 为与 **`[RBX+0x10]`/`+0x9d0`/`+0x9d8`** 配套的 **待处理链表头/尾/计数**（见 **`FUN_1414e5290`** 入队、**`FUN_1414e5210`** 按 **`param_2`** 摘除）。**`FUN_1414e5290`** 调 **`(*(+0x9c0)+0x10)(RBX)`** 取块并 **CONCAT 写入 payload**，再 **挂链** — **首次可用的 facet 侧 vtbl+0x10**。**析构**：**`FUN_1403c4560`**（**`142065b70` slot0**）→ **`FUN_1414e50d0`**：首指令 **`MOV [RCX],imm → 142065b70`**（Listing `1414e50ee`）将 **整对象主 vptr** 换到 **GameEvent 表** 后 **排空 `0x139`** 并 **`(*(*plVar1)+0x18)(plVar1)`**、`1403a6b20`、`1413b55e0`。",
+        "findListingPattern_lea0x9c0": {
+          "needle0x9c0": "dev/ghidra/analysis/output/FindListingPattern__0x9c0__0x1414e0000__0x1414e6000__30__20260320_135451_093.log",
+          "needlePlus0x9c0": "dev/ghidra/analysis/output/FindListingPattern___0x9c0__0x1414e0000__0x1414e6000__30__20260320_135455_502.log",
+          "note": "子串 **`0x9c0`**：4 hits（`50d0`/`5210`/`5290`/`5320`）；子串 **`+0x9c0`**：0 hits（Ghidra 列 **`[RCX + 0x9c0]`** 无加号）。Daemon 重启后已重跑。"
+        },
+        "semantics": "对 **0x9c0 调度体**：`*(float*)(this+0x136) -= DAT_1420728cc` 与 `1414e5410` 条件 **`DAT_1420728cc <= *(this+0x9b0)`** 对齐同一时钟；遍历 **`this[0x139]`** 链表，逐项 **`(**( *this +0x10))(this, *slot, *(slot+8), slot[4])`** — **再次进入与 `1413b6820` 相同的 vtable+0x10**；并把子项 **`*(child+0x18)`** 上 float **回拨** `-DAT_1420728cc`。第二段 while **排空 `0x139` 链表**，对 **尾部 facet** 调 **虚 `+0x18`**（见上）。"
+      },
+      "deferredMainThreadThunks_1414260a0": {
+        "FUN_1413b5950": {
+          "entryVa": "1413b5950",
+          "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1413b5950__1__80__20260320_134108_042.log",
+          "role": "`1414260a0` 投递的 **0x10** 包装：解引用 **`**(void**)payload`** 为 **函数指针** 并 **`( callee, *(uint*)(payload+8) )`**；再 **`d0fb84(payload,0x10)`**。"
+        },
+        "FUN_1413b5980": {
+          "entryVa": "1413b5980",
+          "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1413b5980__1__80__20260320_134108_722.log",
+          "role": "`1414260a0` 投递的 **0x18** 包装：**`1413b5680(*(longlong*)payload)`** 后释放。"
+        },
+        "FUN_1413b5680": {
+          "entryVa": "1413b5680",
+          "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1413b5680__1__100__20260320_134118_007.log",
+          "semantics": "对 **`param_1[1]`** 调 **`(*(*obj+8))(obj, (int)param_1[2], *(uint*)(param_1+0x14))`**；若返回真则把 **`param_1[1]`** 挂入 **`(*param_1)+0x50/0x58/0x60`** 与 **`1413b6330`/`1413b69c0`** 同形 **待处理链表**（`32f270/32f360(*param_1+8)` 锁 **`0x9c0` 调度器内嵌子块**）。"
+        }
+      },
+      "gameEventSchedulerVtable_142065b70": {
+        "readPointersLog": "dev/ghidra/analysis/output/ReadPointers__0x142065b70__16__20260320_135525_522.log",
+        "rttiHint": "邻 **GameEvent** 串；与 **`142065b90`** 表带连续",
+        "slotsSummary": "+0:`1403c4560`；+8:`1413b69c0`；+10:`1413b6820`；+18:`1414e51e0`；+28:`1414e5410`",
+        "FUN_1414e50d0": {
+          "describeLog": "dev/ghidra/analysis/output/DescribeAddress__0x1414e50d0__20260320_135521_717.log",
+          "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1414e50d0__1__80__20260320_135505_658.log",
+          "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__1414e50d0__20260320_135506_406.log"
+        },
+        "FUN_1414e5210": {
+          "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1414e5210__1__80__20260320_135505_994.log",
+          "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__1414e5210__20260320_135539_607.log",
+          "role": "`+0x9c8` 链上按 `+8==param_2` 摘除；每次 **`CALL (*(+0x9c0)+0x18)`**。"
+        },
+        "FUN_1414e5290": {
+          "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1414e5290__1__80__20260320_135506_314.log",
+          "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__1414e5290__20260320_135539_362.log",
+          "role": "`(*(+0x9c0)+0x10)` 取块、填参、`+0x9c8/9d0/9d8` 入队。"
+        },
+        "FUN_1414e51e0": {
+          "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1414e51e0__1__50__20260320_135539_254.log",
+          "role": "`142065b70`+0x18：`1414e5210` + `1413b6330`。"
+        },
+        "FUN_1403c4560": {
+          "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1403c4560__1__40__20260320_135549_585.log",
+          "role": "scalar dtor：`1414e50d0` 后 `d0fb84(0x9e0)`。"
+        },
+        "facetIntermediateVtable_142065b50": {
+          "readPointersLog": "dev/ghidra/analysis/output/ReadPointers__0x142065b50__14__20260320_140805_186.log",
+          "layoutNote": "**`142065b50`** 与 **`142065b70`** 数据重叠：表中 **`+0x20`（地址 `142065b70`）首槽即为 `FUN_1403c4560`**，与同 **`ReadPointers 142065b70`** 的 slot0 一致；**`+0x40` 为 `LAB_14045a580`**（**`JMP 1414e5290`** 跳板）。",
+          "FUN_1403a6b20": {
+            "entryVa": "1403a6b20",
+            "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1403a6b20__1__80__20260320_140753_727.log",
+            "semantics": "**`*param_1 = &PTR_FUN_142065b50`**；卸 **`param_1[1]`** 双向链表节点，每摘一项 **`(**(code**)(*param_1+0x18))(param_1)`**（以 **当前 vtbl `142065b50`** 解析 **slot+0x18**）。与 **`FUN_1414e50d0`** 后段 **`1403a6b20` 调用**衔接（**GameEvent / 0x9c0 析构链**）。"
+          }
+        },
+        "jmpThunk_to_FUN_1414e5290": {
+          "thunkVa": "14045a580",
+          "ghidraLabel": "LAB_14045a580",
+          "target": "1414e5290",
+          "callerContext": "vtable **`142065b50` +0x40**；**非** `FUN_14045a520` 的紧邻尾部（`RET` 在 `14045a576`，`JMP 1414e5290` 为独立 **`LAB_14045a580`**，供 **虚槽/间接** 命中）。",
+          "describeLog": "dev/ghidra/analysis/output/DescribeAddress__0x14045a575__20260320_140805_598.log",
+          "listingCallSite_14045a56c": "dev/ghidra/analysis/output/DescribeAddress__0x14045a56c__20260320_141354_275.log",
+          "pyghidraCli_20260320": {
+            "FUN_14045a520": {
+              "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14045a520__1__140__20260320_141341_206.log",
+              "registerArgs": "`RCX=*(DAT_142b19b98+8)`（**全局 sink**），`RDX=&stackDesc`，`R8=0`，`R9B=1` → **`CALL 140360460`**",
+              "stackDesc": "`local_30=&PTR_FUN_142066468`；**`local_28=9`**（**GameEvent 类型 id**，≠ UCS opcode）；**`local_20=0x44`**；**`local_10=param_2`**（调用方传入的 **DWORD**，见 **`FUN_140b0f6b0`**）。"
+            },
+            "PTR_FUN_142066468": {
+              "readPointersLog": "dev/ghidra/analysis/output/ReadPointers__0x142066468__24__20260320_141340_735.log",
+              "stringsNearVtable": [
+                "Projectiles",
+                "PhysX Simulate",
+                "Unknown",
+                "GameIsReady"
+              ],
+              "interpretation": "**SoE/引擎侧事件分类/阶段注册表**（邻 rdata 串），**不是** `Character.UpdateCharacterState` 的 wire case **9**。"
+            },
+            "FUN_140360460": {
+              "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x140360460__1__220__20260320_141340_320.log",
+              "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__0x140360460__20260320_141340_523.log",
+              "codeCallSiteNote": "**唯一 `CALL`**：`14045a56c`；其余为 **DATA** 表项。",
+              "semantics": "栈上 **`SoeUtil::Array<unsigned_char,8192,1>`**（`local_50=0x10000000` 与 **`local_2078+2` 处 `*(int*)(+0x10)`** 做 **`min`**，本路径第二次写满 **`4`** 字节）；**`FUN_1403626b0(desc,&local_2078)`** 先写 **`1+2`** 字节；再 **`local_2088[0]=*(uint32_t*)(desc+0x20)`**（**`45a520` 的 `local_10`** = **`d7e0e0` 返回值**）经 **`30d520`** 追加 **`4`** 字节 → **缓冲内共约 `7`** 字节有效载荷。**`local_20=0x44`** 仍为描述符 **登记尺寸/表项宽度**，**≠** 本次必然拷贝长度。末尾 **`FUN_14063c180`**（反编译可能吞 **`param_5`**，以 **Listing `63c180` 调用约定** 为准）。",
+              "stackDescriptorOffsets_from45a520": "`+0` **vptr** `142066468`；`+8` **`local_28`**（**type=9**，首字节供 **`3626b0` 拷 1B**）；`+0x10` **`local_20`**（**0x44**，低 **word** 供第二次 **`30d520` 拷 2B**）；`+0x20` **`local_10`**（**DWORD 指标**，来自 **`d7e0e0`**）。",
+              "callFUN_14063c180_140360557": {
+                "findListingLog": "dev/ghidra/analysis/output/FindListingPattern__0x14063c180__0x140360400__0x140360600__30__20260320_142423_131.log",
+                "describeLog": "dev/ghidra/analysis/output/DescribeAddress__0x140360557__20260320_142429_120.log",
+                "preCallListingLog": "dev/ghidra/analysis/output/DescribeAddress__0x140360538__20260320_142450_580.log",
+                "microsoftX64AtCall": "**`RCX=RSI`** = **`360460` arg0** = **`*(DAT_142b19b98+8)`**（**网关/通道对象的 **+8** 子头**，**≠** `DAT_142b19b98` 本体）；**`RDX=RDI`** = **`local_2078[1]`**（**`Array` 数据区 `hdr+8`**，无有效缓冲时可 **0**）；**`R8D`** = **累计写入长度**（`[RSP+0x2070]` **`ADD EBX`** 后）；**`R9D=EBP`** = **`360460` 第 3 实参**（**`45a520` 路径为 `R8=0`**）；**第 5 整型/标志**：**`MOV [RSP+0x20],R14B`** 后 **`CALL`** — **对应 `param_4`/`R9B=1`**（**置信度中高**）。"
+              }
+            },
+            "FUN_1403626b0": {
+              "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1403626b0__1__200__20260320_141524_393.log",
+              "semantics": "**`param_1`** = **`360460` 的 `desc`**；**`param_2`** = 指向 **`SoeUtil::Array` 包装**（`**param_2` = `vftable` 指针；`param_2[0x405]`/`[0x406]`** 为 Ghidra 下 **写指针/游标** 视图）。两次 **`FUN_14030d520`**：**1** 字节自 **`*(byte*)(desc+8)`**，**2** 字节自 **`*(uint32*)(desc+0x10)` 的低 16 位**。"
+            },
+            "FUN_14030d520": {
+              "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14030d520__1__200__20260320_141524_898.log",
+              "semantics": "**向 `Array` 缓冲写 `param_4` 字节**：源为 **`param_3`**（**栈上局部或 `desc+0x20` 读到的小缓冲**）；用 **`*(param_1+8)`** 基址与 **`*(param_1+0x10)`** 已用长度做界；越界/重叠走 **`FUN_14030e860`** 扩容或 **`FUN_140d11e20`** memmove。"
+            },
+            "FUN_140d7e0e0": {
+              "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x140d7e0e0__1__150__20260320_141525_456.log",
+              "listingNote": "**`140d7e0e4`：`CALL 140d7cb70`** 时 **`RCX/RDX` 来自调用方**（**Ghidra 反编译误为无参**）。**`140b0f6dc`**：`MOV EDX,1` + **`MOV RCX,RBX`** → **`d7cb70(ctx,1)`**。",
+              "d7cb70Log": "dev/ghidra/analysis/output/DumpDecompile__0x140d7cb70__1__80__20260320_141546_637.log",
+              "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__0x140d7e0e0__20260320_141526_124.log",
+              "semantics": "**`pdVar = d7cb70(incomingRCX,incomingEDX)`** 取 **指标槽**；若 **`*(int*)(slot+8)!=3`** 则 **`d8a390` 惰性填充**；返回 **`(longlong)*(uint64*)slot`** —— **`45a520`/`360460` 写入 `desc+0x20` 的 `DWORD`**，语义为 **计数器/采样值（置信度中）**。"
+            },
+            "FUN_140d8a390": {
+              "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x140d8a390__1__150__20260320_142413_812.log",
+              "semantics": "**指标槽就绪化**：若 **`(int)param_1[1]==3`** 直接返回 **`param_1`**；若 **`==4`** 则 **`d86380(*param_1+0x18, local)`** 成功后把 **`*param_2`/`param_2[1]=3`** 填回 **就绪态**；否则 **`NULL`**。"
+            },
+            "FUN_140d86380": {
+              "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x140d86380__1__150__20260320_143850_265.log",
+              "semantics": "**字符串→`double`**：先 **`d5aa58`** 解析；若尾字节分类允许则 **`strtoul(...,0x10)`** 十六进制；**`isspace` 收尾** — 供 **`d8a390`** 刷新 **状态 4** 槽。"
+            },
+            "playClientLive_vtable_1420469a8_slot2b0": {
+              "readPointersLog": "dev/ghidra/analysis/output/ReadPointers__0x1420469a8__95__20260320_143913_442.log",
+              "rdataString": "`H1Z1 PlayClient (Live)` @ **`142046c30`**（与槽表同段）",
+              "slotPlus2b0": "**`1420469a8 + 0x2b0` → `142046c58`** → **`FUN_1402ecab0`**",
+              "slotPlus48_for63c180": "**`1420469a8 + 0x48` → `FUN_1404690c0`**（**`63c180` Listing：`CALL [RAX+0x48]`**，**`RAX=[*p]`**）",
+              "slotPlus180_after4690c0": "**`1420469a8 + 0x180` → `FUN_1403dd800`**（**`ReadPointers` 行 56**）",
+              "FUN_1404690c0": {
+                "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1404690c0__1__150__20260320_144803_443.log",
+                "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__0x1404690c0__20260320_144803_637.log",
+                "semantics": "**`FUN_140ce9630(&local_20)`** 建 **`SoeUtil::IString`**；二次虚调 **`(**(*param_1+0x180))(…)`** → **`FUN_1403dd800`**（**槽 `1420469a8+0x180`**）；析构 **`-4` refcount** 见原 **`DumpDecompile 144803`**。"
+              },
+              "FUN_1403dd800": {
+                "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1403dd800__1__200__20260320_144924_939.log",
+                "semantics": "**薄封装**：**`2fc0f0(0x2b8)`** 分配；读 **`this+0x38bf0`** → **`local`**；**`63cc10(alloc, &local, *(this+0x316b0), param_2, param_3, …, -2, …)`**。 **`4690c0` 栈上 `IString`/缓冲** 注入此路径。",
+                "FUN_14063cc10": {
+                  "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14063cc10__1__180__20260320_145013_370.log",
+                  "semantics": "**外层 ~0x2b8 信封**（**`3dd800` 分配体**）：**`*param_1=1420dd6e0`**；**`param_1[1]`** 挂 **`Gateway::ExternalGatewayApi`（`0x1068`）** 指针。**`2fc0f0(0x80)`** + **`63b470`** 建 **`14162c9f0`**；**`63c2a0(inner,outer)`** 写 **`*(inner+0x1058)=outer`**；**`63c290`/`63bcd0`** 写 **`+0x70`/`+0x3c`**；**`2bd7f0`**：**`ClientProtocol`** 字面。**返回 `param_1`。**",
+                  "FUN_14063b470": {
+                    "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14063b470__1__200__20260320_150101_716.log",
+                    "semantics": "**`2fc0f0(0x1068)`** → **`14162c9f0`**（**首参 `param_1` 为分配块**）；**`*stash=返回值`**（**`stash` = 调用方 **`0x80` scratch**）；**`param_1[1]=32e7b0`**；**`param_1[2]=&PTR_FUN_1420dd230`**；**`32ee90(...,4000,0)`**。"
+                  },
+                  "FUN_14063c2a0": {
+                    "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14063c2a0__1__150__20260320_150102_145.log",
+                    "semantics": "**反链**：**`*((*param_1) + 0x1058) = param_2`** — **`param_1` 指向内层 `ExternalGatewayApi*`**，`**+0x1058`** 存 **ClientProtocol 外层信封**。"
+                  },
+                  "FUN_14162c9f0": {
+                    "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14162c9f0__1__120__20260320_150114_883.log",
+                    "semantics": "**`Gateway::ExternalGatewayApi` 构造/初始化**：**`1415f8b70`** 带 **`ExternalGatewayApi`** 字面；多槽写 **`Gateway::ExternalGatewayApi::vftable`**（**`1424be298` 主表**）；**`14162d1e0`** 收尾。**供 `63b470` stash。**",
+                    "mainVftableReadPointersLog": "dev/ghidra/analysis/output/ReadPointers__0x1424be298__40__20260320_150344_486.log",
+                    "FUN_14162d1e0": {
+                      "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14162d1e0__1__200__20260320_150304_251.log",
+                      "semantics": "**植入网关身份字段**：**`+0xfc0`←`*param_2`**；**`2bd670`：`+0xfc8`←`param_3`**、**`+0xff8`←`param_4` 或默认 **`142046fcb`**、**`+0x1028`←`param_5` 或默认**；**`+0x1058=0`**（**`63c2a0` 后指信封**）；**`+0xd48`** 组装 **`ExternalGatewayApi(%llu,…)` 调试前缀**（**比对 `DAT_143c77ff8`**）。",
+                      "FUN_14162d140_vtableSlot_plus30": {
+                        "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14162d140__1__80__20260320_150401_004.log",
+                        "searchDecompile14162dcc0Log": "dev/ghidra/analysis/output/SearchDecompile__0x14162d140__14162dcc0__12__20260320_150401_471.log",
+                        "semantics": "**主 vtable `+0x30`**：**`2bd670(+0xf80)`** + 同步 **`+0xd48`/`f88`/`fc0` 文案** → **`1415f3ea0`**。**未**直接 **`14162dcc0`**（**Search 0**）。"
+                      },
+                      "FUN_1415f3ea0_afterRenameHook": {
+                        "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1415f3ea0__1__220__20260320_151144_968.log",
+                        "searchDecompile14162dcc0Log": "dev/ghidra/analysis/output/SearchDecompile__0x1415f3ea0__14162dcc0__20__20260320_151145_597.log",
+                        "searchDecompile14063bf90Log": "dev/ghidra/analysis/output/SearchDecompile__0x1415f3ea0__14063bf90__20__20260320_151146_199.log",
+                        "semantics": "**`ExternalGatewayApi` 连接参数路径**：**`+0xbe0`/`1415f3130`/`453600`**、**`+0x2f0`/`+0x2f8`** → **`1415f4660`**；**`BaseApi connect request`** 日志。**SearchDecompile**：**无 `14162dcc0`/`63bf90`**。"
+                      }
+                    }
+                  }
+                }
+              },
+              "clientProtocolEnvelope_vtable_1420dd6e0": {
+                "readPointersLog": "dev/ghidra/analysis/output/ReadPointers__0x1420dd6e0__16__20260320_150304_469.log",
+                "semantics": "**`63cc10` 信封首 QWORD**：**槽 `+0` → `FUN_14063d370`**；邻 **`63dbb0`/`63dc30`**…；**rdata 缀 `RECEIVED=OnConnect %lld` 等** — **与 `1424be298`（EGA）不同族**。**抽样反编译搜** **`14162dcc0`/`63bf90`**（**`63d370`/`dbb0`/`dc30`/`de90`**）：**均 0** — **发送多经 defer vtbl（见 `1420dd210`）或虚调**。"
+              },
+              "FUN_14063bf90_deferToDcc0": {
+                "describeCallSiteTailLog": "dev/ghidra/analysis/output/DescribeAddress__0x14063bfd4__20260320_155840_715.log",
+                "describeCallSiteBranch2Log": "dev/ghidra/analysis/output/DescribeAddress__0x14063c012__20260320_155726_075.log",
+                "describeListingLog": "dev/ghidra/analysis/output/DescribeAddress__0x14063bfd4__20260320_150113_979.log",
+                "vtableReadPointersLog": "dev/ghidra/analysis/output/ReadPointers__0x1420dd218__24__20260320_150142_896.log",
+                "vtableBaseReadPointersLog": "dev/ghidra/analysis/output/ReadPointers__0x1420dd210__12__20260320_154148_514.log",
+                "queryXrefToFunLog": "dev/ghidra/analysis/output/QueryXref__to__0x14063bf90__20260320_150303_603.log",
+                "queryXrefToVtablePtrLog": "dev/ghidra/analysis/output/QueryXref__to__0x1420dd218__20260320_150303_806.log",
+                "scanMemoryPatternVtableQwordLog": "dev/ghidra/analysis/output/ScanMemoryPattern__8__1420dd218__max_20__20260320_150326_470.log",
+                "semantics": "**`0x2058` defer 包 vtbl 槽 `+8` → `63bf90`**（**`1420dd218`**）。**主路径 `CALL 14162dcc0`**：**`14063bfd4`** / **`14063c012`**（见 **Describe**）。**text `14063bf4b`/`14063bf5a`：`JMP 14162dba0`**（**`dba0` 另口**；**非直接 `CALL`，可能尾合并**）。**从 defer 对象取参**：**`*(+0x8)`→`dcc0` param_1**；**`*(+0x18)`→payload 指针/长** → **`uVar5`/`iVar2`**；**`*(+0x2050)`→param_4**；**`+0x10` 种类 `iVar1`**：`iVar1<2` 时 **`param_5=(iVar1==1)`，`param_6=0`**；**`iVar1==2`** 时 **`param_5=param_6=1`**。**`63b590` 写 `*this=1420dd210`**。EGA **`1424be298`** 仍不含 **`63bf90`**。**`1420dd230`/`63b710`** 与 **`63b470` stash** 仍对齐。"
+              },
+              "FUN_14162dcc0_xrefs": {
+                "queryXrefLog": "dev/ghidra/analysis/output/QueryXref__to__0x14162dcc0__20260320_155649_988.log",
+                "codeSites": [
+                  { "from": "14063bfd4", "caller": "FUN_14063bf90", "note": "`iVar1<2` 分支 CALL `dcc0`" },
+                  { "from": "14063c012", "caller": "FUN_14063bf90", "note": "`iVar1==2` 分支 CALL `dcc0`（同函数第二处）" },
+                  { "from": "14063c1fb", "caller": "FUN_14063c180", "note": "尾调：drain+`4690c0` 后" }
+                ],
+                "semantics": "**CODE 入口**：**`14063c1fb`**（**`63c180`**）；**`14063bfd4`/`14063c012`** 皆在 **`FUN_14063bf90`**（**非** `63c030` 体）。**DATA**：`143f527f4`、`142910c78`。"
+              },
+              "FUN_14162dcc0_PacketTunnel": {
+                "dumpDecompileLog": "dev/ghidra/analysis/output/DumpDecompile__0x14162dcc0__1__120__20260320_155630_502.log",
+                "poolAcquireDumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14063d5a0__1__100__20260320_155851_382.log",
+                "poolAcquireDumpCompareLog": "dev/ghidra/analysis/output/DumpDecompile__0x14063d5a0__1__120__20260320_163631_436.log",
+                "poolAcquireFirstParamNote_zh": "**`FUN_14063d5a0(longlong poolMgr)`** — **8192 块分配/摘链**。**反编译在 `dcc0`/`cb70` 处常显 `63d5a0()`**；**Listing** **`MOV RCX,[142b31b00]`** 在前。**勿与 `FUN_14163d5a0`（角色创建包）混淆。**",
+                "dat142b31b00DescribeLog": "dev/ghidra/analysis/output/DescribeAddress__0x142b31b00__20260320_155650_578.log",
+                "semantics_zh": "**Tunnel 外联网包 framing**：`PacketTunnelPacketFromExternalConnection` + 8KiB `SoeUtil::Array`；**`DAT_142b31b00==0`** 走栈；否则 **`FUN_14063d5a0(DAT_142b31b00)`** ：空则 **`2fc0f0()` 造块**（**`puVar2+0x405=0x10000000`、`+0x406=0`** 同 **`dcc0` 局部队列**）；否则从 **`param_1+0x50`** 链表摘 **`+0x60` 计数**。**`30d520`**×2 写 payload；**尾** **`db20`（`param_6==0`）** 或 **`dba0`**。"
+              },
+              "FUN_14162dba0_secureQueue": {
+                "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14162dba0__1__100__20260320_155649_859.log",
+                "call1415f8e70DescribeLog": "dev/ghidra/analysis/output/DescribeAddress__0x14162dc1a__20260320_160627_934.log",
+                "jmpThunkSitesLog": [
+                  "dev/ghidra/analysis/output/DescribeAddress__0x14063bf4b__20260320_160639_904.log",
+                  "dev/ghidra/analysis/output/DescribeAddress__0x14063bf5a__20260320_160640_323.log"
+                ],
+                "semantics_zh": "**Heavy encrypt 路径**：栈 `Array<8192>` + **`1415f8e70(this, payload, len, &local_2028, 0x…fe)`**（**`14162dc1a`** **CALL**）；失败 **`SendPacketSecure…`**；成功 **`14165aff0`**。**另**：**`JMP dba0`** @ **`bf4b`/`bf5a`**。"
+              },
+              "FUN_1415f8e70_gateToF96b0": {
+                "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1415f8e70__1__200__20260320_160614_768.log",
+                "workerDumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1415f96b0__1__250__20260320_160826_604.log",
+                "workerDumpPriorLog": "dev/ghidra/analysis/output/DumpDecompile__0x1415f96b0__1__150__20260320_160627_618.log",
+                "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__0x1415f8e70__20260320_160603_050.log",
+                "semantics_zh": "**门控**：**`*(param_1+0xd30)`** 非空才 **`1415f96b0(...)`**。**`1415f96b0`**：**102 行**；**`param_4!=0` 且 `param_5->+0x20` 失败** → **`PacketUtils::WrapPacket - Failed to encrypt…`**（**`1402bab70`**）。**`313f70`** 把密文尾写入 **输出 `Array`**。详见 **`FUN_140313f70_appendToSoeArray`**。"
+              },
+              "FUN_140313f70_appendToSoeArray": {
+                "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x140313f70__1__120__20260320_160826_929.log",
+                "callFrom14163d5a0Log": "dev/ghidra/analysis/output/DescribeAddress__0x14163d610__20260320_164527_429.log",
+                "semantics_zh": "**可扩容字节数组追加**（**Ghidra 常显 3 形参**；**`14163d5a0` Listing** 示 **≥5 实参**：**`RCX/RDX/R8` + 栈**）— **宜在 Ghidra 里扩 **`313f70` 原型**。**"
+              },
+              "FUN_14063d000_releaseTunnelOr8192Block": {
+                "describeSiteLog": "dev/ghidra/analysis/output/DescribeAddress__0x14063d023__20260320_160627_277.log",
+                "semantics_zh": "**与 `63d5a0` 对偶**：若全局池 **`DAT_142b31b00!=0`**，**`63e360`** 归还；否则就地 **`30bf90`/`d0fb84`**。"
+              },
+              "FUN_14063cb70_tunnelBufferPlacementNew": {
+                "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14063cb70__1__150__20260320_161335_411.log",
+                "listingLoadPoolThenD5a0Log": "dev/ghidra/analysis/output/DescribeAddress__0x14063cba5__20260320_161413_952.log",
+                "semantics_zh": "**8192 隧道缓冲「placement」初始化**：**`DAT_142b31b00==0`** 则 **`head` 指内嵌块 **`param_1+1`**；**否则 **`head=63d5a0(RCX)`**（**Listing 先 `MOV RCX,[142b31b00]`**）。**内联 vtbl** 来自 **`14204b0a0`**（**Describe `14063cba0`**）。**与 `dcc0`/`63cb70`/`72fd10` 共用释放套路**。"
+              },
+              "FUN_14072fd10_tunnelLikeDispatch": {
+                "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14072fd10__1__120__20260320_161335_848.log",
+                "call14163d5a0SiteLog": "dev/ghidra/analysis/output/QueryXref__to__0x14163d5a0__20260320_163630_288.log",
+                "semantics_zh": "**类网关栈帧路径**：**`72a6a0`** 写 Tunnel；**`CALL 14163d5a0`** @ **`14072fe9d`** — **发 `PacketCharacterCreateRequest`**（**非** **8192 池 `14063d5a0`**）；**`param_1+0x2bf`** 门控；**池归还** 同 **`dcc0`**。"
+              },
+              "FUN_14163d5a0_sendCharacterCreateRequest": {
+                "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14163d5a0__1__120__20260320_163630_680.log",
+                "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__0x14163d5a0__20260320_163630_288.log",
+                "call313f70ListingLog": "dev/ghidra/analysis/output/DescribeAddress__0x14163d610__20260320_164527_429.log",
+                "semantics_zh": "**`PacketCharacterCreateRequest`**：**`param_2`→`313f70` 并入 `local_28` Array**（**`14163d61c`**）；**`*(int *)(param_1+8)`** 0/1 **分班**：**`-0xd40`→`6350d0`**（**二进制/8192 Tunnel**）**；**`-0xae0`→`634370`**（**JSON `ServerId`/`Payload`**）。**`14063d5a0`** = **8192 池** — **勿混。**"
+              },
+              "FUN_14163d6b0_nameHandleToCharacterCreate": {
+                "describeCallSiteLog": "dev/ghidra/analysis/output/DescribeAddress__0x14163d8b4__20260320_164441_976.log",
+                "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14163d6b0__1__130__20260320_164458_129.log",
+                "semantics_zh": "**C 串 + 句柄 *param_3** → **`Array<0>`** → **`14163d5a0`**。**R15/R14/RBP** 栈布局见 **`14163d8xx` Listing**。"
+              },
+              "FUN_1416350d0_tunnelAndVtableA0": {
+                "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1416350d0__1__100__20260320_164441_616.log",
+                "semantics_zh": "**分支0**：**`6364d0`** 写 **`local_2048`**；**`vtable+0xa0`** 三参 + **`1` + `0xfe`**；**`142b31b00`/`63d5a0`/`63e360`** 套路与 **`dcc0` 尾** 同型。"
+              },
+              "FUN_1416364d0_frameCharacterCreateIntoTunnel": {
+                "dumpResolveLog": "dev/ghidra/analysis/output/DumpDecompile__0x1416364d0__resolve__20260320_164804_899.log",
+                "callee9030Log": "dev/ghidra/analysis/output/DumpDecompile__0x141639030__resolve__20260320_164815_229.log",
+                "param1StructGuess_zh": "**`param_1`**：**`+8`** 首字节（**写入 1B**）；**`+0x10`** **QWORD**（**写入 8B**）；**`+0x18`** 起子记录：**`+8`** **Blob 指针**，**`+0x10`** **`uint` 长度** — **`9030` 先写长度字段 4B（封顶 `min(ringFree,4)`）再写 Blob（`min(len,ringFree)`）。**",
+                "semantics_zh": "**`6364d0`**：**`*param_2` = 8192 块头**（**`[0x405]` 顶/余量、`[0x406]` 写游标** 同 **`dcc0`**）。**`30d520`×2** 写 **1B + 8B**；**`FUN_141639030`** 续写 **`len` + 变长体**。**与 `72a6a0`/`dcc0` 同为 `30d520` 环形封装**，唯 **头布局** 来自 **`14163d5a0` 分支0** 组好的 `param_2` 描述块。**"
+              },
+              "FUN_141639030_appendLengthAndBlobToTunnel": {
+                "dumpResolveLog": "dev/ghidra/analysis/output/DumpDecompile__0x141639030__resolve__20260320_164815_229.log",
+                "semantics_zh": "**`(tunnelPtrHolder, desc)`**：**`desc+0x10` = `uVar3`**；**首段** **`30d520`** 写 **`local_res18[0]=uVar3`** **至多 4B**；**若 `uVar3>0`**：**第二段** 从 **`*(desc+8)`** 写 **`uVar3`** 字节（与余量夹紧）。"
+              },
+              "FUN_141634370_jsonCharacterCreateRequest": {
+                "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x141634370__1__120__20260320_164442_596.log",
+                "semantics_zh": "**分支1**：**`3212f0` 文档根**；**`ServerId`/`Payload` 键**；**`3236d0` 序列化**；**`vtable+0x88`** 投递。"
+              },
+              "FUN_14072a6a0_tunnelFieldWriter": {
+                "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14072a6a0__1__180__20260320_163631_042.log",
+                "semantics_zh": "**角色创建相关载荷前缀**：**1B + 3×4B + `467e80` 子块 + 2×4B + `72a890` 尾**；全经 **`30d520`/`+0x406`**。"
+              },
+              "vtable14204b0a0_logOrSoeDiagCluster": {
+                "readPointersLog": "dev/ghidra/analysis/output/ReadPointers__0x14204b0a0__24__20260320_163630_202.log",
+                "semantics_zh": "**内嵌诊断 vtbl + 串表 + EH `FuncInfo`** — **`63cb70` 写入子头 `*ptr`**；**Tunnel 数据 vtbl 仍为 `SoeUtil::Array<8192>` @ `param_1[2]`**。"
+              },
+              "DAT_142b31b00_poolOrQueueRoot": {
+                "describeLog": "dev/ghidra/analysis/output/DescribeAddress__0x142b31b00__20260320_155650_578.log",
+                "describeLog_zeroInitQword": "dev/ghidra/analysis/output/DescribeAddress__0x142b31b00__20260320_165412_571.log",
+                "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__0x142b31b00__20260320_160602_987.log",
+                "queryXrefToRefresh_36read": "dev/ghidra/analysis/output/QueryXref__to__0x142b31b00__20260320_165318_665.log",
+                "queryXrefFromLog": "dev/ghidra/analysis/output/QueryXref__from__0x142b31b00__20260320_161036_315.log",
+                "queryXrefFromRefresh_still0": "dev/ghidra/analysis/output/QueryXref__from__0x142b31b00__20260320_165318_475.log",
+                "absoluteLoadListingScanLog": "dev/ghidra/analysis/output/FindListingPattern__142b31b00__0x140000000__0x142000000__100__20260320_161024_154.log",
+                "absoluteLoadListingScanNarrowLog": "dev/ghidra/analysis/output/FindListingPattern__142b31b00__0x140600000__0x140900000__80__20260320_161353_461.log",
+                "listingScan_timeout12LoadsOnly": "dev/ghidra/analysis/output/FindListingPattern__142b31b00__0x140000000__0x142000000__120__20260320_165603_874.log",
+                "semantics_zh": "**池根指针**：**`DescribeAddress`（165412）**：**`undefined8 0000000000000000h`** — **已类型化为 8B 全局，映像初值 0**，非未占位空洞。**`QueryXref to`**：**36× 全 READ**（165318 复跑）。**`QueryXref from`**：**0**（165318）。**`FindListingPattern`** 宽扫 **超时前仅列满 12 条** `MOV RCX,[0x142b31b00]`（14063/14072），**14162/14163 区 READ** 同 xref 表、未写入该 log — **宜窄扫 `141600000..141680000`**。**绝对址 `MOV [0x142b31b00],…`**：仍未见。**推论**：二进制里可能 **永不装池（恒走栈/`param_1+1`）**；若有赋值则为 **寄存器间接 / 未映射 STORE**。**守护偶发 `result parse error`**：批命令后宜重启再扫。"
+              },
+              "FUN_14165aff0_DataQueueInsert": {
+                "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14165aff0__1__150__20260320_155630_911.log",
+                "semantics_zh": "**磁盘/内存发送队列插入**；字段 **`+0x88` 累计字节**、**`+0x210` 文件游标** 等。"
+              },
+              "playClientVtable1420469a8_immediateRefs": {
+                "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__0x1420469a8__20260320_150115_126.log",
+                "scanMemoryPatternLog": "dev/ghidra/analysis/output/ScanMemoryPattern__8__1420469a8__50__20260320_160614_474.log",
+                "scanMemoryPatternPriorLog": "dev/ghidra/analysis/output/ScanMemoryPattern__8__1420469a8__max_40__20260320_150139_125.log",
+                "note": "**`QueryXref to 1420469a8` = 0**；**`ScanMemoryPattern` 8B 精确 qword 仍 0**（**160614**）— **映像无裸常量**；**装表 `LEA`/ctor**。**`DAT_142b19b98` 仍跟 `46e660`。**"
+              },
+              "describeListing2b0Call": "dev/ghidra/analysis/output/DescribeAddress__0x14046e6fe__20260320_143851_218.log",
+              "note": "**`FUN_14046e660`**：**`CALL [R9+0x2b0]`** with **`R9=*RSI`**（**PlayClient `this` vftable**）。"
+            },
+            "FUN_1402ecab0_gatewayHeadCtor": {
+              "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x1402ecab0__1__150__20260320_143922_309.log",
+              "describeLog": "dev/ghidra/analysis/output/DescribeAddress__0x1402ecab0__20260320_143954_095.log",
+              "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__0x1402ecab0__20260320_143922_490.log",
+              "semantics": "**`LEA RAX,[142046c58]` → `MOV [RCX],RAX`**；**`TEST DL,1`** 时 **`d0fb84(RCX,0x10)`**；**`RAX=RBX=RCX`**。** placement ctor** 写入 **`DAT_142b19b98` 来源**（**`46e660`：RAX 回存全局**）。**`RCX` 实参 = `this`**（**Listing `14046e6fb`**）。",
+              "objectVtable142046c58": "dev/ghidra/analysis/output/ReadPointers__0x142046c58__32__20260320_143933_129.log",
+              "objectVtableNote": "**槽 +0x38 → `LAB_1402ecd10`**（**`LEA RAX,[142ae8588]`**，**`ReadPointers__…160628_147.log`**）；**`+0x40` 起 MSVC `FuncInfo`**。**`63c180` 实际为 **`CALL [vptr+0x48]`**（见 **DescribeAddress `14063c1d8`**），**不是** 小表 **`142046c58`** 上的 **`+0x48`**（该偏移在 rdata 已落入 **EH**）— **运行期 `p` 须带完整 PlayClient vtable `1420469a8`**。"
+            },
+            "globals_BSS": {
+              "DAT_142b19b98": {
+                "describeLog": "dev/ghidra/analysis/output/DescribeAddress__0x142b19b98__20260320_141525_903.log",
+                "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__0x142b19b98__20260320_142413_371.log",
+                "semantics": "**全局存 `p`（网关/客户端对象）**。Listing **`14063c1be`**：`MOV RCX,[142b19b98]`；**`14063c1dc`**：`MOV RAX,[RCX]`（**vptr**）；**`14063c1e3`**：**`CALL qword ptr [RAX+0x48]`** — **虚槽字节 +0x48**。**`1420469a8` 上该槽 = `FUN_1404690c0`**。**反编译 **`*(DAT_142b19b98+0x48)`** 易误解为 **数据偏移**；以 **Listing** 为准。**`360460`** 路径 **`param_1` 仍为 `*(p+8)`**。**`3e42c0`** teardown **dtor +0**。",
+                "assignmentWrites": "`14046e705` **`MOV [142b19b98],RAX`**；清零 **`14046e6eb`/`1403e4cd5`** 等。",
+                "initFactoryDumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14046e660__1__100__20260320_142513_666.log",
+                "initFactorySearchLog": "dev/ghidra/analysis/output/SearchDecompile__0x1403e42c0__142b19b98__25__20260320_142502_698.log",
+                "assignmentSiteLog": "dev/ghidra/analysis/output/DescribeAddress__0x14046e6eb__20260320_142513_165.log"
+              },
+              "DAT_142b19780": "dev/ghidra/analysis/output/DescribeAddress__0x142b19780__20260320_141602_640.log（**`b0f6b0` → `45a520` 首参**；静态 **0**）",
+              "readPointers142b19b90": "dev/ghidra/analysis/output/ReadPointers__0x142b19b90__8__20260320_141602_825.log"
+            },
+            "deferThreadMismatch_63b590_63b820": {
+              "describe63c244Log": "dev/ghidra/analysis/output/DescribeAddress__0x14063c244__20260320_154148_953.log",
+              "dump63c180FreshLog": "dev/ghidra/analysis/output/DumpDecompile__0x14063c180__1__80__20260320_154149_430.log",
+              "FUN_14063b590": {
+                "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14063b590__1__250__20260320_154134_965.log",
+                "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__0x14063b590__20260320_154135_761.log",
+                "semantics": "**`2fc0f0(0x2058)` 块 ctor**：**`*param_1=1420dd210`**；**`[1]=*param_2`（通道/上下文 QWORD）**；**内嵌 **`Array<u8,8192>`** @ **`param_1+4`**；**`30d520` 拷 payload**。**仅 `63c180` 在 `32e7b0!=param_1[1]` 时调用**（**`14063c244`**）。"
+              },
+              "FUN_14063b820": {
+                "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14063b820__1__120__20260320_154135_553.log",
+                "semantics": "**入队**：**`(*(*(param_1+0x10)+0x10))(param_1+0x10)`** 取 **节点**；**`*node=packet_ptr`**；挂 **`param_1+0x18`/`+0x20`** 链表；**`+0x28++`**；**`+0x30=1`**。**`63b9f0` 在同一 `param_1` 上 drain `+0x18`**。"
+              },
+              "vtable1420dd210_family": {
+                "readPointersLog": "dev/ghidra/analysis/output/ReadPointers__0x1420dd210__32__20260320_154844_611.log",
+                "semantics": "**`0x2058` defer vtbl**：**`+0` dtor `63b7d0`**；**`+8`→`63bf90`**；**`+0x10..+0x18` Ghidra 标混字节**（**`ReadMemory` 映像段可全零 — 重定位/基址**）；**`+0x20`→`63b710`**（**`DumpDecompile`**：调 **`63b640`**、可选 **`d0fb84`**、**`return param_1`** — **似 this 调整/释放助手**）；**`+0x28`…→`63be00`/`63b8c0`/`63bba0`**。**`63b9f0` 行 33** 用 **`vptr+0x18`** 取 **`plVar12`** — **与 `+0x20` 槽并存时需 Listing 区分 thunk/adjustor**。"
+              },
+              "vtable1420dd1f0_0x2050": {
+                "readPointersLog": "dev/ghidra/analysis/output/ReadPointers__0x1420dd1f0__16__20260320_154933_455.log",
+                "FUN_14063b3d0": {
+                  "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14063b3d0__1__100__20260320_154921_994.log",
+                  "semantics": "**`2fc0f0(0x2050)`**：**`*=1420dd1f0`**；**`[1]=*ctx`**；**`Array<8192>` + `30d520`** — **布局同 `63b590` 而短 8B**。**`63c030`/`63c0e0` 错线程入队**。"
+                },
+                "slotPlus8DescribeLog": "dev/ghidra/analysis/output/DescribeAddress__0x14063bf20__20260320_154953_238.log",
+                "slotPlus18DescribeLog": "dev/ghidra/analysis/output/DescribeAddress__0x14063bc80__20260320_154953_678.log",
+                "semantics": "**`0x2050` vtbl**：**`+8`→`14063bf20`**（**`MOV R8D,[RCX+0x10]`**）；**`+0x10`→`14063bbc0`**；**`+0x18`→`14063bc80`**。**`63b9f0` 第一虚调依 **`*plVar3`（包类型）** 走 **`bf20` 或 `63bf90`**。**"
+              }
+            },
+            "gatewayPostVariants_63c030_63c0e0": {
+              "FUN_14063c030": {
+                "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14063c030__1__100__20260320_154910_787.log",
+                "semantics": "**线程命中**：**`63b9f0`** → **`14162db20`**（**非 `14162dcc0`**）。**错线程**：**`0x2050`/`63b3d0`/`63b820`**。"
+              },
+              "FUN_14063c0e0": {
+                "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14063c0e0__1__100__20260320_154911_219.log",
+                "semantics": "**与 `63c030` 分支互反**（**错线先入队；命中 `63b9f0`+`14162db20`**）。**`63b3d0` 末参恒 `1`**。"
+              },
+              "FUN_14162db20": {
+                "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14162db20__1__80__20260320_154922_422.log",
+                "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__0x14162db20__20260320_154922_683.log",
+                "semantics": "**`FUN_14162db20`**：**亦被 `14162dcc0` 尾调**（**`param_6==0`**，见 **`155630` `dcc0` dump**）— **Tunnel 帧之后**。**另路**：**`63c030`/`0e0`** 在 **`63b9f0` 成功后直调 `db20`**，**不**经 **`dcc0`**（**`154910`**）。**体内**：**`(byte *)(param_1+0x1062)`**、**`param_1[0x20c]`**；**`14162d4e0`**；**`14165aff0(param_1+0x1ad,…)`** / **`vptr+0xa0`**。**`14162dba0`**：**`vptr+0xb0`** 分支。**`65aff0`**：**`DataQueue::Insert`** — **`155630_911`**。"
+              }
+            },
+            "FUN_14063b9f0_queueDrain": {
+              "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14063b9f0__1__180__20260320_153121_213.log",
+              "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__0x14063b9f0__20260320_153133_845.log",
+              "callFrom63c180DescribeLog": "dev/ghidra/analysis/output/DescribeAddress__0x14063c1a7__20260320_153140_729.log",
+              "indirectCallRaxPlus0HitLog": "dev/ghidra/analysis/output/FindIndirectCallsByOffset__0x0__0x14062f000__0x140650000__20260320_153111_316.log",
+              "wrapperAfterDrainLog": "dev/ghidra/analysis/output/DescribeAddress__0x14063bcff__20260320_153141_160.log",
+              "dumpDecompile300Log": "dev/ghidra/analysis/output/DumpDecompile__0x14063b9f0__1__300__20260320_154823_475.log",
+              "findIndirectCallVslotPlus18Log": "dev/ghidra/analysis/output/FindIndirectCallsByOffset__0x18__0x14063b9f0__0x14063bc00__20260320_155705_184.log",
+              "indirectCallSites": [
+                { "ea": "14063ba6e", "disasm": "CALL qword ptr [RDX + 0x18]" },
+                { "ea": "14063bb50", "disasm": "CALL qword ptr [RAX + 0x18]" }
+              ],
+              "semantics": "**结点 `plVar6`**：**`[0]=plVar3`**（**defer 包 this**），**`[1]` next**，**`[2]` prev**。**循环**：**`cVar10 = (*(vptr+8))(this)`**。 **`0x2058`**：**`63bf90` → 内部已 `dcc0`**；**`0x2050`**：**`bf20`**。**若 `cVar10`**：**`plVar12 = (*(vptr+0x18))()`**（**`…154823` 行 33**；**Listing 钉 **`14063ba6e`/`14063bb50`**）。**`1f0`**：**`bc80`→常返 0 ⇒ 跳过 `4690c0`**。** **`210`**：**`+0x20`→`63b710`**。**`plVar12!=0`**：**`lVar8=plVar12[0x406]`** 等同 **`dcc0`/`bf90` 里 `+0x406` 写游标**。**`4690c0`** 后释放/Unlink/池回收。**`dcc0` 不在此**，但 **`63bf90` 从本循环可入**。"
+            },
+            "FUN_14063c180": {
+              "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x14063c180__1__120__20260320_141352_988.log",
+              "dumpTailLog": "dev/ghidra/analysis/output/DumpDecompile__0x14063c180__1__45__20260320_143954_519.log",
+              "queryXrefToLog": "dev/ghidra/analysis/output/QueryXref__to__0x14063c180__20260320_141353_208.log",
+              "dispatchListingDescribeLog": "dev/ghidra/analysis/output/DescribeAddress__0x14063c1d8__20260320_144741_577.log",
+              "call14162dcc0ListingLog": "dev/ghidra/analysis/output/QueryXref__to__0x14162dcc0__20260320_150102_336.log",
+              "semantics": "**线程闸**：**`32e7b0` vs `param_1[1]`** → 否：**`63b590`/`63b820`**。是：**`63b9f0(param_1)`**（**drain `+0x18`**，**体内可已调 `vptr+0x48`/ `4690c0`**）→ 若 **`AL!=0`**：**`[vptr+0x48]` 再次**（**`14063c1d8` Listing**）→ **`14162dcc0`**。**`14162dcc0` 平行入口**：**`FUN_14063bf90`**（**defer 包 vtbl **`1420dd210`** 槽 **`+8`**，址 **`1420dd218`**）。**反编译 **`*DAT_142b19b98+0x48`** 易混；**以 Listing **`*[RCX]` 得 `RAX` 再 `[RAX+0x48]`**。"
+            },
+            "FUN_140b0f6b0": {
+              "dumpLog": "dev/ghidra/analysis/output/DumpDecompile__0x140b0f6b0__1__60__20260320_141409_308.log",
+              "callSiteLog": "dev/ghidra/analysis/output/DescribeAddress__0x140b0f6ea__20260320_141403_502.log",
+              "d7e0e0CallListing": "dev/ghidra/analysis/output/DescribeAddress__0x140b0f6dc__20260320_141546_101.log",
+              "semantics": "`FUN_140d7d290()>0` 且 **`FUN_140d7d3c0(RBX,1)`** 成功后：**`MOV EDX,1`/`MOV RCX,RBX`/`CALL d7e0e0`**（寄存器透传 **`d7cb70`**）→ **`EAX` 为 QWORD 指标窄化为 `uVar2`** → **`FUN_14045a520(DAT_142b19780,uVar2)`**。"
+            }
+          },
+          "followUp": "**【岔路/降权】** 仅 Login/隧道对齐时需要：`313f70` 原型、`6350d0` +0xa0、`142b31b00`。**【主线】** 僵尸：`526310`/`4e5a70`/re-6 MRN、`511840` case 与 NPC 动画衔接 — **勿再默认占用网关深潜。**"
+        }
+      },
+      "embedVtable142467c60": {
+        "readPointersLog": "dev/ghidra/analysis/output/ReadPointers__0x142467c60__20__20260320_133540_031.log",
+        "note": "142467c60 与 142467c80 数据重叠衔接（ReadPointers：142467c60[+0x20]==142467c80），典型 MSVC 多继承/内嵌基类；未再跟 142467c70 的 LAB_1413b5a70。"
+      }
+    },
+    "vtableLayoutNote": "`ReadPointers 0x142065bb0`：**`142065bb0`/`142065bc8` 两族 vtable 均在 slot+0x10 指 **`1414e5730`** — `dev/ghidra/analysis/output/ReadPointers__0x142065bb0__12__20260320_133155_092.log`。"
+  },
+  "profiledFunctions": [
+    {
+      "address": "FUN_14091ee40",
+      "guessedName": "EntityPerTickQueueDrainThunk",
+      "guessedNameConfidence": 0.62,
+      "purpose": "**每 tick 薄包装**：若 **`*(char *)(entity+0x4b64)!=0`** 则 **`46ab00(DAT_142b19780)`** 并清零该字节；**始终 `526310(entity)`**。**无直接 CODE 入边**（vtable/数据槽调度），与 **主线程实体更新** 对齐。",
+      "purposeConfidence": 0.74,
+      "mainlineAlignment": "P1_README_zombie_tick",
+      "parameters": [
+        {
+          "index": 0,
+          "type": "EntityState* / longlong*",
+          "guessedPurpose": "**entity this**（传入 `526310`）。",
+          "confidence": 0.78
+        }
+      ],
+      "relations": [
+        "`QueryXref to 14091ee40` 仅 DATA（见本 JSON `FUN_14091ee40`）",
+        "**唯一 CALL `526310`**：`14091ee6d`"
+      ]
+    },
+    {
+      "address": "FUN_140526310",
+      "guessedName": "ApplyQueuedCharacterOrPropertyMergeToEntity",
+      "guessedNameConfidence": 0.58,
+      "purpose": "**消费与 `0x1170`/UCS 排出相关的队列式状态**：对 **`param_1[0x22f]`** 链节点 **OR/AND** 合并到 **`param_1[0x35b]`**；条件分支下 **`4e2ee0`→`4e2e70`→`1414e5a70`**，把 **`param_1[0x353]`**（**entity+0x1a98**）等 **DWORD** 推进 **属性图**（**`511840` case0x18 与 0x1170 在此汇合**）。**不**组 Login tunnel。",
+      "purposeConfidence": 0.72,
+      "mainlineAlignment": "P1_README_zombie_ucs_to_property",
+      "parameters": [
+        {
+          "index": 0,
+          "type": "longlong*",
+          "guessedPurpose": "**entity 基址**（Ghidra 以 QWORD 索引访问）。",
+          "confidence": 0.82
+        }
+      ],
+      "relations": [
+        "**唯一 CODE 调用方**：`14091ee40`",
+        "`FUN_1404eb0f0`：**`53d4e0` 入队 0x1170**",
+        "`profiledFunctions`：`1414e5a70` 族"
+      ]
+    },
+    {
+      "address": "FUN_1414e5320",
+      "guessedName": "ProxiedPropertySchedulerFlushAfterGlobalTick",
+      "guessedNameConfidence": 0.78,
+      "purpose": "`DAT_1420728cc` 全局 tick 对齐后：回拨内部计时、对 `this[0x139]` 队列再投 `vtable+0x10`（等同属性插入）、校正子项时间戳，最后 drain 链表并调 **尾部 `+0x9c0` 嵌套 facet 的虚 `+0x18`**。",
+      "purposeConfidence": 0.82,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "ProxiedScheduler0x9c0*",
+          "guessedPurpose": "`FUN_1413b5410` 构造的 **0x9c0** 属性调度主对象（RCX）。",
+          "confidence": 0.88
+        }
+      ],
+      "relations": [
+        "Listing：`DescribeAddress 0x1414e5350`",
+        "仅供 `FUN_1414e5410` 调用"
+      ]
+    },
+    {
+      "address": "FUN_1414e5410",
+      "guessedName": "ProxiedOrGameEventSchedulerAdvanceWithThreshold",
+      "guessedNameConfidence": 0.72,
+      "purpose": "包装 **`FUN_1413b69c0`（`R9B=1` 等，Listing 为准）**；若全局常数 **`DAT_1420728cc <= *(this+0x9b0)`** 则 **`FUN_1414e5320`** 做 tick 对齐 flush。",
+      "purposeConfidence": 0.8,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "ProxiedScheduler0x9c0*",
+          "guessedPurpose": "调度对象 this（RBX/RCX）。",
+          "confidence": 0.85
+        }
+      ],
+      "relations": [
+        "`ReadPointers 0x142065b90`：邻 **GameEvent** 类型 vtable **slot+8**",
+        "`1414e541c` → `1413b69c0`"
+      ]
+    },
+    {
+      "address": "FUN_1413b69c0",
+      "guessedName": "ProxiedPropertySchedulerAdvanceTimeAndDispatch",
+      "guessedNameConfidence": 0.84,
+      "purpose": "对 **`142467c80`** 对象按 **float 时间** 驱动 **min-heap**；到期执行 **node vtable 槽0/8/10/20**；TLS 分支 **`1414260a0`** 延迟；与 **`param_1[10]`** 延迟回调链协同。",
+      "purposeConfidence": 0.86,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "ProxiedScheduler0x9c0*",
+          "guessedPurpose": "调度 this。",
+          "confidence": 0.9
+        },
+        {
+          "index": 1,
+          "type": "float",
+          "guessedPurpose": "本帧/步进 **deltaTime**（与 `0x136` 累加）。",
+          "confidence": 0.76
+        },
+        {
+          "index": 2,
+          "type": "char/bool",
+          "guessedPurpose": "控制是否调用 **`(*(*node+0x10))`**  재排路径（反编译 `param_3`）。",
+          "confidence": 0.55
+        }
+      ],
+      "relations": [
+        "`142467c80` **+8**",
+        "`FUN_1414e5410` 调用边"
+      ]
+    },
+    {
+      "address": "FUN_1413b6820",
+      "guessedName": "ProxiedPropertySchedulerInsertKeyedNode",
+      "guessedNameConfidence": 0.8,
+      "purpose": "在 **BST+堆** 结构中插入/更新 **property 节点**；**`piVar7[0xe] |= param_4`** 合并 **`4e2e70` 常量 4**。",
+      "purposeConfidence": 0.83,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "ProxiedScheduler0x9c0*",
+          "guessedPurpose": "调度 this。",
+          "confidence": 0.88
+        },
+        {
+          "index": 1,
+          "type": "float",
+          "guessedPurpose": "排序/调度用 **时间键**（常与 0 立即触发相关）。",
+          "confidence": 0.7
+        },
+        {
+          "index": 2,
+          "type": "PropertyGraphNode*",
+          "guessedPurpose": "`1414e5a70` 传入的 **hash 链节点**（`param_3+0x20` 为树根）。",
+          "confidence": 0.74
+        },
+        {
+          "index": 3,
+          "type": "uint",
+          "guessedPurpose": "**通道/标志位**，与 **`4e2e70`** 第三参 **4** 同源。",
+          "confidence": 0.72
+        }
+      ],
+      "relations": [
+        "`142467c80` **+0x10**"
+      ]
+    },
+    {
+      "address": "FUN_1413b5680",
+      "guessedName": "MainThreadRequeuePropertyOperationThunkBody",
+      "guessedNameConfidence": 0.68,
+      "purpose": "解析延迟包：对 **`param_1[1]`** 调 **`vt+8`**；成功则挂回 **`(*param_1)`** 的 **`+0x50/0x58/0x60`** 工作队列。",
+      "purposeConfidence": 0.74,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "DeferredPayload*",
+          "guessedPurpose": "`FUN_1414260a0` 传入的 **0x18** 块解码入口。",
+          "confidence": 0.65
+        }
+      ],
+      "relations": [
+        "`FUN_1413b5980` 调用"
+      ]
+    },
+    {
+      "address": "FUN_141343840",
+      "guessedName": "InitSmallRegionForOffset0x188",
+      "guessedNameConfidence": 0.58,
+      "purpose": "`1413b5410` 内对 **`param_1+0x31`（字节 +0x188）** 做 **环形/链式缓冲初始化**（与 **`141345550`** 池配合），**不**初始化 **`+0x9c0` 尾部 vptr**。",
+      "purposeConfidence": 0.66,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "void*",
+          "guessedPurpose": "**0x188** 侧子块头指针。",
+          "confidence": 0.72
+        }
+      ],
+      "relations": []
+    },
+    {
+      "address": "FUN_1414e50d0",
+      "guessedName": "SwapToGameEventVtableDrainTailAndTeardownHelper",
+      "guessedNameConfidence": 0.77,
+      "purpose": "将 **`0x9c0` 调度块** 主 **`[RCX]` vptr** 置 **`142065b70`**；**排空 `0x139`**；对 **尾部 facet (`plVar1=base+0x9c0`)** 调 **虚 `+0x18`**；**`1403a6b20`/`1413b55e0`**。由 **`FUN_1403c4560` scalar dtor** 调用。",
+      "purposeConfidence": 0.8,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "Scheduler0x9c0*",
+          "guessedPurpose": "调度对象基址（原 **`142467c80`**，此处置换为 **`142065b70`**）。",
+          "confidence": 0.86
+        }
+      ],
+      "relations": [
+        "`FUN_1403c4560`",
+        "`FindListingPattern 0x9c0` 命中"
+      ]
+    },
+    {
+      "address": "FUN_1414e5290",
+      "guessedName": "EnqueueGameEventSliceViaFacetVt10",
+      "guessedNameConfidence": 0.74,
+      "purpose": "经 **`+0x9c0` facet 的 vt+0x10** 分配/取节点，写入 **`param_2..4`**，维护 **`+0x9c8/+0x9d0/+0x9d8`**。",
+      "purposeConfidence": 0.78,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "Scheduler0x9c0*",
+          "guessedPurpose": "调度基址。",
+          "confidence": 0.84
+        },
+        {
+          "index": 1,
+          "type": "uint / union low",
+          "guessedPurpose": "事件载荷 DWORD/头。",
+          "confidence": 0.55
+        },
+        {
+          "index": 2,
+          "type": "void*",
+          "guessedPurpose": "第二 QWORD 载荷。",
+          "confidence": 0.52
+        },
+        {
+          "index": 3,
+          "type": "uint",
+          "guessedPurpose": "附加 DWORD（`CONCAT` 写入）。",
+          "confidence": 0.5
+        }
+      ],
+      "relations": [
+        "CALL from `14045a580`、`1414e59a5`、`1414e5a34`"
+      ]
+    },
+    {
+      "address": "FUN_1414e5210",
+      "guessedName": "RemoveQueuedGameEventByKeyAndNotifyFacet18",
+      "guessedNameConfidence": 0.72,
+      "purpose": "在 **`+0x9c8`** 链上匹配 **`node+8==param_2`** 摘除；每节点调用 **`(*(+0x9c0)+0x18)`**。",
+      "purposeConfidence": 0.76,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "Scheduler0x9c0*",
+          "guessedPurpose": "调度基址。",
+          "confidence": 0.84
+        },
+        {
+          "index": 1,
+          "type": "longlong",
+          "guessedPurpose": "链表节点匹配键（**`+8`**）。",
+          "confidence": 0.62
+        }
+      ],
+      "relations": [
+        "`FUN_1414e51e0` → `CALL 1414e51f0`"
+      ]
+    },
+    {
+      "address": "FUN_1403c4560",
+      "guessedName": "ScalarDeletingDtor_Scheduler0x9e0",
+      "guessedNameConfidence": 0.8,
+      "purpose": "**`142065b70` vtable slot0**：**`FUN_1414e50d0`** 体内清理；**`param_2&1`** 时 **`d0fb84(0x9e0)`**（较 **`0x9c0`** 多 **0x20** 对齐/尾域）。",
+      "purposeConfidence": 0.82,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "void*",
+          "guessedPurpose": "**this** 转交释放。",
+          "confidence": 0.78
+        },
+        {
+          "index": 1,
+          "type": "ulong",
+          "guessedPurpose": "destructor 标志（析构+释放）。",
+          "confidence": 0.7
+        }
+      ],
+      "relations": [
+        "`ReadPointers 142065b70` +0"
+      ]
+    },
+    {
+      "address": "FUN_1414e58a0",
+      "guessedName": "ProxiedObjectVtSlot_GameEventEnqueueOrProperty",
+      "guessedNameConfidence": 0.72,
+      "purpose": "与 **`1414e5730` 同形锁+hash 桶**：向 **`*(this+8)` 的 `0x9c0` 子调度** 要么走 **`vtbl+0x10`（`1413b6820`）**，要么 **`FUN_1414e5290` 入队 GameEvent**（体内多处 **`CALL 1414e5290`**）。",
+      "purposeConfidence": 0.76,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "ProxiedObject*",
+          "guessedPurpose": "**this**，含 **`+0x140` 锁** 与 **`+8` → 子调度**。",
+          "confidence": 0.8
+        },
+        {
+          "index": 1,
+          "type": "float",
+          "guessedPurpose": "与 **`1413b6820`** 时间/优先级实参同族（常见 0）。",
+          "confidence": 0.55
+        },
+        {
+          "index": 2,
+          "type": "void*",
+          "guessedPurpose": "property **node**，挂 **`this+0x30+hash`** 桶。",
+          "confidence": 0.7
+        },
+        {
+          "index": 3,
+          "type": "ulong / uint",
+          "guessedPurpose": "分支/标志（与 **`DAT_1420728cc`** 等比较，决定 **`1414e5290` vs `+0x10`**）。",
+          "confidence": 0.58
+        }
+      ],
+      "relations": [
+        "`ReadPointers 142065bc8` +0x28 → `142065bf0`",
+        "`DumpDecompile 1414e58a0`"
+      ]
+    },
+    {
+      "address": "FUN_1403a6b20",
+      "guessedName": "GameEventFacet_ResetVtbl142065b50_DrainLinkedPlus18",
+      "guessedNameConfidence": 0.74,
+      "purpose": "将 facet **`[RCX]=142065b50`**，清空 **`param_1[1]`** 链表；每节点 **`(*(*param_1)+0x18)(param_1)`** — **与 `1414e50d0` 析构尾部一致**。",
+      "purposeConfidence": 0.78,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "longlong*",
+          "guessedPurpose": "**facet / 队列头**；`[0]` vptr、`[1]` 链表头、`[3]` 计数（反编译）。",
+          "confidence": 0.75
+        }
+      ],
+      "relations": [
+        "`ReadPointers 142065b50`",
+        "`FUN_1414e50d0` → `1403a6b20`"
+      ]
+    },
+    {
+      "address": "FUN_14045a520",
+      "guessedName": "EmitSoeGameEvent_Type9_BufferVia360460",
+      "guessedNameConfidence": 0.72,
+      "purpose": "栈描述符：**type=9**、**size=0x44**、**vptr=`142066468`**（邻串 **Projectiles / PhysX Simulate / GameIsReady**）；**`CALL 140360460(*(*DAT_142b19b98)+8, &desc, 0, 1)`** → **`63c180`**。**非** UCS **`0x0f0a` case 9** 解析链。",
+      "purposeConfidence": 0.76,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "void*",
+          "guessedPurpose": "反编译签名残留；**`FUN_140b0f6b0`** 传 **`DAT_142b19780`**，体内主要用 **param_2**。",
+          "confidence": 0.4
+        },
+        {
+          "index": 1,
+          "type": "uint",
+          "guessedPurpose": "**`FUN_140d7e0e0(parent,1)`** 返回值 → 写入描述符 **`local_10`**，随 **`360460`** 打包。",
+          "confidence": 0.65
+        }
+      ],
+      "relations": [
+        "`DescribeAddress 14045a56c`",
+        "`FUN_140b0f6b0` → `14045a520`",
+        "`jmpThunk 14045a580`（vtable 槽，≠ 本函数直跳）"
+      ]
+    },
+    {
+      "address": "FUN_140360460",
+      "guessedName": "SoeUtil_GameEvent_Encode8192_then_63c180",
+      "guessedNameConfidence": 0.7,
+      "purpose": "**`3626b0`** 写入 **`1+2`** 字节（自 **`desc+8`/`+0x10`**）；再 **`*(uint32*)(desc+0x20)`** 经 **`30d520`** 写 **`4`** 字节 —— **本路径约 `7` B**。**`local_20=0x44`** 为 **元数据尺寸**，未必等于拷贝长度；最后 **`63c180`**。",
+      "purposeConfidence": 0.78,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "void*",
+          "guessedPurpose": "**`*(DAT_142b19b98+8)`** — 客户端 **全局事件 sink / facade**。",
+          "confidence": 0.7
+        },
+        {
+          "index": 1,
+          "type": "void*",
+          "guessedPurpose": "指向 **`PTR_FUN_142066468` + 头字段** 的 **little 描述符**（type/size/payload 源）。",
+          "confidence": 0.72
+        },
+        {
+          "index": 2,
+          "type": "uint",
+          "guessedPurpose": "传入 **`63c180` 的 `param_3`**（日志为 **`0`**）。",
+          "confidence": 0.55
+        },
+        {
+          "index": 3,
+          "type": "byte",
+          "guessedPurpose": "传入 **`63c180` 的 `param_5` 布尔**（**`R9B=1`**）。",
+          "confidence": 0.58
+        }
+      ],
+      "relations": [
+        "`QueryXref to 140360460`：仅 **`14045a56c`**",
+        "`DumpDecompile 140360460`",
+        "`FUN_1403626b0` / `FUN_14030d520` logs 20260320_141524_*"
+      ]
+    },
+    {
+      "address": "FUN_1403626b0",
+      "guessedName": "GameEventDesc_AppendHeaderBytesToArray",
+      "guessedNameConfidence": 0.75,
+      "purpose": "从 **`desc`** 顺序追加 **`1` 字节（+8）** 与 **`2` 字节（`+0x10` 低 word）** 到 **`SoeUtil::Array`**，两次 **`30d520`**。",
+      "purposeConfidence": 0.8,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "void*",
+          "guessedPurpose": "**`360460` 的栈描述符基址**（与 **`45a520` 的 `RDX` 同源）。",
+          "confidence": 0.78
+        },
+        {
+          "index": 1,
+          "type": "void**",
+          "guessedPurpose": "指向 **Array 包装/写游标**（`**param_2` → vftable；`[0x406]` 游标）。",
+          "confidence": 0.65
+        }
+      ],
+      "relations": [
+        "`DumpDecompile 1403626b0`"
+      ]
+    },
+    {
+      "address": "FUN_14030d520",
+      "guessedName": "SoeUtil_Array_WriteOrGrow_Memmove",
+      "guessedNameConfidence": 0.72,
+      "purpose": "**向 byte 数组写 `param_4` 字节**；边界用 **`+8` 数据指针**与 **`+0x10` 已用长度**；需时 **`30e860`/`140d11e20`**。",
+      "purposeConfidence": 0.76,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "void*",
+          "guessedPurpose": "**Array 头**（SoE 模板）。",
+          "confidence": 0.72
+        },
+        {
+          "index": 1,
+          "type": "int",
+          "guessedPurpose": "**写偏移/游标**。",
+          "confidence": 0.62
+        },
+        {
+          "index": 2,
+          "type": "ulong",
+          "guessedPurpose": "**源地址**（栈临时或字面缓冲）。",
+          "confidence": 0.58
+        },
+        {
+          "index": 3,
+          "type": "uint",
+          "guessedPurpose": "**写入字节数**（`1`/`2`/`4`…）。",
+          "confidence": 0.75
+        }
+      ],
+      "relations": [
+        "`DumpDecompile 14030d520`"
+      ]
+    },
+    {
+      "address": "FUN_140d7e0e0",
+      "guessedName": "PerfMetricSlot_QwordValue",
+      "guessedNameConfidence": 0.58,
+      "purpose": "**Listing：`CALL d7cb70` 继承 `RCX/RDX`**（反编译误为无参）。**`d7cb70(ctx,1)`** 取槽；`**(int)(slot+8)==3** 为就绪；否则 **`d8a390`**；返回 **`*slot` 的 QWORD**（**`45a520` 缩成 DWORD 填入 `desc+0x20`**）。",
+      "purposeConfidence": 0.64,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "void*",
+          "guessedPurpose": "**`FUN_140b0f6b0`：`RCX=RBX`** — GPU/驱动 **上下文/设备**。",
+          "confidence": 0.55
+        },
+        {
+          "index": 1,
+          "type": "int",
+          "guessedPurpose": "常 **`1`**：**`d7cb70` 槽索引**（正分支 **`(idx-1)*0x10` + `*(ctx+0x18)`**）。",
+          "confidence": 0.62
+        }
+      ],
+      "relations": [
+        "`DescribeAddress 140d7e0e0`",
+        "`DescribeAddress 140b0f6dc`",
+        "`QueryXref to 140d7e0e0`（382）"
+      ]
+    },
+    {
+      "address": "FUN_140d8a390",
+      "guessedName": "PerfMetric_EnsureSlotState3_CopyOut",
+      "guessedNameConfidence": 0.7,
+      "purpose": "**`d7e0e0`** 分支：槽 **`[1]`** 为 **3** 已就绪；为 **4** 时 **`d86380` 填充** 输出 **`param_2`** 就绪副本；否则失败。",
+      "purposeConfidence": 0.74,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "longlong*",
+          "guessedPurpose": "**指标槽**（`**[0]`** 数据，`**[1]`** 状态）。",
+          "confidence": 0.72
+        },
+        {
+          "index": 1,
+          "type": "longlong*",
+          "guessedPurpose": "**输出/临时** 槽（`**d86380`** 成功则写入）。",
+          "confidence": 0.6
+        }
+      ],
+      "relations": [
+        "`DumpDecompile 140d8a390`",
+        "`FUN_140d86380`",
+        "`FUN_140d7e0e0`"
+      ]
+    },
+    {
+      "address": "FUN_140d86380",
+      "guessedName": "ParseMetricString_ToDouble",
+      "guessedNameConfidence": 0.68,
+      "purpose": "**`d5aa58` + 条件 `strtoul(,,16)`** 与空白裁剪 — 把 **GPU/计数器文本** 变成 **`double`**，供 **`d8a390`**。",
+      "purposeConfidence": 0.72,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "byte*",
+          "guessedPurpose": "**源字符串/缓冲**（来自槽 **`+0x18`** 区）。",
+          "confidence": 0.55
+        },
+        {
+          "index": 1,
+          "type": "double*",
+          "guessedPurpose": "**输出** 解析值。",
+          "confidence": 0.7
+        }
+      ],
+      "relations": [
+        "`DumpDecompile 140d86380`",
+        "`FUN_140d8a390`"
+      ]
+    },
+    {
+      "address": "FUN_1402ecab0",
+      "guessedName": "PlayClient_GatewayObject_PlacementCtor_142046c58",
+      "guessedNameConfidence": 0.76,
+      "purpose": "**`[RCX]=142046c58`**；可选 **`d0fb84(,0x10)`**；**`RAX=this`**。**`1420469a8` vtbl `+0x2b0`** 目标；**`46e660` 写入 `DAT_142b19b98`**。",
+      "purposeConfidence": 0.8,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "void*",
+          "guessedPurpose": "**`this` 缓冲**（**`MOV [RCX],imm`**）。",
+          "confidence": 0.78
+        },
+        {
+          "index": 1,
+          "type": "ulong",
+          "guessedPurpose": "** ctor 标志**（**`TEST DL,1`** → **`0x10` 分配**）。",
+          "confidence": 0.55
+        }
+      ],
+      "relations": [
+        "`ReadPointers 1420469a8`（+0x2b0）",
+        "`ReadPointers 142046c58`",
+        "`FUN_14046e660`"
+      ]
+    },
+    {
+      "address": "FUN_14046e660",
+      "guessedName": "GatewayChannel_InitAssign_DAT_142b19b98",
+      "guessedNameConfidence": 0.72,
+      "purpose": "**`DAT_142b19b98 = (*(*game+0x2b0))(game,1,UseCompression)`**（**槽 → `FUN_1402ecab0`**）；邻 **`63d680`/`63bda0`** **s-channel**；**`3e42c0`** teardown **`(*DAT)(...,1)`** 清空。",
+      "purposeConfidence": 0.78,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "longlong*",
+          "guessedPurpose": "**大上下文 `game`/client**（含 **`0x62c2` 地址、`0x71c6` 配置、`UseCompression`**）。",
+          "confidence": 0.68
+        }
+      ],
+      "relations": [
+        "`DumpDecompile 14046e660`",
+        "`DescribeAddress 14046e6fe`",
+        "`FUN_1402ecab0`",
+        "`SearchDecompile 3e42c0 142b19b98`",
+        "`QueryXref to 142b19b98`"
+      ]
+    },
+    {
+      "address": "FUN_1404690c0",
+      "guessedName": "PlayClient_Virtual48_IStringThen3dd800",
+      "guessedNameConfidence": 0.74,
+      "purpose": "**PlayClient `+0x48`**：**`63c180`** 同步 **`CALL`**；**`ce9630` 建 `IString`** 再 **`vtable+0x180` → `FUN_1403dd800`**。",
+      "purposeConfidence": 0.8,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "longlong*",
+          "guessedPurpose": "**`this`**（**`DAT_142b19b98` 与之一致**）。",
+          "confidence": 0.72
+        },
+        {
+          "index": 1,
+          "type": "void*",
+          "guessedPurpose": "**`param_4`**（来自 **`63c180`/`360460` 链**）。",
+          "confidence": 0.45
+        },
+        {
+          "index": 2,
+          "type": "void*",
+          "guessedPurpose": "**`param_2` 缓冲**。",
+          "confidence": 0.45
+        },
+        {
+          "index": 3,
+          "type": "void*",
+          "guessedPurpose": "**`param_3`**。",
+          "confidence": 0.4
+        }
+      ],
+      "relations": [
+        "`ReadPointers 1420469a8` +0x48/+0x180",
+        "`FUN_1403dd800`",
+        "`DescribeAddress 14063c1d8`",
+        "`DumpDecompile 1404690c0`"
+      ]
+    },
+    {
+      "address": "FUN_1403dd800",
+      "guessedName": "PlayClient_Virtual180_Alloc2b8_63cc10",
+      "guessedNameConfidence": 0.72,
+      "purpose": "**`vtable+0x180`**：**`2fc0f0(0x2b8)`** + **`63cc10`**；读 **`this+0x38bf0`** / **`this+0x316b0`**。**`4690c0`** 下游。",
+      "purposeConfidence": 0.76,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "longlong*",
+          "guessedPurpose": "**PlayClient `this`**（同 **`DAT_142b19b98`** 对象）。",
+          "confidence": 0.7
+        },
+        {
+          "index": 1,
+          "type": "byte",
+          "guessedPurpose": "**透传 `63cc10`**（**`4690c0` 实参**）。",
+          "confidence": 0.5
+        },
+        {
+          "index": 2,
+          "type": "byte",
+          "guessedPurpose": "**同上**。",
+          "confidence": 0.5
+        }
+      ],
+      "relations": [
+        "`ReadPointers 1420469a8` +0x180",
+        "`DumpDecompile 1403dd800`",
+        "`DumpDecompile 14063cc10`",
+        "`FUN_1404690c0`"
+      ]
+    },
+    {
+      "address": "FUN_14063c180",
+      "guessedName": "ClientGameEventBus_PostMaybeDeferred",
+      "guessedNameConfidence": 0.68,
+      "purpose": "**线程闸** + 同步：**`CALL [vptr+0x48]`**（**`FUN_1404690c0`** 当 **`vptr=1420469a8`**）+ **`14162dcc0`**。**`360460`→`63c180` 首参 `*(p+8)`**。",
+      "purposeConfidence": 0.78,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "void**",
+          "guessedPurpose": "**`*(DAT_142b19b98+8)` 子头**（**Listing `360460`→`63c180`**）；`**param_1[1]`** 线程/队列 id。",
+          "confidence": 0.7
+        },
+        {
+          "index": 1,
+          "type": "void*",
+          "guessedPurpose": "**`Array` 数据指针**（**`local_2078[1]`**）。",
+          "confidence": 0.68
+        },
+        {
+          "index": 2,
+          "type": "uint",
+          "guessedPurpose": "**缓冲总长 `local_48`**（**`140360557` 的 `R8`**）。",
+          "confidence": 0.62
+        },
+        {
+          "index": 3,
+          "type": "uint",
+          "guessedPurpose": "**`360460` arg2 → `R9D`**（**`45a520` 路径多为 `0`**）。",
+          "confidence": 0.55
+        },
+        {
+          "index": 4,
+          "type": "bool",
+          "guessedPurpose": "**第 5 参**：**`[RSP+20]`**（**`45a520`：`1`**）。",
+          "confidence": 0.58
+        }
+      ],
+      "relations": [
+        "`QueryXref to 14063c180`：555+（高频）",
+        "`DescribeAddress 14063c1d8`",
+        "`FUN_1404690c0`",
+        "`FUN_1403dd800`",
+        "`14162dcc0` + `FUN_14063bf90`",
+        "`DescribeAddress 140360557`",
+        "`FUN_14046e660`"
+      ]
+    },
+    {
+      "address": "FUN_140b0f6b0",
+      "guessedName": "PerfProbe_emitType9_whenD7Ready",
+      "guessedNameConfidence": 0.58,
+      "purpose": "**`d7d290`/`d7d3c0(RBX,1)`** 成功后 **`d7e0e0`：`RCX=RBX,EDX=1` → `d7cb70`**；**`EAX` → `45a520(...,uVar2)`** — **唯一 CODE 上游**；**`uVar2`** = **指标 QWORD 低 32 位**。",
+      "purposeConfidence": 0.66,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "void*",
+          "guessedPurpose": "传入 **`FUN_140d7d3c0`/`d7e0e0`** 的 **上下文/设备句柄**（待钉）。",
+          "confidence": 0.55
+        }
+      ],
+      "relations": [
+        "`DescribeAddress 140b0f6ea`",
+        "`FUN_14045a520`"
+      ]
+    }
+  ],
+  "appendix_findMemoryRefs_0xa3_any": {
+    "note": "扩大 `mode=any` 仍无 `entity+base+0xa3` 形态；栈槽与立即数不算实体字段写入者。",
+    "scans": [
+      {
+        "range": ["140400000", "140600000"],
+        "log": "dev/ghidra/analysis/output/FindMemoryRefsByOffset__0xa3__any__0x140400000__0x140600000__20260320_085851_570.log",
+        "matchCount": 7,
+        "summary": "含 `FUN_1404b7070` 内 `MOV R8D,0xa3`（立即数）；6 条为 `FUN_14050c220` / `FUN_140524f60` / `FUN_14053b5c0` 的 `[RSP+0xa3]` store/load"
+      },
+      {
+        "range": ["140600000", "140800000"],
+        "log": "dev/ghidra/analysis/output/FindMemoryRefsByOffset__0xa3__any__0x140600000__0x140800000__20260320_085948_895.log",
+        "matchCount": 1,
+        "summary": "仅 `FUN_140759360` @ `1407593ba`：`MOV ECX,0xa3`（立即数）"
+      }
+    ]
+  }
+}

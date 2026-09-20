@@ -93,6 +93,7 @@ type WorkerRequest =
         existingNpcPositions: number[][];
         npcSpawnRadius: number;
         chanceNpc: number;
+        chanceRabbit: number;
         chanceScreamer: number;
         chanceGasser: number;
         chanceExploder: number;
@@ -200,6 +201,7 @@ export class LootSpawnWorker {
     existingNpcPositions: number[][],
     npcSpawnRadius: number,
     chanceNpc: number,
+    chanceRabbit: number,
     chanceScreamer: number,
     chanceGasser: number,
     chanceExploder: number,
@@ -212,6 +214,7 @@ export class LootSpawnWorker {
         existingNpcPositions,
         npcSpawnRadius,
         chanceNpc,
+        chanceRabbit,
         chanceScreamer,
         chanceGasser,
         chanceExploder,

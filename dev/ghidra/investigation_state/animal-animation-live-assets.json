@@ -1,0 +1,615 @@
+{
+  "tool": "audit-animal-animation-mrn",
+  "asset": {
+    "file": "D:\\WindowsOnly\\Games\\H1EMU_Client\\Resources\\Assets\\unpacked\\AnimalsX64.mrn",
+    "header": {
+      "magic": "0x18",
+      "resourceFamily": "0x0a",
+      "headerBytes": 48,
+      "animationPacketType": "0x0f",
+      "fileNamesPacketType": "0x0d"
+    },
+    "packetCount": 117,
+    "animations": [
+      {
+        "index": 0,
+        "name": "Animals_Wolf001_SlopeLR_Additive",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Wolf001\\Animals_Wolf001_SlopeLR_Additive.xmd",
+        "resourceFilename": "Animals_Wolf001_SlopeLR_Additive_Animals_Wolf001_SlopeLR_Additive_33cb8d1a.nsa",
+        "durationSeconds": 1.0333333015441895,
+        "framerate": 30.0,
+        "packetOffset": 0,
+        "packetLength": 9264
+      },
+      {
+        "index": 1,
+        "name": "Animals_Wolf001_SlopeBF_Additive",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Wolf001\\Animals_Wolf001_SlopeBF_Additive.xmd",
+        "resourceFilename": "Animals_Wolf001_SlopeBF_Additive_Animals_Wolf001_SlopeBF_Additive_7969125a.nsa",
+        "durationSeconds": 1.0333333015441895,
+        "framerate": 30.0,
+        "packetOffset": 9312,
+        "packetLength": 8320
+      },
+      {
+        "index": 2,
+        "name": "Animals_Wolf001_DeathB",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Wolf001\\Animals_Wolf001_DeathB.xmd",
+        "resourceFilename": "Animals_Wolf001_DeathB_Animals_Wolf001_DeathB_d4af919b.nsa",
+        "durationSeconds": 4.333333492279053,
+        "framerate": 29.999998092651367,
+        "packetOffset": 17680,
+        "packetLength": 29184
+      },
+      {
+        "index": 3,
+        "name": "Animals_Wolf001_FlinchB",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Wolf001\\Animals_Wolf001_FlinchB.xmd",
+        "resourceFilename": "Animals_Wolf001_FlinchB_Animals_Wolf001_FlinchB_65f3b075.nsa",
+        "durationSeconds": 1.0,
+        "framerate": 30.0,
+        "packetOffset": 46912,
+        "packetLength": 8112
+      },
+      {
+        "index": 4,
+        "name": "Animals_Wolf001_Howl",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Wolf001\\Animals_Wolf001_Howl.xmd",
+        "resourceFilename": "Animals_Wolf001_Howl_Animals_Wolf001_Howl_b5143673.nsa",
+        "durationSeconds": 5.0,
+        "framerate": 30.0,
+        "packetOffset": 55072,
+        "packetLength": 41248
+      },
+      {
+        "index": 5,
+        "name": "Animals_Wolf001_IdleB",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Wolf001\\Animals_Wolf001_IdleB.xmd",
+        "resourceFilename": "Animals_Wolf001_IdleB_Animals_Wolf001_IdleB_b2af806d.nsa",
+        "durationSeconds": 8.966666221618652,
+        "framerate": 30.000001907348633,
+        "packetOffset": 96368,
+        "packetLength": 56992
+      },
+      {
+        "index": 6,
+        "name": "Animals_Wolf001_IdlePassive",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Wolf001\\Animals_Wolf001_IdlePassive.xmd",
+        "resourceFilename": "Animals_Wolf001_IdlePassive_Animals_Wolf001_IdlePassive_752d19ee.nsa",
+        "durationSeconds": 6.0,
+        "framerate": 30.0,
+        "packetOffset": 153408,
+        "packetLength": 36672
+      },
+      {
+        "index": 7,
+        "name": "Animals_Wolf001_IdleLookLeft",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Wolf001\\Animals_Wolf001_IdleLookLeft.xmd",
+        "resourceFilename": "Animals_Wolf001_IdleLookLeft_Animals_Wolf001_IdleLookLeft_33c0b30a.nsa",
+        "durationSeconds": 8.333333015441895,
+        "framerate": 30.000001907348633,
+        "packetOffset": 190128,
+        "packetLength": 53120
+      },
+      {
+        "index": 8,
+        "name": "Animals_Wolf001_Idle_LeftSniff",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Wolf001\\Animals_Wolf001_IdleLeftSniff.xmd",
+        "resourceFilename": "Animals_Wolf001_IdleLeftSniff_Animals_Wolf001_Idle_LeftSniff_6ffbc9e5.nsa",
+        "durationSeconds": 9.0,
+        "framerate": 30.0,
+        "packetOffset": 243296,
+        "packetLength": 70256
+      },
+      {
+        "index": 9,
+        "name": "Animals_Wolf001_Sprint",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Wolf001\\Animals_Wolf001_Sprint.xmd",
+        "resourceFilename": "Animals_Wolf001_Sprint_Animals_Wolf001_Sprint_4828b56e.nsa",
+        "durationSeconds": 1.0,
+        "framerate": 30.0,
+        "packetOffset": 313600,
+        "packetLength": 9680
+      },
+      {
+        "index": 10,
+        "name": "Animals_Wolf001_RunB",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Wolf001\\Animals_Wolf001_RunB.xmd",
+        "resourceFilename": "Animals_Wolf001_RunB_Animals_Wolf001_RunB_9a109499.nsa",
+        "durationSeconds": 1.3333333730697632,
+        "framerate": 30.0,
+        "packetOffset": 323328,
+        "packetLength": 12128
+      },
+      {
+        "index": 11,
+        "name": "Animals_Wolf001_WalkB",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Wolf001\\Animals_Wolf001_WalkB.xmd",
+        "resourceFilename": "Animals_Wolf001_WalkB_Animals_Wolf001_WalkB_8162b2f4.nsa",
+        "durationSeconds": 2.0,
+        "framerate": 30.0,
+        "packetOffset": 335504,
+        "packetLength": 18576
+      },
+      {
+        "index": 12,
+        "name": "Animals_Wolf001_TurnRight",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Wolf001\\Animals_Wolf001_TurnRight.xmd",
+        "resourceFilename": "Animals_Wolf001_TurnRight_Animals_Wolf001_TurnRight_cc762b3c.nsa",
+        "durationSeconds": 0.9333333373069763,
+        "framerate": 30.0,
+        "packetOffset": 354128,
+        "packetLength": 6400
+      },
+      {
+        "index": 13,
+        "name": "Animals_Wolf001_TurnLeft",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Wolf001\\Animals_Wolf001_TurnLeft.xmd",
+        "resourceFilename": "Animals_Wolf001_TurnLeft_Animals_Wolf001_TurnLeft_a92ce9f3.nsa",
+        "durationSeconds": 0.9333333373069763,
+        "framerate": 30.0,
+        "packetOffset": 360576,
+        "packetLength": 6256
+      },
+      {
+        "index": 14,
+        "name": "Animals_Wolf001_AttackB",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Wolf001\\Animals_Wolf001_AttackB.xmd",
+        "resourceFilename": "Animals_Wolf001_AttackB_Animals_Wolf001_AttackB_ca873963.nsa",
+        "durationSeconds": 1.6666666269302368,
+        "framerate": 30.0,
+        "packetOffset": 366880,
+        "packetLength": 16112
+      },
+      {
+        "index": 15,
+        "name": "Animals_Deer001_SlopeLR_Additive",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Deer001\\Animals_Deer001_SlopeLR_Additive.xmd",
+        "resourceFilename": "Animals_Deer001_SlopeLR_Additive_Animals_Deer001_SlopeLR_Additive_7867020f.nsa",
+        "durationSeconds": 1.0333333015441895,
+        "framerate": 30.0,
+        "packetOffset": 383040,
+        "packetLength": 6928
+      },
+      {
+        "index": 16,
+        "name": "Animals_Deer001_SlopeBF_Additive",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Deer001\\Animals_Deer001_SlopeBF_Additive.xmd",
+        "resourceFilename": "Animals_Deer001_SlopeBF_Additive_Animals_Deer001_SlopeBF_Additive_32c59d4f.nsa",
+        "durationSeconds": 1.0333333015441895,
+        "framerate": 30.0,
+        "packetOffset": 390016,
+        "packetLength": 7296
+      },
+      {
+        "index": 17,
+        "name": "Animals_Deer001_DeathB",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Deer001\\Animals_Deer001_DeathB.xmd",
+        "resourceFilename": "Animals_Deer001_DeathB_Animals_Deer001_DeathB_57f3a9e5.nsa",
+        "durationSeconds": 2.3333332538604736,
+        "framerate": 30.000001907348633,
+        "packetOffset": 397360,
+        "packetLength": 21392
+      },
+      {
+        "index": 18,
+        "name": "Animals_Deer001_RecoilB",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Deer001\\Animals_Deer001_RecoilB.xmd",
+        "resourceFilename": "Animals_Deer001_RecoilB_Animals_Deer001_RecoilB_db610587.nsa",
+        "durationSeconds": 1.0,
+        "framerate": 30.0,
+        "packetOffset": 418800,
+        "packetLength": 10848
+      },
+      {
+        "index": 19,
+        "name": "Animals_Deer001_IdleB",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Deer001\\Animals_Deer001_IdleB.xmd",
+        "resourceFilename": "Animals_Deer001_IdleB_Animals_Deer001_IdleB_299587d3.nsa",
+        "durationSeconds": 10.0,
+        "framerate": 30.0,
+        "packetOffset": 429696,
+        "packetLength": 87296
+      },
+      {
+        "index": 20,
+        "name": "Animals_Deer001_LookB",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Deer001\\Animals_Deer001_LookB.xmd",
+        "resourceFilename": "Animals_Deer001_LookB_Animals_Deer001_LookB_4a2226e0.nsa",
+        "durationSeconds": 7.333333492279053,
+        "framerate": 30.0,
+        "packetOffset": 517040,
+        "packetLength": 65440
+      },
+      {
+        "index": 21,
+        "name": "Animals_Deer001_SprintB",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Deer001\\Animals_Deer001_SprintB.xmd",
+        "resourceFilename": "Animals_Deer001_SprintB_Animals_Deer001_SprintB_50a3a727.nsa",
+        "durationSeconds": 2.0,
+        "framerate": 30.0,
+        "packetOffset": 582528,
+        "packetLength": 18352
+      },
+      {
+        "index": 22,
+        "name": "Animals_Deer001_RunB",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Deer001\\Animals_Deer001_RunB.xmd",
+        "resourceFilename": "Animals_Deer001_RunB_Animals_Deer001_RunB_13b2d65d.nsa",
+        "durationSeconds": 1.3333333730697632,
+        "framerate": 30.0,
+        "packetOffset": 600928,
+        "packetLength": 12080
+      },
+      {
+        "index": 23,
+        "name": "Animals_Deer001_WalkB",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Deer001\\Animals_Deer001_WalkB.xmd",
+        "resourceFilename": "Animals_Deer001_WalkB_Animals_Deer001_WalkB_1a58b54a.nsa",
+        "durationSeconds": 2.0,
+        "framerate": 30.0,
+        "packetOffset": 613056,
+        "packetLength": 19616
+      },
+      {
+        "index": 24,
+        "name": "Animals_Deer001_TurnRightB",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Deer001\\Animals_Deer001_TurnRightB.xmd",
+        "resourceFilename": "Animals_Deer001_TurnRightB_Animals_Deer001_TurnRightB_c1303762.nsa",
+        "durationSeconds": 1.0,
+        "framerate": 30.0,
+        "packetOffset": 632720,
+        "packetLength": 5584
+      },
+      {
+        "index": 25,
+        "name": "Animals_Deer001_TurnLeft",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Deer001\\Animals_Deer001_TurnLeft.xmd",
+        "resourceFilename": "Animals_Deer001_TurnLeft_Animals_Deer001_TurnLeft_6a4b1c2f.nsa",
+        "durationSeconds": 1.0,
+        "framerate": 30.0,
+        "packetOffset": 638352,
+        "packetLength": 6320
+      },
+      {
+        "index": 26,
+        "name": "Animals_Deer001_GrazeB",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Deer001\\Animals_Deer001_GrazeB.xmd",
+        "resourceFilename": "Animals_Deer001_GrazeB_Animals_Deer001_GrazeB_b741383c.nsa",
+        "durationSeconds": 15.5,
+        "framerate": 30.0,
+        "packetOffset": 644720,
+        "packetLength": 143456
+      },
+      {
+        "index": 27,
+        "name": "Animals_Buck001_Attack",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Deer001\\Animals_Buck001_Attack.xmd",
+        "resourceFilename": "Animals_Buck001_Attack_Animals_Buck001_Attack_afd2bb0d.nsa",
+        "durationSeconds": 2.6666667461395264,
+        "framerate": 30.0,
+        "packetOffset": 788224,
+        "packetLength": 19232
+      },
+      {
+        "index": 28,
+        "name": "Animals_Bear001_SlopeLR_Additive",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Bear001\\Animals_Bear001_SlopeLR_Additive.xmd",
+        "resourceFilename": "Animals_Bear001_SlopeLR_Additive_Animals_Bear001_SlopeLR_Additive_e57b0b8a.nsa",
+        "durationSeconds": 1.0333333015441895,
+        "framerate": 30.0,
+        "packetOffset": 807504,
+        "packetLength": 6256
+      },
+      {
+        "index": 29,
+        "name": "Animals_Bear001_SlopeBF_Additive",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Bear001\\Animals_Bear001_SlopeBF_Additive.xmd",
+        "resourceFilename": "Animals_Bear001_SlopeBF_Additive_Animals_Bear001_SlopeBF_Additive_afd994ca.nsa",
+        "durationSeconds": 1.0333333015441895,
+        "framerate": 30.0,
+        "packetOffset": 813808,
+        "packetLength": 5232
+      },
+      {
+        "index": 30,
+        "name": "Animals_Bear001_Death",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Bear001\\Animals_Bear001_Death.xmd",
+        "resourceFilename": "Animals_Bear001_Death_Animals_Bear001_Death_57b2436d.nsa",
+        "durationSeconds": 4.333333492279053,
+        "framerate": 29.999998092651367,
+        "packetOffset": 819088,
+        "packetLength": 32672
+      },
+      {
+        "index": 31,
+        "name": "Animals_Bear001_CmbtRecoil",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Bear001\\Animals_Bear001_CmbtRecoil.xmd",
+        "resourceFilename": "Animals_Bear001_CmbtRecoil_Animals_Bear001_CmbtRecoil_2df274cb.nsa",
+        "durationSeconds": 1.6666666269302368,
+        "framerate": 30.0,
+        "packetOffset": 851808,
+        "packetLength": 13568
+      },
+      {
+        "index": 32,
+        "name": "Animals_Bear001_Idle01",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Bear001\\Animals_Bear001_Idle01.xmd",
+        "resourceFilename": "Animals_Bear001_Idle01_Animals_Bear001_Idle01_21dda6b2.nsa",
+        "durationSeconds": 11.0,
+        "framerate": 30.0,
+        "packetOffset": 865424,
+        "packetLength": 63920
+      },
+      {
+        "index": 33,
+        "name": "Animals_Bear001_Look",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Bear001\\Animals_Bear001_Look.xmd",
+        "resourceFilename": "Animals_Bear001_Look_Animals_Bear001_Look_8a7addc5.nsa",
+        "durationSeconds": 11.0,
+        "framerate": 30.0,
+        "packetOffset": 929392,
+        "packetLength": 59920
+      },
+      {
+        "index": 34,
+        "name": "Animals_Bear001_RearUp",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Bear001\\Animals_Bear001_RearUp.xmd",
+        "resourceFilename": "Animals_Bear001_RearUp_Animals_Bear001_RearUp_84cd5327.nsa",
+        "durationSeconds": 5.333333492279053,
+        "framerate": 30.0,
+        "packetOffset": 989360,
+        "packetLength": 35888
+      },
+      {
+        "index": 35,
+        "name": "Animals_Bear001_Sprint",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Bear001\\Animals_Bear001_Sprint.xmd",
+        "resourceFilename": "Animals_Bear001_Sprint_Animals_Bear001_Sprint_e28e288d.nsa",
+        "durationSeconds": 1.0666667222976685,
+        "framerate": 29.999998092651367,
+        "packetOffset": 1025296,
+        "packetLength": 9280
+      },
+      {
+        "index": 36,
+        "name": "Animals_Bear001_Run",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Bear001\\Animals_Bear001_Run.xmd",
+        "resourceFilename": "Animals_Bear001_Run_Animals_Bear001_Run_5901ba64.nsa",
+        "durationSeconds": 1.399999976158142,
+        "framerate": 30.0,
+        "packetOffset": 1034624,
+        "packetLength": 13520
+      },
+      {
+        "index": 37,
+        "name": "Animals_Bear001_WalkB",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Bear001\\Animals_Bear001_WalkB.xmd",
+        "resourceFilename": "Animals_Bear001_WalkB_Animals_Bear001_WalkB_ea0e5f46.nsa",
+        "durationSeconds": 1.5,
+        "framerate": 30.0,
+        "packetOffset": 1048192,
+        "packetLength": 14864
+      },
+      {
+        "index": 38,
+        "name": "Animals_Bear001_TurnRight",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Bear001\\Animals_Bear001_TurnRight.xmd",
+        "resourceFilename": "Animals_Bear001_TurnRight_Animals_Bear001_TurnRight_75acd631.nsa",
+        "durationSeconds": 2.0,
+        "framerate": 30.0,
+        "packetOffset": 1063104,
+        "packetLength": 16048
+      },
+      {
+        "index": 39,
+        "name": "Animals_Bear001_TurnLeft",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Bear001\\Animals_Bear001_TurnLeft.xmd",
+        "resourceFilename": "Animals_Bear001_TurnLeft_Animals_Bear001_TurnLeft_8b785613.nsa",
+        "durationSeconds": 2.0,
+        "framerate": 30.0,
+        "packetOffset": 1079200,
+        "packetLength": 16768
+      },
+      {
+        "index": 40,
+        "name": "Animals_Bear001_Attack02",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Bear001\\Animals_Bear001_Attack02.xmd",
+        "resourceFilename": "Animals_Bear001_Attack02_Animals_Bear001_Attack02_3b07f39f.nsa",
+        "durationSeconds": 2.133333444595337,
+        "framerate": 29.999998092651367,
+        "packetOffset": 1096016,
+        "packetLength": 14704
+      },
+      {
+        "index": 41,
+        "name": "Animals_Bear001_Attack01",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Bear001\\Animals_Bear001_Attack01.xmd",
+        "resourceFilename": "Animals_Bear001_Attack01_Animals_Bear001_Attack01_2a35c8b5.nsa",
+        "durationSeconds": 1.0,
+        "framerate": 30.0,
+        "packetOffset": 1110768,
+        "packetLength": 6496
+      },
+      {
+        "index": 42,
+        "name": "Animals_Rabbit001_SlopeLR_Additive",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Rabbit001\\Animals_Rabbit001_SlopeLR_Additive.xmd",
+        "resourceFilename": "Animals_Rabbit001_SlopeLR_Additive_Animals_Rabbit001_SlopeLR_Additive_21d37970.nsa",
+        "durationSeconds": 1.0333333015441895,
+        "framerate": 30.0,
+        "packetOffset": 1117312,
+        "packetLength": 6000
+      },
+      {
+        "index": 43,
+        "name": "Animals_Rabbit001_SlopeBF_Additive",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Rabbit001\\Animals_Rabbit001_SlopeBF_Additive.xmd",
+        "resourceFilename": "Animals_Rabbit001_SlopeBF_Additive_Animals_Rabbit001_SlopeBF_Additive_d5667e17.nsa",
+        "durationSeconds": 1.0333333015441895,
+        "framerate": 30.0,
+        "packetOffset": 1123360,
+        "packetLength": 6000
+      },
+      {
+        "index": 44,
+        "name": "Animals_Rabbit001_Death",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Rabbit001\\Animals_Rabbit001_Death.xmd",
+        "resourceFilename": "Animals_Rabbit001_Death_Animals_Rabbit001_Death_4f41e13c.nsa",
+        "durationSeconds": 2.200000047683716,
+        "framerate": 30.0,
+        "packetOffset": 1129408,
+        "packetLength": 11584
+      },
+      {
+        "index": 45,
+        "name": "Animals_Rabbit001_Flinch",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Rabbit001\\Animals_Rabbit001_Flinch.xmd",
+        "resourceFilename": "Animals_Rabbit001_Flinch_Animals_Rabbit001_Flinch_7c8583cc.nsa",
+        "durationSeconds": 1.2999999523162842,
+        "framerate": 30.000001907348633,
+        "packetOffset": 1141040,
+        "packetLength": 10032
+      },
+      {
+        "index": 46,
+        "name": "Rabbit_Tan",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Rabbit001\\Animals_Rabbit001A_BindPose.xmd",
+        "resourceFilename": "Animals_Rabbit001A_BindPose_Rabbit_Tan_2fb39458.nsa",
+        "durationSeconds": 0.7666666507720947,
+        "framerate": 30.0,
+        "packetOffset": 1151120,
+        "packetLength": 1360
+      },
+      {
+        "index": 47,
+        "name": "Animals_Rabbit001_idle",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Rabbit001\\Animals_Rabbit001_idle.xmd",
+        "resourceFilename": "Animals_Rabbit001_idle_Animals_Rabbit001_idle_9f687b61.nsa",
+        "durationSeconds": 6.266666889190674,
+        "framerate": 29.999998092651367,
+        "packetOffset": 1152528,
+        "packetLength": 32672
+      },
+      {
+        "index": 48,
+        "name": "Animals_Rabbit001_StandSniff",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Rabbit001\\Animals_Rabbit001_StandSniff.xmd",
+        "resourceFilename": "Animals_Rabbit001_StandSniff_Animals_Rabbit001_StandSniff_e604c033.nsa",
+        "durationSeconds": 10.0,
+        "framerate": 30.0,
+        "packetOffset": 1185248,
+        "packetLength": 77600
+      },
+      {
+        "index": 49,
+        "name": "Animals_Rabbit001_Scratch",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Rabbit001\\Animals_Rabbit001_Scratch.xmd",
+        "resourceFilename": "Animals_Rabbit001_Scratch_Animals_Rabbit001_Scratch_42534009.nsa",
+        "durationSeconds": 3.3333332538604736,
+        "framerate": 30.0,
+        "packetOffset": 1262896,
+        "packetLength": 22736
+      },
+      {
+        "index": 50,
+        "name": "Rabbit_Preen",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Rabbit001\\Animals_Rabbit001_Preen.xmd",
+        "resourceFilename": "Animals_Rabbit001_Preen_Rabbit_Preen_342460b3.nsa",
+        "durationSeconds": 7.4666666984558105,
+        "framerate": 30.0,
+        "packetOffset": 1285680,
+        "packetLength": 53024
+      },
+      {
+        "index": 51,
+        "name": "Animals_Rabbit001_Look",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Rabbit001\\Animals_Rabbit001_Look.xmd",
+        "resourceFilename": "Animals_Rabbit001_Look_Animals_Rabbit001_Look_bc7757da.nsa",
+        "durationSeconds": 6.266666889190674,
+        "framerate": 29.999998092651367,
+        "packetOffset": 1338752,
+        "packetLength": 35696
+      },
+      {
+        "index": 52,
+        "name": "Animals_Rabbit001_Sprint",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Rabbit001\\Animals_Rabbit001_Sprint.xmd",
+        "resourceFilename": "Animals_Rabbit001_Sprint_Animals_Rabbit001_Sprint_bebe7c7d.nsa",
+        "durationSeconds": 1.0666667222976685,
+        "framerate": 29.999998092651367,
+        "packetOffset": 1374496,
+        "packetLength": 6800
+      },
+      {
+        "index": 53,
+        "name": "Animals_Rabbit001_Run",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Rabbit001\\Animals_Rabbit001_Run.xmd",
+        "resourceFilename": "Animals_Rabbit001_Run_Animals_Rabbit001_Run_64883f7d.nsa",
+        "durationSeconds": 1.4666666984558105,
+        "framerate": 30.0,
+        "packetOffset": 1381344,
+        "packetLength": 8496
+      },
+      {
+        "index": 54,
+        "name": "Animals_Rabbit001_Walk",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Rabbit001\\Animals_Rabbit001_Walk.xmd",
+        "resourceFilename": "Animals_Rabbit001_Walk_Animals_Rabbit001_Walk_54bd6b5b.nsa",
+        "durationSeconds": 1.5333333015441895,
+        "framerate": 30.0,
+        "packetOffset": 1389888,
+        "packetLength": 8224
+      },
+      {
+        "index": 55,
+        "name": "Animals_Rabbit001_TurnRight",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Rabbit001\\Animals_Rabbit001_TurnRight.xmd",
+        "resourceFilename": "Animals_Rabbit001_TurnRight_Animals_Rabbit001_TurnRight_270e5cb7.nsa",
+        "durationSeconds": 1.0,
+        "framerate": 30.0,
+        "packetOffset": 1398160,
+        "packetLength": 5488
+      },
+      {
+        "index": 56,
+        "name": "Animals_Rabbit001_TurnLeft",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Rabbit001\\Animals_Rabbit001_TurnLeft.xmd",
+        "resourceFilename": "Animals_Rabbit001_TurnLeft_Animals_Rabbit001_TurnLeft_a17e6fbf.nsa",
+        "durationSeconds": 1.0,
+        "framerate": 30.0,
+        "packetOffset": 1403696,
+        "packetLength": 5712
+      },
+      {
+        "index": 57,
+        "name": "Rabbit_Eat",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Rabbit001\\Animals_Rabbit001_Eating.xmd",
+        "resourceFilename": "Animals_Rabbit001_Eating_Rabbit_Eat_104c9a13.nsa",
+        "durationSeconds": 10.0,
+        "framerate": 30.0,
+        "packetOffset": 1409456,
+        "packetLength": 58272
+      },
+      {
+        "index": 58,
+        "name": "Animals_Rabbit001_Attack",
+        "sourceFilename": "$(RootDir)\\Networks\\Animals\\Animations\\Rabbit001\\Animals_Rabbit001_Attack.xmd",
+        "resourceFilename": "Animals_Rabbit001_Attack_Animals_Rabbit001_Attack_22ded8bd.nsa",
+        "durationSeconds": 2.3333332538604736,
+        "framerate": 30.000001907348633,
+        "packetOffset": 1467776,
+        "packetLength": 12176
+      }
+    ],
+    "summary": {
+      "animationCount": 59,
+      "framerates": [
+        29.999998092651367,
+        30.0,
+        30.000001907348633
+      ],
+      "semanticStatus": "source-clip-duration-recovered; graph-selector-speed-and-live-contact-unverified"
+    }
+  }
+}

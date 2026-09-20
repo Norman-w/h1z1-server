@@ -1,0 +1,737 @@
+{
+  "tool": "audit-animal-animation-mrn",
+  "asset": {
+    "file": "D:\\WindowsOnly\\Games\\H1EMU_Client\\Resources\\Assets\\unpacked\\ThirdPersonZombie_AnimationX64.mrn",
+    "header": {
+      "magic": "0x18",
+      "resourceFamily": "0x0a",
+      "headerBytes": 48,
+      "animationPacketType": "0x0f",
+      "fileNamesPacketType": "0x0d"
+    },
+    "packetCount": 151,
+    "animations": [
+      {
+        "index": 0,
+        "name": "Zombie001_Common_FakeRagdollRight",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_FakeRagdollRight.xmd",
+        "resourceFilename": "Zombie001_Common_FakeRagdollRight_Zombie001_Common_FakeRagdollRight_25bdb149.nsa",
+        "durationSeconds": 1.5,
+        "framerate": 30.0,
+        "packetOffset": 0,
+        "packetLength": 10096
+      },
+      {
+        "index": 1,
+        "name": "Zombie001_Common_FakeRagdollBack",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_FakeRagdollBack.xmd",
+        "resourceFilename": "Zombie001_Common_FakeRagdollBack_Zombie001_Common_FakeRagdollBack_d6646ef.nsa",
+        "durationSeconds": 1.5,
+        "framerate": 30.0,
+        "packetOffset": 10144,
+        "packetLength": 14464
+      },
+      {
+        "index": 2,
+        "name": "Zombie001_Common_FakeRagdollLeft",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_FakeRagdollLeft.xmd",
+        "resourceFilename": "Zombie001_Common_FakeRagdollLeft_Zombie001_Common_FakeRagdollLeft_ec2237ff.nsa",
+        "durationSeconds": 1.0,
+        "framerate": 30.0,
+        "packetOffset": 24656,
+        "packetLength": 6064
+      },
+      {
+        "index": 3,
+        "name": "Zombie001_Common_FakeRagdollFront",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_FakeRagdollFront.xmd",
+        "resourceFilename": "Zombie001_Common_FakeRagdollFront_Zombie001_Common_FakeRagdollFront_2eefe4b3.nsa",
+        "durationSeconds": 1.5,
+        "framerate": 30.0,
+        "packetOffset": 30768,
+        "packetLength": 8576
+      },
+      {
+        "index": 4,
+        "name": "Zombie001_Common_KnockbackExtremeSouthEast",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_KnockbackExtremeSouthEast.xmd",
+        "resourceFilename": "Zombie001_Common_KnockbackExtremeSouthEast_Zombie001_Common_KnockbackExtremeSouthEast_e2282f71.nsa",
+        "durationSeconds": 1.2999999523162842,
+        "framerate": 30.000001907348633,
+        "packetOffset": 39392,
+        "packetLength": 6944
+      },
+      {
+        "index": 5,
+        "name": "Zombie001_Common_KnockbackExtremeEast",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_KnockbackExtremeEast.xmd",
+        "resourceFilename": "Zombie001_Common_KnockbackExtremeEast_Zombie001_Common_KnockbackExtremeEast_12e9195d.nsa",
+        "durationSeconds": 1.3333333730697632,
+        "framerate": 30.0,
+        "packetOffset": 46384,
+        "packetLength": 7424
+      },
+      {
+        "index": 6,
+        "name": "Zombie001_Common_KnockbackExtremeNorthEast",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_KnockbackExtremeNorthEast.xmd",
+        "resourceFilename": "Zombie001_Common_KnockbackExtremeNorthEast_Zombie001_Common_KnockbackExtremeNorthEast_bc8a99e2.nsa",
+        "durationSeconds": 1.6333333253860474,
+        "framerate": 30.0,
+        "packetOffset": 53856,
+        "packetLength": 7984
+      },
+      {
+        "index": 7,
+        "name": "Zombie001_Common_KnockbackExtremeNorth",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_KnockbackExtremeNorth.xmd",
+        "resourceFilename": "Zombie001_Common_KnockbackExtremeNorth_Zombie001_Common_KnockbackExtremeNorth_6417702a.nsa",
+        "durationSeconds": 2.0,
+        "framerate": 30.0,
+        "packetOffset": 61888,
+        "packetLength": 12048
+      },
+      {
+        "index": 8,
+        "name": "Zombie001_Common_KnockbackExtremeNorthWest",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_KnockbackExtremeNorthWest.xmd",
+        "resourceFilename": "Zombie001_Common_KnockbackExtremeNorthWest_Zombie001_Common_KnockbackExtremeNorthWest_8992c89e.nsa",
+        "durationSeconds": 1.600000023841858,
+        "framerate": 30.0,
+        "packetOffset": 73984,
+        "packetLength": 7280
+      },
+      {
+        "index": 9,
+        "name": "Zombie001_Common_KnockbackExtremeWest",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_KnockbackExtremeWest.xmd",
+        "resourceFilename": "Zombie001_Common_KnockbackExtremeWest_Zombie001_Common_KnockbackExtremeWest_d9952bf1.nsa",
+        "durationSeconds": 1.6666666269302368,
+        "framerate": 30.0,
+        "packetOffset": 81312,
+        "packetLength": 8960
+      },
+      {
+        "index": 10,
+        "name": "Zombie001_Common_KnockbackExtremeSouthWest",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_KnockbackExtremeSouthWest.xmd",
+        "resourceFilename": "Zombie001_Common_KnockbackExtremeSouthWest_Zombie001_Common_KnockbackExtremeSouthWest_d7307e0d.nsa",
+        "durationSeconds": 1.5,
+        "framerate": 30.0,
+        "packetOffset": 90320,
+        "packetLength": 8992
+      },
+      {
+        "index": 11,
+        "name": "Zombie001_Common_KnockbackExtremeSouth",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_KnockbackExtremeSouth.xmd",
+        "resourceFilename": "Zombie001_Common_KnockbackExtremeSouth_Zombie001_Common_KnockbackExtremeSouth_270241be.nsa",
+        "durationSeconds": 1.5,
+        "framerate": 30.0,
+        "packetOffset": 99360,
+        "packetLength": 8640
+      },
+      {
+        "index": 12,
+        "name": "Zombie001_Common_DieEastActive",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_DieEastActive.xmd",
+        "resourceFilename": "Zombie001_Common_DieEastActive_Zombie001_Common_DieEastActive_d1cdd5b5.nsa",
+        "durationSeconds": 2.0,
+        "framerate": 30.0,
+        "packetOffset": 108048,
+        "packetLength": 20976
+      },
+      {
+        "index": 13,
+        "name": "Zombie001_Common_DieNorthActive",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_DieNorthActive.xmd",
+        "resourceFilename": "Zombie001_Common_DieNorthActive_Zombie001_Common_DieNorthActive_a89979d3.nsa",
+        "durationSeconds": 2.0,
+        "framerate": 30.0,
+        "packetOffset": 129072,
+        "packetLength": 22464
+      },
+      {
+        "index": 14,
+        "name": "Zombie001_Common_DieWestActive",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_DieWestActive.xmd",
+        "resourceFilename": "Zombie001_Common_DieWestActive_Zombie001_Common_DieWestActive_da7ef325.nsa",
+        "durationSeconds": 2.0,
+        "framerate": 30.0,
+        "packetOffset": 151584,
+        "packetLength": 20976
+      },
+      {
+        "index": 15,
+        "name": "Zombie001_Common_DieSouthActive",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_DieSouthActive.xmd",
+        "resourceFilename": "Zombie001_Common_DieSouthActive_Zombie001_Common_DieSouthActive_3176e2e6.nsa",
+        "durationSeconds": 2.5,
+        "framerate": 30.0,
+        "packetOffset": 172608,
+        "packetLength": 27728
+      },
+      {
+        "index": 16,
+        "name": "Zombie001_Common_GrapplePunch",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_GrapplePunch.xmd",
+        "resourceFilename": "Zombie001_Common_GrapplePunch_Zombie001_Common_GrapplePunch_f08c99a2.nsa",
+        "durationSeconds": 1.3333333730697632,
+        "framerate": 30.0,
+        "packetOffset": 200384,
+        "packetLength": 15616
+      },
+      {
+        "index": 17,
+        "name": "Zombie001_Common_FlinchAdditiveSouth",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_FlinchAdditiveSouth.xmd",
+        "resourceFilename": "Zombie001_Common_FlinchAdditiveSouth_Zombie001_Common_FlinchAdditiveSouth_9caccdb0.nsa",
+        "durationSeconds": 1.0,
+        "framerate": 30.0,
+        "packetOffset": 216048,
+        "packetLength": 6688
+      },
+      {
+        "index": 18,
+        "name": "Zombie001_Common_FlinchAdditiveNorth",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_FlinchAdditiveNorth.xmd",
+        "resourceFilename": "Zombie001_Common_FlinchAdditiveNorth_Zombie001_Common_FlinchAdditiveNorth_3682c01b.nsa",
+        "durationSeconds": 1.0,
+        "framerate": 30.0,
+        "packetOffset": 222784,
+        "packetLength": 10672
+      },
+      {
+        "index": 19,
+        "name": "Zombie001_Common_FlinchAdditiveEast",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_FlinchAdditiveEast.xmd",
+        "resourceFilename": "Zombie001_Common_FlinchAdditiveEast_Zombie001_Common_FlinchAdditiveEast_27ad205d.nsa",
+        "durationSeconds": 1.1666666269302368,
+        "framerate": 30.000001907348633,
+        "packetOffset": 233504,
+        "packetLength": 9232
+      },
+      {
+        "index": 20,
+        "name": "Zombie001_Common_FlinchAdditiveWest",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_FlinchAdditiveWest.xmd",
+        "resourceFilename": "Zombie001_Common_FlinchAdditiveWest_Zombie001_Common_FlinchAdditiveWest_b9e6359e.nsa",
+        "durationSeconds": 1.2999999523162842,
+        "framerate": 30.000001907348633,
+        "packetOffset": 242784,
+        "packetLength": 9536
+      },
+      {
+        "index": 21,
+        "name": "Zombie001_11_AttackBite",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\11\\Zombie001_11_AttackBite.xmd",
+        "resourceFilename": "Zombie001_11_AttackBite_Zombie001_11_AttackBite_276e4780.nsa",
+        "durationSeconds": 1.0,
+        "framerate": 30.0,
+        "packetOffset": 252368,
+        "packetLength": 6704
+      },
+      {
+        "index": 22,
+        "name": "Zombie001_11_AttackRightB",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\11\\Zombie001_11_AttackRightB.xmd",
+        "resourceFilename": "Zombie001_11_AttackRightB_Zombie001_11_AttackRightB_61692d16.nsa",
+        "durationSeconds": 1.6666666269302368,
+        "framerate": 30.0,
+        "packetOffset": 259120,
+        "packetLength": 19936
+      },
+      {
+        "index": 23,
+        "name": "Zombie001_11_AttackRight",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\11\\Zombie001_11_AttackRight.xmd",
+        "resourceFilename": "Zombie001_11_AttackRight_Zombie001_11_AttackRight_56793482.nsa",
+        "durationSeconds": 2.0,
+        "framerate": 30.0,
+        "packetOffset": 279104,
+        "packetLength": 22224
+      },
+      {
+        "index": 24,
+        "name": "Zombie001_11_AttackLeft",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\11\\Zombie001_11_AttackLeft.xmd",
+        "resourceFilename": "Zombie001_11_AttackLeft_Zombie001_11_AttackLeft_4b62a057.nsa",
+        "durationSeconds": 2.0,
+        "framerate": 30.0,
+        "packetOffset": 301376,
+        "packetLength": 22688
+      },
+      {
+        "index": 25,
+        "name": "Zombie001_00_AttackBite",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_AttackBite.xmd",
+        "resourceFilename": "Zombie001_00_AttackBite_Zombie001_00_AttackBite_b9e0d0f3.nsa",
+        "durationSeconds": 1.0,
+        "framerate": 30.0,
+        "packetOffset": 324112,
+        "packetLength": 6704
+      },
+      {
+        "index": 26,
+        "name": "Zombie001_00_AttackRightB",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_AttackRightB.xmd",
+        "resourceFilename": "Zombie001_00_AttackRightB_Zombie001_00_AttackRightB_d57bdb34.nsa",
+        "durationSeconds": 1.6666666269302368,
+        "framerate": 30.0,
+        "packetOffset": 330864,
+        "packetLength": 19936
+      },
+      {
+        "index": 27,
+        "name": "Zombie001_00_AttackRight",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_AttackRight.xmd",
+        "resourceFilename": "Zombie001_00_AttackRight_Zombie001_00_AttackRight_21f98f2d.nsa",
+        "durationSeconds": 2.0,
+        "framerate": 30.0,
+        "packetOffset": 350848,
+        "packetLength": 22224
+      },
+      {
+        "index": 28,
+        "name": "Zombie001_00_AttackLeft",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_AttackLeft.xmd",
+        "resourceFilename": "Zombie001_00_AttackLeft_Zombie001_00_AttackLeft_d5ec3724.nsa",
+        "durationSeconds": 2.0,
+        "framerate": 30.0,
+        "packetOffset": 373120,
+        "packetLength": 22688
+      },
+      {
+        "index": 29,
+        "name": "Zombie001_11_SprintB",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\11\\Zombie001_11_SprintB.xmd",
+        "resourceFilename": "Zombie001_11_SprintB_Zombie001_11_SprintB_27bafc6f.nsa",
+        "durationSeconds": 0.5333333611488342,
+        "framerate": 29.999998092651367,
+        "packetOffset": 395856,
+        "packetLength": 7664
+      },
+      {
+        "index": 30,
+        "name": "Zombie001_11_Run",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\11\\Zombie001_11_Run.xmd",
+        "resourceFilename": "Zombie001_11_Run_Zombie001_11_Run_8fa2a635.nsa",
+        "durationSeconds": 1.8333333730697632,
+        "framerate": 30.0,
+        "packetOffset": 403568,
+        "packetLength": 21696
+      },
+      {
+        "index": 31,
+        "name": "Zombie001_11_Walk",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\11\\Zombie001_11_Walk.xmd",
+        "resourceFilename": "Zombie001_11_Walk_Zombie001_11_Walk_59005b9.nsa",
+        "durationSeconds": 2.0,
+        "framerate": 30.0,
+        "packetOffset": 425312,
+        "packetLength": 16480
+      },
+      {
+        "index": 32,
+        "name": "Zombie001_11_IdleActive",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\11\\Zombie001_11_IdleActive.xmd",
+        "resourceFilename": "Zombie001_11_IdleActive_Zombie001_11_IdleActive_b8f75e29.nsa",
+        "durationSeconds": 5.0,
+        "framerate": 30.0,
+        "packetOffset": 441840,
+        "packetLength": 47488
+      },
+      {
+        "index": 33,
+        "name": "Zombie001_00_WalkC",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_WalkC.xmd",
+        "resourceFilename": "Zombie001_00_WalkC_Zombie001_00_WalkC_68a54bd7.nsa",
+        "durationSeconds": 1.0,
+        "framerate": 30.0,
+        "packetOffset": 489376,
+        "packetLength": 9312
+      },
+      {
+        "index": 34,
+        "name": "Zombie001_00_WalkB",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_WalkB.xmd",
+        "resourceFilename": "Zombie001_00_WalkB_Zombie001_00_WalkB_352e5d96.nsa",
+        "durationSeconds": 1.0666667222976685,
+        "framerate": 29.999998092651367,
+        "packetOffset": 498736,
+        "packetLength": 12848
+      },
+      {
+        "index": 35,
+        "name": "Zombie001_00_WalkA_Alt",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_WalkA_Alt.xmd",
+        "resourceFilename": "Zombie001_00_WalkA_Alt_Zombie001_00_WalkA_Alt_a85336f7.nsa",
+        "durationSeconds": 4.0,
+        "framerate": 30.0,
+        "packetOffset": 511632,
+        "packetLength": 41872
+      },
+      {
+        "index": 36,
+        "name": "Zombie001_00_WalkA",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_WalkA.xmd",
+        "resourceFilename": "Zombie001_00_WalkA_Zombie001_00_WalkA_d3b36755.nsa",
+        "durationSeconds": 5.266666889190674,
+        "framerate": 29.999998092651367,
+        "packetOffset": 553552,
+        "packetLength": 67136
+      },
+      {
+        "index": 37,
+        "name": "Zombie001_00_IdleActive",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_IdleActive.xmd",
+        "resourceFilename": "Zombie001_00_IdleActive_Zombie001_00_IdleActive_2679c95a.nsa",
+        "durationSeconds": 5.0,
+        "framerate": 30.0,
+        "packetOffset": 620736,
+        "packetLength": 45648
+      },
+      {
+        "index": 38,
+        "name": "Zombie001_Common_StuckBehindFence",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_StuckBehindFence.xmd",
+        "resourceFilename": "Zombie001_Common_StuckBehindFence_Zombie001_Common_StuckBehindFence_9ab4f1eb.nsa",
+        "durationSeconds": 2.5,
+        "framerate": 30.0,
+        "packetOffset": 666432,
+        "packetLength": 19760
+      },
+      {
+        "index": 39,
+        "name": "Zombie001_Common_ReachOverFence",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_ReachOverFence.xmd",
+        "resourceFilename": "Zombie001_Common_ReachOverFence_Zombie001_Common_ReachOverFence_94d9f702.nsa",
+        "durationSeconds": 2.5,
+        "framerate": 30.0,
+        "packetOffset": 686240,
+        "packetLength": 20656
+      },
+      {
+        "index": 40,
+        "name": "Zombie001_Common_AnimationFalse",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_AnimationFalse.xmd",
+        "resourceFilename": "Zombie001_Common_AnimationFalse_Zombie001_Common_AnimationFalse_a898046e.nsa",
+        "durationSeconds": 2.0,
+        "framerate": 30.0,
+        "packetOffset": 706944,
+        "packetLength": 3296
+      },
+      {
+        "index": 41,
+        "name": "Zombie001_Common_AnimationTrue",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_AnimationTrue.xmd",
+        "resourceFilename": "Zombie001_Common_AnimationTrue_Zombie001_Common_AnimationTrue_cd7bad42.nsa",
+        "durationSeconds": 2.0,
+        "framerate": 30.0,
+        "packetOffset": 710288,
+        "packetLength": 2592
+      },
+      {
+        "index": 42,
+        "name": "Zombie001_11_TurnLeft180",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\11\\Zombie001_11_TurnLeft180.xmd",
+        "resourceFilename": "Zombie001_11_TurnLeft180_Zombie001_11_TurnLeft180_5b188c59.nsa",
+        "durationSeconds": 2.5,
+        "framerate": 30.0,
+        "packetOffset": 712928,
+        "packetLength": 22016
+      },
+      {
+        "index": 43,
+        "name": "Zombie001_00_TurnLeft180",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_TurnLeft180.xmd",
+        "resourceFilename": "Zombie001_00_TurnLeft180_Zombie001_00_TurnLeft180_2c9837f6.nsa",
+        "durationSeconds": 2.5,
+        "framerate": 30.0,
+        "packetOffset": 734992,
+        "packetLength": 22016
+      },
+      {
+        "index": 44,
+        "name": "Zombie001_11_TurnRight180",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\11\\Zombie001_11_TurnRight180.xmd",
+        "resourceFilename": "Zombie001_11_TurnRight180_Zombie001_11_TurnRight180_95ac3142.nsa",
+        "durationSeconds": 2.5,
+        "framerate": 30.0,
+        "packetOffset": 757056,
+        "packetLength": 16160
+      },
+      {
+        "index": 45,
+        "name": "Zombie001_00_TurnRight180",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_TurnRight180.xmd",
+        "resourceFilename": "Zombie001_00_TurnRight180_Zombie001_00_TurnRight180_21bec760.nsa",
+        "durationSeconds": 2.5,
+        "framerate": 60.0,
+        "packetOffset": 773264,
+        "packetLength": 30112
+      },
+      {
+        "index": 46,
+        "name": "Zombie001_11_TurnLeft45",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\11\\Zombie001_11_TurnLeft45.xmd",
+        "resourceFilename": "Zombie001_11_TurnLeft45_Zombie001_11_TurnLeft45_2767837d.nsa",
+        "durationSeconds": 4.699999809265137,
+        "framerate": 30.000001907348633,
+        "packetOffset": 803424,
+        "packetLength": 47328
+      },
+      {
+        "index": 47,
+        "name": "Zombie001_00_TurnLeft45",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_TurnLeft45.xmd",
+        "resourceFilename": "Zombie001_00_TurnLeft45_Zombie001_00_TurnLeft45_b9e9140e.nsa",
+        "durationSeconds": 4.699999809265137,
+        "framerate": 60.000003814697266,
+        "packetOffset": 850800,
+        "packetLength": 92160
+      },
+      {
+        "index": 48,
+        "name": "Zombie001_11_TurnRight45",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\11\\Zombie001_11_TurnRight45.xmd",
+        "resourceFilename": "Zombie001_11_TurnRight45_Zombie001_11_TurnRight45_89604e57.nsa",
+        "durationSeconds": 1.0666667222976685,
+        "framerate": 29.999998092651367,
+        "packetOffset": 943008,
+        "packetLength": 9424
+      },
+      {
+        "index": 49,
+        "name": "Zombie001_00_TurnRight45",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_TurnRight45.xmd",
+        "resourceFilename": "Zombie001_00_TurnRight45_Zombie001_00_TurnRight45_fee0f5f8.nsa",
+        "durationSeconds": 4.699999809265137,
+        "framerate": 60.000003814697266,
+        "packetOffset": 952480,
+        "packetLength": 68288
+      },
+      {
+        "index": 50,
+        "name": "Zombie001_Common_LostTarget",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_LostTarget.xmd",
+        "resourceFilename": "Zombie001_Common_LostTarget_Zombie001_Common_LostTarget_d7ac9a98.nsa",
+        "durationSeconds": 6.0,
+        "framerate": 30.0,
+        "packetOffset": 1020816,
+        "packetLength": 61552
+      },
+      {
+        "index": 51,
+        "name": "Zombie001_11_TurnRight90",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\11\\Zombie001_11_TurnRight90.xmd",
+        "resourceFilename": "Zombie001_11_TurnRight90_Zombie001_11_TurnRight90_80befd52.nsa",
+        "durationSeconds": 2.3333332538604736,
+        "framerate": 30.000001907348633,
+        "packetOffset": 1082416,
+        "packetLength": 17248
+      },
+      {
+        "index": 52,
+        "name": "Zombie001_00_TurnRight90",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_TurnRight90.xmd",
+        "resourceFilename": "Zombie001_00_TurnRight90_Zombie001_00_TurnRight90_f73e46fd.nsa",
+        "durationSeconds": 2.3333332538604736,
+        "framerate": 60.000003814697266,
+        "packetOffset": 1099712,
+        "packetLength": 32224
+      },
+      {
+        "index": 53,
+        "name": "Zombie001_11_TurnLeft90",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\11\\Zombie001_11_TurnLeft90.xmd",
+        "resourceFilename": "Zombie001_11_TurnLeft90_Zombie001_11_TurnLeft90_53f378f.nsa",
+        "durationSeconds": 2.3333332538604736,
+        "framerate": 30.000001907348633,
+        "packetOffset": 1131984,
+        "packetLength": 17552
+      },
+      {
+        "index": 54,
+        "name": "Zombie001_00_TurnLeft90",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_TurnLeft90.xmd",
+        "resourceFilename": "Zombie001_00_TurnLeft90_Zombie001_00_TurnLeft90_9bb1a0fc.nsa",
+        "durationSeconds": 2.3333332538604736,
+        "framerate": 60.000003814697266,
+        "packetOffset": 1149584,
+        "packetLength": 32800
+      },
+      {
+        "index": 55,
+        "name": "Zombie001_00_FeedingLoop",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_FeedingLoop.xmd",
+        "resourceFilename": "Zombie001_00_FeedingLoop_Zombie001_00_FeedingLoop_a883111b.nsa",
+        "durationSeconds": 2.8333332538604736,
+        "framerate": 60.0,
+        "packetOffset": 1182432,
+        "packetLength": 27312
+      },
+      {
+        "index": 56,
+        "name": "Zombie001_00_FeedingEnd",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_FeedingEnd.xmd",
+        "resourceFilename": "Zombie001_00_FeedingEnd_Zombie001_00_FeedingEnd_6f556f8.nsa",
+        "durationSeconds": 2.933333396911621,
+        "framerate": 60.0,
+        "packetOffset": 1209792,
+        "packetLength": 27504
+      },
+      {
+        "index": 57,
+        "name": "Zombie001_00_FeedingStart",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_FeedingStart.xmd",
+        "resourceFilename": "Zombie001_00_FeedingStart_Zombie001_00_FeedingStart_66d7deb1.nsa",
+        "durationSeconds": 1.0,
+        "framerate": 60.0,
+        "packetOffset": 1237344,
+        "packetLength": 10800
+      },
+      {
+        "index": 58,
+        "name": "Zombie001_Common_GrappleStart",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_GrappleStart.xmd",
+        "resourceFilename": "Zombie001_Common_GrappleStart_Zombie001_Common_GrappleStart_e4913d69.nsa",
+        "durationSeconds": 0.6666666865348816,
+        "framerate": 30.0,
+        "packetOffset": 1248192,
+        "packetLength": 8528
+      },
+      {
+        "index": 59,
+        "name": "Zombie001_Common_GrappleLoop",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_GrappleLoop.xmd",
+        "resourceFilename": "Zombie001_Common_GrappleLoop_Zombie001_Common_GrappleLoop_ee96218f.nsa",
+        "durationSeconds": 3.5333333015441895,
+        "framerate": 30.0,
+        "packetOffset": 1256768,
+        "packetLength": 37712
+      },
+      {
+        "index": 60,
+        "name": "Zombie001_Common_GrappleBite",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_GrappleBite.xmd",
+        "resourceFilename": "Zombie001_Common_GrappleBite_Zombie001_Common_GrappleBite_fb2267e2.nsa",
+        "durationSeconds": 3.4666666984558105,
+        "framerate": 30.0,
+        "packetOffset": 1294528,
+        "packetLength": 38736
+      },
+      {
+        "index": 61,
+        "name": "Zombie001_Common_FallOverFenceGetUp",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_FallOverFenceGetUp.xmd",
+        "resourceFilename": "Zombie001_Common_FallOverFenceGetUp_Zombie001_Common_FallOverFenceGetUp_387f0245.nsa",
+        "durationSeconds": 2.0,
+        "framerate": 30.0,
+        "packetOffset": 1333312,
+        "packetLength": 12880
+      },
+      {
+        "index": 62,
+        "name": "Zombie001_Common_BlownbackNorth",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_BlownbackNorth.xmd",
+        "resourceFilename": "Zombie001_Common_BlownbackNorth_Zombie001_Common_BlownbackNorth_c0c4eeac.nsa",
+        "durationSeconds": 2.0,
+        "framerate": 30.0,
+        "packetOffset": 1346240,
+        "packetLength": 23168
+      },
+      {
+        "index": 63,
+        "name": "Zombie001_Common_PushbackSouthMedium",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_PushbackSouthMedium.xmd",
+        "resourceFilename": "Zombie001_Common_PushbackSouthMedium_Zombie001_Common_PushbackSouthMedium_696a19.nsa",
+        "durationSeconds": 2.1666667461395264,
+        "framerate": 29.999998092651367,
+        "packetOffset": 1369456,
+        "packetLength": 25696
+      },
+      {
+        "index": 64,
+        "name": "Zombie001_Common_PushbackWestMedium",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_PushbackWestMedium.xmd",
+        "resourceFilename": "Zombie001_Common_PushbackWestMedium_Zombie001_Common_PushbackWestMedium_42f568aa.nsa",
+        "durationSeconds": 2.200000047683716,
+        "framerate": 30.0,
+        "packetOffset": 1395200,
+        "packetLength": 29856
+      },
+      {
+        "index": 65,
+        "name": "Zombie001_Common_PushbackEastMedium",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_PushbackEastMedium.xmd",
+        "resourceFilename": "Zombie001_Common_PushbackEastMedium_Zombie001_Common_PushbackEastMedium_ba3cd182.nsa",
+        "durationSeconds": 2.1666667461395264,
+        "framerate": 29.999998092651367,
+        "packetOffset": 1425104,
+        "packetLength": 29424
+      },
+      {
+        "index": 66,
+        "name": "Zombie001_Common_PushbackNorthMedium",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\Common\\Zombie001_Common_PushbackNorthMedium.xmd",
+        "resourceFilename": "Zombie001_Common_PushbackNorthMedium_Zombie001_Common_PushbackNorthMedium_ed3aa55c.nsa",
+        "durationSeconds": 1.6333333253860474,
+        "framerate": 30.0,
+        "packetOffset": 1454576,
+        "packetLength": 22048
+      },
+      {
+        "index": 67,
+        "name": "Zombie001_00_GetUp",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_GetUp.xmd",
+        "resourceFilename": "Zombie001_00_GetUp_Zombie001_00_GetUp_aef80c52.nsa",
+        "durationSeconds": 7.599999904632568,
+        "framerate": 30.0,
+        "packetOffset": 1476672,
+        "packetLength": 79152
+      },
+      {
+        "index": 68,
+        "name": "Zombie001_00_FallDown",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_FallDown.xmd",
+        "resourceFilename": "Zombie001_00_FallDown_Zombie001_00_FallDown_36be0b6d.nsa",
+        "durationSeconds": 2.5333333015441895,
+        "framerate": 30.0,
+        "packetOffset": 1555872,
+        "packetLength": 28976
+      },
+      {
+        "index": 69,
+        "name": "Zombie001_00_GetUpB",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_GetUpB.xmd",
+        "resourceFilename": "Zombie001_00_GetUpB_Zombie001_00_GetUpB_d1596e80.nsa",
+        "durationSeconds": 3.0,
+        "framerate": 60.0,
+        "packetOffset": 1584896,
+        "packetLength": 59376
+      },
+      {
+        "index": 70,
+        "name": "Zombie001_00_FallDownB",
+        "sourceFilename": "$(RootDir)\\Networks\\ThirdPerson\\Animations\\Zombie001\\00\\Zombie001_00_FallDownB.xmd",
+        "resourceFilename": "Zombie001_00_FallDownB_Zombie001_00_FallDownB_c46ca434.nsa",
+        "durationSeconds": 1.5666667222976685,
+        "framerate": 29.999998092651367,
+        "packetOffset": 1644320,
+        "packetLength": 18512
+      }
+    ],
+    "summary": {
+      "animationCount": 71,
+      "framerates": [
+        29.999998092651367,
+        30.0,
+        30.000001907348633,
+        60.0,
+        60.000003814697266
+      ],
+      "semanticStatus": "source-clip-duration-recovered; graph-selector-speed-and-live-contact-unverified"
+    }
+  }
+}

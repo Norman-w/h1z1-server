@@ -25,6 +25,7 @@ import {
   ZombieOneshotAnim,
   ZombieTransitions,
   ZombieEvents,
+  shouldFinishZombieStumble,
   type ZombieInstance
 } from "./zombie.jsm";
 
@@ -51,10 +52,25 @@ function moveToward(
   npc: Npc,
   target: Float32Array,
   server: ZoneServer2016
-): void {
-  if (!npc.navAgent) return;
-  const navTarget = server.navManager.getClosestNavPointVec3(target);
-  npc.navAgent.requestMoveTarget(navTarget);
+): boolean {
+  if (!npc.navAgent) {
+    npc.setLocomotionMode?.("walk");
+    npc.stopMovement();
+    return false;
+  }
+  try {
+    const navTarget = server.navManager.getClosestNavPointVec3(target);
+    if (npc.navAgent.requestMoveTarget(navTarget) === false) {
+      npc.setLocomotionMode?.("walk");
+      npc.stopMovement();
+      return false;
+    }
+  } catch {
+    npc.setLocomotionMode?.("walk");
+    npc.stopMovement();
+    return false;
+  }
+  return true;
 }
 
 function listenToSounds(
@@ -141,6 +157,28 @@ function getChaseTarget(exploder: ZombieInstance): {
   return null;
 }
 
+function getMeleeRange(exploder: ZombieInstance): number {
+  return exploder.npc.getMeleeAttackRange?.(2) ?? 2;
+}
+
+function scheduleExploderRemoval(server: ZoneServer2016, npc: Npc): void {
+  // ExplodeExpand is a real client one-shot (1.000 s in the Zombie001
+  // physics resource).  Removing the entity after 300 ms used to delete the
+  // actor while the contraction/expansion/death graph was still rendering,
+  // making the explosion look like a teleport/despawn.  Keep a small grace
+  // period after the shared action clock, and let the normal dead-NPC
+  // despawn worker handle any later cleanup.
+  const durationMs = npc.getAnimationDurationMs?.(ZombieOneshotAnim.ExplodeExpand);
+  const actionMs =
+    Number.isFinite(durationMs) && (durationMs as number) > 0
+      ? (durationMs as number)
+      : 1000;
+  const timer = setTimeout(() => {
+    server.deleteEntity(npc.characterId, server._npcs);
+  }, Math.max(300, actionMs) + 100);
+  (timer as unknown as { unref?: () => void }).unref?.();
+}
+
 export function detonateExploder(server: ZoneServer2016, npc: Npc): void {
   server.sendDataToAllWithSpawnedEntity(
     server._npcs,
@@ -153,11 +191,7 @@ export function detonateExploder(server: ZoneServer2016, npc: Npc): void {
   );
   npc.playAnimation(ZombieOneshotAnim.ExplodeExpand);
   server.explosionDamage(npc);
-
-  // schedule body removal after ragdoll animation completes (~0.3 seconds)
-  setTimeout(() => {
-    server.deleteEntity(npc.characterId, server._npcs);
-  }, 300);
+  scheduleExploderRemoval(server, npc);
 }
 
 function explodeAndDie(exploder: ZombieInstance): void {
@@ -167,11 +201,6 @@ function explodeAndDie(exploder: ZombieInstance): void {
     entity: npc.characterId,
     damage: npc.health + 1
   });
-
-  // schedule body removal after ragdoll animation completes (~0.3 seconds)
-  setTimeout(() => {
-    server.deleteEntity(npc.characterId, server._npcs);
-  }, 300);
 }
 
 function tickTimers(exploder: ZombieInstance, dt: number): void {
@@ -181,22 +210,42 @@ function tickTimers(exploder: ZombieInstance, dt: number): void {
 }
 
 function enterWander(exploder: ZombieInstance): void {
+  // Clear the previous chase velocity before switching back to patrol walk.
+  exploder.npc.stopMovement();
   exploder.stateTimer = 0;
   exploder.agitation = AGITATION_INITIAL;
   exploder.targetCharacterId = null;
+  exploder.npc.setLookAtCharacter?.(null);
+  exploder.npc.setCombatAnimationMode?.(false);
+  exploder.npc.setLocomotionMode?.("walk");
+  // Keep the post-action reset explicit.  ExplodeContract is normally
+  // terminal, but EatingDone/CoverEarsDone can also route through this
+  // shared Wander entry and must never restore the previous action loop.
+  exploder.npc.setAnimation(ZombieLoopingAnim.Idle);
   exploder.npc.lookAtTarget = null;
   exploder.wanderOrigin = exploder.npc.state.position.slice() as Float32Array;
+  exploder.targetPos = null;
   const pt = pickPatrolPoint(exploder.server, exploder.wanderOrigin);
   if (pt) {
     exploder.targetPos = pt;
-    moveToward(exploder.npc, pt, exploder.server);
+    if (moveToward(exploder.npc, pt, exploder.server)) {
+      applyAgitation(exploder);
+    } else {
+      exploder.targetPos = null;
+      exploder.npc.setSpeed(0);
+    }
+  } else {
+    exploder.npc.setSpeed(0);
   }
 }
 
 function enterFeed(exploder: ZombieInstance): void {
   exploder.npc.stopMovement();
+  exploder.npc.setCombatAnimationMode?.(false);
+  exploder.npc.setLocomotionMode?.("walk");
   exploder.stateTimer = 0;
   exploder.targetCharacterId = null;
+  exploder.npc.setLookAtCharacter?.(null);
   exploder.npc.lookAtTarget = null;
   exploder.isEatingCorpse = false;
 }
@@ -221,7 +270,6 @@ export function createExploder(
     {
       [ZombieTransitions.Wander]: (dt: number) => {
         tickTimers(exploder, dt);
-        applyAgitation(exploder);
 
         if (trySeePlayer(exploder)) return;
         if (trySmellCorpse(exploder)) return;
@@ -248,8 +296,18 @@ export function createExploder(
           const pt = pickPatrolPoint(exploder.server, exploder.wanderOrigin);
           if (pt) {
             exploder.targetPos = pt;
-            moveToward(exploder.npc, pt, exploder.server);
+            if (!moveToward(exploder.npc, pt, exploder.server)) {
+              exploder.targetPos = null;
+              exploder.npc.setSpeed(0);
+            } else {
+              applyAgitation(exploder);
+            }
+          } else {
+            exploder.targetPos = null;
+            exploder.npc.stopMovement();
           }
+        } else {
+          applyAgitation(exploder);
         }
       },
 
@@ -270,7 +328,8 @@ export function createExploder(
 
       [ZombieTransitions.Investigate]: (dt: number) => {
         tickTimers(exploder, dt);
-        applyAgitation(exploder);
+        exploder.npc.setCombatAnimationMode?.(false);
+        exploder.npc.setLocomotionMode?.("walk");
 
         if (trySeePlayer(exploder)) return;
         if (trySmellCorpse(exploder)) return;
@@ -288,18 +347,31 @@ export function createExploder(
           return;
         }
 
+        if (exploder.targetPos != null) {
+          applyAgitation(exploder);
+        } else {
+          exploder.npc.setSpeed(0);
+        }
+
         const nearestSound = listenToSounds(exploder, exploder.server.sounds);
         if (nearestSound) {
           exploder.lastNoisePos = nearestSound.position;
           exploder.stateTimer = 0;
-          moveToward(exploder.npc, nearestSound.position, exploder.server);
+          exploder.targetPos = nearestSound.position;
+          if (!moveToward(exploder.npc, exploder.targetPos, exploder.server)) {
+            exploder.targetPos = null;
+            exploder.npc.setSpeed(0);
+          } else {
+            applyAgitation(exploder);
+          }
         }
       },
 
       [ZombieTransitions.Chase]: (dt: number) => {
         tickTimers(exploder, dt);
+        exploder.npc.setCombatAnimationMode?.(true);
+        exploder.npc.setLocomotionMode?.("sprint");
         listenToSounds(exploder, exploder.server.sounds);
-        applyAgitation(exploder);
 
         const chaseTarget = getChaseTarget(exploder);
         if (
@@ -311,6 +383,7 @@ export function createExploder(
           exploder.event(ZombieEvents.LostPlayer);
           return;
         }
+        exploder.npc.setLookAtCharacter?.(exploder.targetCharacterId);
 
         const chaseDist = getDistance2d(
           exploder.npc.state.position,
@@ -318,7 +391,7 @@ export function createExploder(
         );
         if (chaseDist > 50) {
           exploder.event(ZombieEvents.LostPlayer);
-        } else if (chaseDist < 2) {
+        } else if (chaseDist < getMeleeRange(exploder)) {
           exploder.event(ZombieEvents.ReachPlayer);
         } else {
           if (trySmellCorpse(exploder)) return;
@@ -326,22 +399,27 @@ export function createExploder(
             exploder.event(ZombieEvents.StartStumble);
             return;
           }
-          moveToward(exploder.npc, chaseTarget.position, exploder.server);
+          if (!moveToward(exploder.npc, chaseTarget.position, exploder.server)) {
+            exploder.npc.setSpeed(0);
+          } else {
+            applyAgitation(exploder);
+          }
         }
       },
 
       [ZombieTransitions.Stumble]: (dt: number) => {
+        exploder.npc.setCombatAnimationMode?.(false);
+        exploder.npc.setLocomotionMode?.("walk");
         exploder.stateTimer += dt;
-        if (exploder.stateTimer >= 5) {
+        if (shouldFinishZombieStumble(exploder)) {
           exploder.event(ZombieEvents.StumbleTimeout);
         }
       },
 
       [ZombieTransitions.Attack]: (dt: number) => {
         tickTimers(exploder, dt);
+        exploder.npc.setCombatAnimationMode?.(true);
         listenToSounds(exploder, exploder.server.sounds);
-        applyAgitation(exploder);
-
         const attackTarget = getChaseTarget(exploder);
         if (!attackTarget || !attackTarget.isAlive) {
           if (exploder.hunger >= 30) {
@@ -355,22 +433,40 @@ export function createExploder(
           exploder.event(ZombieEvents.LostPlayer);
           return;
         }
+        exploder.npc.setLookAtCharacter?.(exploder.targetCharacterId);
         exploder.npc.lookAtTarget = attackTarget.position;
-        moveToward(exploder.npc, attackTarget.position, exploder.server);
         const attackDist = getDistance(
           exploder.npc.state.position,
           attackTarget.position
         );
-        if (attackDist >= 2) {
-          exploder.event(ZombieEvents.PlayerBacked);
-        } else if (exploder.lastAttackTime > 2) {
-          exploder.event(ZombieEvents.StartAttacking);
+        const meleeRange = getMeleeRange(exploder);
+        if (attackDist >= meleeRange) {
+          exploder.npc.setLocomotionMode?.("sprint");
+          if (moveToward(exploder.npc, attackTarget.position, exploder.server)) {
+            applyAgitation(exploder);
+            exploder.event(ZombieEvents.PlayerBacked);
+          } else {
+            exploder.npc.setSpeed(0);
+          }
+        } else {
+          exploder.npc.setLocomotionMode?.("walk");
+          exploder.npc.stopMovement();
+          if (exploder.lastAttackTime > 2)
+            exploder.event(ZombieEvents.StartAttacking);
         }
       },
 
       [ZombieTransitions.Attacking]: (dt: number) => {
+        exploder.npc.setCombatAnimationMode?.(true);
         exploder.stateTimer += dt;
-        if (exploder.stateTimer >= EXPLODE_WINDUP) {
+        const contractClipActive =
+          exploder.npc.isAnimationActive?.(ZombieOneshotAnim.ExplodeContract) ??
+          false;
+        // Keep the detonation boundary on the public contract one-shot.  The
+        // logical wind-up is a lower bound; if a coarse AI tick reaches two
+        // seconds while the client clock still owns the pose, wait for that
+        // clock instead of replacing ExplodeContract mid-animation.
+        if (exploder.stateTimer >= EXPLODE_WINDUP && !contractClipActive) {
           explodeAndDie(exploder);
         }
       },
@@ -378,8 +474,9 @@ export function createExploder(
       [ZombieTransitions.Feed]: (dt: number) => {
         exploder.stateTimer += dt;
         exploder.lastAttackTime += dt;
+        exploder.npc.setCombatAnimationMode?.(false);
+        exploder.npc.setLocomotionMode?.("walk");
         listenToSounds(exploder, exploder.server.sounds);
-        applyAgitation(exploder);
 
         if (exploder.corpseTargetId) {
           const corpse = exploder.server._characters[exploder.corpseTargetId];
@@ -396,7 +493,11 @@ export function createExploder(
             );
             if (dist > 2) {
               exploder.npc.lookAtTarget = corpse.state.position;
-              moveToward(exploder.npc, corpse.state.position, exploder.server);
+              if (moveToward(exploder.npc, corpse.state.position, exploder.server)) {
+                applyAgitation(exploder);
+              } else {
+                exploder.npc.setSpeed(0);
+              }
               return;
             }
             exploder.npc.lookAtTarget = null;
@@ -405,12 +506,15 @@ export function createExploder(
         }
 
         if (!exploder.isEatingCorpse) {
+          exploder.npc.setSpeed(0);
           const vel = exploder.npc.navAgent?.velocity();
           const speed = vel ? Math.sqrt(vel.x * vel.x + vel.z * vel.z) : 0;
           if (speed > 0.0) return;
           exploder.npc.setAnimation(ZombieLoopingAnim.Eating);
           exploder.isEatingCorpse = true;
           exploder.stateTimer = 0;
+        } else {
+          exploder.npc.setSpeed(0);
         }
 
         exploder.hunger = Math.max(0, exploder.hunger - dt * 15);
@@ -429,9 +533,17 @@ export function createExploder(
         to: ZombieTransitions.Investigate,
         EnterTransition: () => {
           exploder.stateTimer = 0;
+          exploder.npc.setLocomotionMode?.("walk");
+          exploder.npc.setLookAtCharacter?.(null);
           exploder.targetPos = exploder.lastNoisePos;
-          if (exploder.targetPos)
-            moveToward(exploder.npc, exploder.targetPos, exploder.server);
+          if (exploder.targetPos) {
+            if (!moveToward(exploder.npc, exploder.targetPos, exploder.server)) {
+              exploder.targetPos = null;
+              exploder.npc.setSpeed(0);
+            } else {
+              applyAgitation(exploder);
+            }
+          }
         }
       },
       {
@@ -444,6 +556,15 @@ export function createExploder(
         to: ZombieTransitions.Chase,
         EnterTransition: () => {
           exploder.npc.lookAtTarget = null;
+          exploder.npc.setCombatAnimationMode?.(true);
+          exploder.npc.setLocomotionMode?.("sprint");
+          const chaseTarget = getChaseTarget(exploder);
+          if (chaseTarget) {
+            exploder.npc.setLookAtCharacter?.(exploder.targetCharacterId);
+            if (moveToward(exploder.npc, chaseTarget.position, exploder.server)) {
+              applyAgitation(exploder);
+            }
+          }
         }
       },
       {
@@ -468,6 +589,8 @@ export function createExploder(
         from: [ZombieTransitions.Chase],
         to: ZombieTransitions.Attack,
         EnterTransition: () => {
+          exploder.npc.stopMovement();
+          exploder.npc.setLocomotionMode?.("walk");
           exploder.lastAttackTime = 2;
         }
       },
@@ -477,15 +600,20 @@ export function createExploder(
         to: ZombieTransitions.Stumble,
         EnterTransition: () => {
           exploder.npc.stopMovement();
+          exploder.npc.setLocomotionMode?.("walk");
           exploder.stateTimer = 0;
-          const anims = [
+          const anims: Array<
+            | ZombieOneshotAnim.StumbleA
+            | ZombieOneshotAnim.StumbleB
+            | ZombieOneshotAnim.StumbleC
+          > = [
             ZombieOneshotAnim.StumbleA,
             ZombieOneshotAnim.StumbleB,
             ZombieOneshotAnim.StumbleC
           ];
-          exploder.npc.playAnimation(
-            anims[Math.floor(Math.random() * anims.length)]
-          );
+          const selected = anims[Math.floor(Math.random() * anims.length)];
+          exploder.stumbleAnimation = selected;
+          exploder.npc.playAnimation(selected);
         }
       },
       {
@@ -494,9 +622,15 @@ export function createExploder(
         to: ZombieTransitions.Chase,
         EnterTransition: () => {
           exploder.stateTimer = 0;
+          exploder.stumbleAnimation = undefined;
+          exploder.npc.setCombatAnimationMode?.(true);
+          exploder.npc.setLocomotionMode?.("sprint");
           const chaseTarget = getChaseTarget(exploder);
           if (chaseTarget) {
-            moveToward(exploder.npc, chaseTarget.position, exploder.server);
+            exploder.npc.setLookAtCharacter?.(exploder.targetCharacterId);
+            if (moveToward(exploder.npc, chaseTarget.position, exploder.server)) {
+              applyAgitation(exploder);
+            }
           }
         }
       },
@@ -506,7 +640,9 @@ export function createExploder(
         to: ZombieTransitions.Attacking,
         EnterTransition: () => {
           exploder.npc.stopMovement();
+          exploder.npc.setLocomotionMode?.("walk");
           exploder.npc.lookAtTarget = null;
+          exploder.npc.setLookAtCharacter?.(null);
           exploder.npc.playAnimation(ZombieOneshotAnim.ExplodeContract);
           exploder.stateTimer = 0;
           exploder.lastAttackTime = 0;
@@ -528,6 +664,16 @@ export function createExploder(
         to: ZombieTransitions.Chase,
         EnterTransition: () => {
           exploder.npc.lookAtTarget = null;
+          exploder.npc.setLookAtCharacter?.(null);
+          exploder.npc.setCombatAnimationMode?.(true);
+          exploder.npc.setLocomotionMode?.("sprint");
+          const chaseTarget = getChaseTarget(exploder);
+          if (chaseTarget) {
+            exploder.npc.setLookAtCharacter?.(exploder.targetCharacterId);
+            if (moveToward(exploder.npc, chaseTarget.position, exploder.server)) {
+              applyAgitation(exploder);
+            }
+          }
         }
       },
       {
@@ -562,13 +708,24 @@ export function createExploder(
   exploder.id = npc.characterId;
   exploder.npc = npc;
   exploder.server = server;
+  exploder.npc.initializeAnimation?.(ZombieLoopingAnim.Idle);
   exploder.hunger = 0;
   exploder.agitation = AGITATION_INITIAL;
+  // Publish the normal walk speed only after the initial patrol request is
+  // accepted; a failed mesh projection must remain a standing graph state.
+  exploder.npc.setLocomotionMode?.("walk");
   exploder.wanderOrigin = npc.state.position.slice() as Float32Array;
   const initialPatrol = pickPatrolPoint(server, npc.state.position);
   exploder.targetPos = initialPatrol;
   if (initialPatrol) {
-    moveToward(npc, initialPatrol, server);
+    if (moveToward(npc, initialPatrol, server)) {
+      applyAgitation(exploder);
+    } else {
+      exploder.targetPos = null;
+      npc.setSpeed(0);
+    }
+  } else {
+    npc.setSpeed(0);
   }
   exploder.lastNoisePos = null;
   exploder.targetCharacterId = null;

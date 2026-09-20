@@ -37,3 +37,20 @@ const HOSTILITY: Record<Factions, Factions[]> = {
 export function isHostile(attacker: Factions, target: Factions): boolean {
   return HOSTILITY[attacker].includes(target);
 }
+
+/**
+ * Passive wildlife reacts to the factions that can actually threaten it.
+ *
+ * This is intentionally not expressed as `faction !== PASSIVE`: the spatial
+ * target map also contains neutral/unknown entries and other passive animals.
+ * Treating those entries as threats makes deer/rabbits flee for no gameplay
+ * reason and can leave them permanently in their flee loop.
+ */
+export function isThreatToPassive(faction: Factions): boolean {
+  return (
+    faction === Factions.HUMAN ||
+    faction === Factions.ZOMBIE ||
+    faction === Factions.WOLF ||
+    faction === Factions.BEAR
+  );
+}

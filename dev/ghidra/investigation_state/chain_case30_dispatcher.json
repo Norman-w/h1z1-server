@@ -1,0 +1,526 @@
+{
+  "schemaVersion": 1,
+  "language": "zh-CN",
+  "updatedAt": "2026-03-19",
+  "scope": "case 0x30 主分发链：从 FUN_140511840 的 case 0x30 分支开始，经过记录解析、handler 查找、entry 链遍历，直到通过实体虚表 +0x4a0 发出 apply 请求。",
+  "resourceAnchors": [
+    "ZombieMale_Skin_01.adr -> AnimationNetwork fileName=ThirdPersonZombiePhysics.mrn, animSetName=Zombie001",
+    "ZombieFemale_Skin_01.adr -> AnimationNetwork fileName=ThirdPersonZombiePhysics.mrn, animSetName=Zombie001Female",
+    "客户端解包资源实际文件名带平台后缀：ThirdPersonZombiePhysicsX64.mrn / ThirdPersonZombie_AnimationX64.mrn / ThirdPersonZombieAIX64.mrn；ADR 中的无后缀名当前可视为运行时资源别名",
+    "ThirdPersonZombiePhysicsX64.mrn 可见 Attack_Grapple / AttackMove_Ping/Pong / AttackStand_Ping/Pong / Attack_Walker / Attack_Runner / Spit / GrappleLoop / Bite 等状态与动画名",
+    "ThirdPersonZombieAIX64.mrn 与 ThirdPersonZombie_AnimationX64.mrn 都可见 Idle_Locomotion / DeathOrDormant / Feeding / Flinch / Attacks 等图状态，以及 InAttack / NPC_AttackSpeed / AttackRegion / HeadLookTarget / DeathType 等控制参数名"
+  ],
+  "functions": [
+    {
+      "address": "FUN_140511840",
+      "guessedName": "ClientActionPacketDispatcher",
+      "guessedNameConfidence": 0.81,
+      "purpose": "大型客户端动作/状态分发函数。当前已确认其中 case 0x30 会解析一条记录并进入后续的行为/状态 entry 应用链；同时 case 0x12 会先用 `FUN_1404eee10` 解析一条链表，再把每个节点送入共享 dispatcher `FUN_140b611a0`，说明同一大分发表里并存 case 0x30 专属重描述子链和更上层的共享 apply 回放链。另一个新锚点是：函数内部地址 `0x140513523` 已直接读取 `DAT_142b24578(DeathType)` 并通过实体虚表 `+0x630` 写入图参数，但其准确 case 语境仍待继续切分。更早期的 0x0f41 路径仍是下游验证锚点。",
+      "purposeConfidence": 0.86,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "longlong*",
+          "guessedPurpose": "实体/代理的大对象实例，后续大量虚表调用都发生在这个对象上。",
+          "confidence": 0.83
+        },
+        {
+          "index": 1,
+          "type": "undefined8",
+          "guessedPurpose": "子动作分支选择：`switch((int)param_2-1)`。`FUN_1404f1080` / UpdateCharacterState 体对应 decompile `case 9:` → **param_2 须为 10**（与 wire 首字节 A0 无必然相等）。",
+          "confidence": 0.84
+        },
+        {
+          "index": 2,
+          "type": "longlong",
+          "guessedPurpose": "待解析 buffer 指针（多数分支为 payload；case 9 为 characterId 之后的 22B 起始指针）。",
+          "confidence": 0.78
+        },
+        {
+          "index": 3,
+          "type": "int",
+          "guessedPurpose": "buffer 可用长度（字节）。",
+          "confidence": 0.78
+        }
+      ],
+      "relations": [
+        "内建注册对齐（PyGhidra `DumpDecompile 0x140ac86a0`）：`FUN_140ac86a0` → `FUN_140ad4db0(0xa000f00, …, \"cCharacterPacketIdUpdateCharacterState\", …)`，与同函数内 `0x1000f00/0x2000f00/…` 同模式 → **子序号 0x0A = 10**，与 **`FUN_140511840` 的 `param_2=10` / decompile `case 9:`** 同值；说明 **internal character packet id** 与 **dispatcher 第二参数** 很可能同源编号。wire **0x0f0a** 仍须确认在收包栈如何映射到 `0xa000f00`（续查 `FUN_140ad4db0` 表消费者）。输出日志：`dev/ghidra/analysis/output/DumpDecompile__0x140ac86a0__1__120__0__20260319_224007_937.log`。",
+        "0x0f0a / UpdateCharacterState：`FUN_1404f1080` 在 `switch((int)param_2-1)` 的 decompile `case 9:`；**第二实参 = 10**。至 `FUN_140511840` 的 xref 均为 DATA（vtable）；`QueryXref to 0x143e46630` 等为 0 hit（槽位多由 vtable+offset 动态用）。见 `packet-format-mismatch.md`、`re-track-update-character-state-chain.md` §re-2。",
+        "case 0x12 -> FUN_1404eee10 -> 遍历 `local_1468` 链并对每个节点调用 `FUN_140b611a0(DAT_142b19ba0 + 0xab48, node, &local_1540, local_1478)`；这条链是共享 apply dispatcher 的 sibling case，而不是 case 0x30 主线",
+        "case 0x30 -> FUN_1404ec420",
+        "case 0x30 -> FUN_1405113e0",
+        "同一大函数内仍存在与 0x0f41 相关的下游动作路径",
+        "内部 `0x140513523` 已确认会把 `DAT_142b24578(DeathType)` 送入实体虚表 `+0x630`，说明 dispatcher 本体也会直接写一部分 zombie graph control parameter；最新窗口已把它收紧到 `case 0x4e`，且同 case 紧邻还会写 `DAT_142b246e0 = DeathDirection` 并触发 `+0x620` 的 death-tag 分支，因此这条更适合归入 death layer，而不是攻击 phase writer",
+        "`0x1405140a1 -> virtual +0x3b8` 现已确认落在 `case 0x14`：`FUN_1404eec70` 成功后，会把本地小块 `local_790/local_7a0/local_7a4/local_788` 打包成 `(&local_163c, &local_1510)` 再调用 `+0x3b8`",
+        "说明 `FUN_140511840` 内出现的 `+0x3b8` 不是 case 0x30 专属后段，而是 sibling case 也会复用的共享分发槽",
+        "上游（2026-03-19 修正）：`FUN_140b5eb40` → `521700` 的第二参 **`&DAT_143c08b78`** 已由 **`FUN_1401d8090`** 钉为 **`FUN_1402ee3a0(\"CHAMBER_INTERRUPT\",…)`** 的句柄（**换弹/枪膛中断** 类 combat tag），**不是** `0x0f0a` / `UpdateCharacterState`。`521700` 仍无 `FUN_140511840` 文本 hit。并行：`FUN_140ad4db0`/`FUN_140ac6170` 仅 **`DAT_142a35ca8` id 树**。",
+        "**`QueryXref to 0x140521700`（2026-03-19）**：共 **36** 引用 — **2 DATA**（`143e46ed0`、`14261c650`）+ **34 UNCONDITIONAL_CALL**；**所有 CALL** 均在 **`0x140b5eb70..0x140b5fe92`**，属 **`FUN_140b5eb40` 邻域内多个相邻 `FUN_140b5e*`/`FUN_140b5f*`**，**无** `FUN_140511840` / `0x140514xxx` 区 **CODE** 调用 → **与 UpdateCharacterState 包泵无直接 CALL 边**。日志：`QueryXref__to__0x140521700__20260319_105139_881.log`。"
+      ]
+    },
+    {
+      "address": "FUN_1404ec420",
+      "guessedName": "ParseCase30Record",
+      "guessedNameConfidence": 0.84,
+      "purpose": "解析 case 0x30 使用的记录结构，当前已能确认它基本是纯顺序反序列化层：先读 `+0x20` 的 1-byte 值，再用 `FUN_140384220` 解析 `+0x28` 容器，然后顺序读出 `+0x48/+0x4c/+0x50/+0x54` 四个 32-bit 字段，再通过 `FUN_140467f40` 解析 `+0x58` 与 `+0x70` 两段 length-prefixed blob，最后以 `FUN_140384500` 解析 `+0x88` 容器。函数本身几乎不做业务判断，主要职责是读流并在越界时把 `stream.error_flag` 置 1。",
+      "purposeConfidence": 0.92,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "record*",
+          "guessedPurpose": "本地解析输出结构。",
+          "confidence": 0.94
+        },
+        {
+          "index": 1,
+          "type": "stream/context",
+          "guessedPurpose": "网络包读取上下文。",
+          "confidence": 0.68
+        }
+      ],
+      "relations": [
+        "由 `FUN_140511840 case 0x30` 调用；上游门控目前只剩三件事：`param_3 != 0`、本函数不能把 `stream.error_flag` 置 1、以及 payload 必须被完整消费（有剩余字节时直接失败）",
+        "输出供 `FUN_1405113e0` 使用",
+        "`+0x20` 是单字节字段；`+0x48/+0x4c/+0x50/+0x54` 是四个连续的 32-bit 字段，其中 `+0x50` 仍是当前最关键的协议字段之一",
+        "`FUN_140384220(param_2, param_1 + 0x28)` 会先清空容器，再读取一个 `int count`，循环构造节点并调用 `FUN_1403671c0` 逐个反序列化",
+        "`+0x58 / +0x70` 都通过 `FUN_140467f40` 读取为长度前缀 blob",
+        "`FUN_140384500(param_2, param_1 + 0x88)` 会先清空容器，再读取一个 `int count`，通过 `(*container->vftable[0x10])` 分配/挂链节点后调用 `FUN_140368210` 逐个反序列化",
+        "`FUN_1403671c0` 显示 `+0x28` 容器的单个元素相当重：包含三段 blob（偏移 `+0x00/+0x60/+0xc0`）、五个 dword（`+0x180..+0x190`）、一个由 `FUN_14037b340` 解析的子结构（`+0x198`）以及一个 bool（`+0x194`），当前明显比 `+0x88` 那侧更像业务/行为描述子",
+        "相比之下，`FUN_140368210` 显示 `+0x88` 容器元素只是一个轻量 tagged 结构：`dword id` + `byte kind` + 在 `kind ∈ {0,1}` 时才继续读取两个 dword；当前更像附属条件/引用项",
+        "就现阶段信息看，它更像 case 0x30 的结构解包层，而不是决定僵尸追击/攻击动画语义的业务入口"
+      ]
+    },
+    {
+      "address": "FUN_140467f40",
+      "guessedName": "ParseLengthPrefixedBlobIntoBuffer",
+      "guessedNameConfidence": 0.73,
+      "purpose": "从流中先读一个带符号 dword 长度，再把对应长度的字节串拷贝到目标缓冲；若越界或长度非法则置 error 并把游标推进到 end。它被 `FUN_1404ec420` 用于读取 case 0x30 记录里的 `+0x58` 与 `+0x70` 两段可变长数据。",
+      "purposeConfidence": 0.84,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "streamCursor*",
+          "guessedPurpose": "带 `current/end/error` 语义的输入流游标。",
+          "confidence": 0.9
+        },
+        {
+          "index": 1,
+          "type": "buffer/string-like*",
+          "guessedPurpose": "接收长度前缀字节串的输出缓冲。",
+          "confidence": 0.78
+        }
+      ],
+      "relations": [
+        "被 FUN_1404ec420 调用两次，对应 record.+0x58 与 record.+0x70",
+        "属于全程序广泛复用的通用 blob/string 解析器",
+        "与邻近 case 使用的 FUN_1404ef4e0 / FUN_1404ef5a0 固定小结构 parser 不是同一数据形状"
+      ]
+    },
+    {
+      "address": "FUN_1405113e0",
+      "guessedName": "ApplyCase30RecordToEntity",
+      "guessedNameConfidence": 0.87,
+      "purpose": "消费 case 0x30 的解析结果。当前已能确认其字段消费顺序相当固定：先把 `record.+0x20` 送入 `virtual +0x148`，再把 `record.+0x54` 送入 `virtual +0x100`；随后读取 `record.+0x50` 作为 key 调 `FUN_1405040c0` 选取 handler/描述器，并把返回对象 `+0xe0` 置 `0x80`，再把 `record.+0x28` 的重型描述子容器交给 `FUN_14053d9b0`。若 `record.+0x4c` 与当前实体状态不同，还会走一段 `FUN_1416d35a0 -> virtual +0x678 -> virtual +0x3b0 -> virtual +0x4a0` 的附加状态/表现同步分支。最后才是后段的 `+0x4b0 -> (+0x770 * N) -> +0x778`；这一段不只是抽象槽位，而是落在共享接口表上的具体实现：`+0x4b0 -> FUN_140537a20`、`+0x770 -> 0x1405325b0(thunk-like, 转发到 +0x638 容器)`、`+0x778 -> FUN_140506890`。",
+      "purposeConfidence": 0.92,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "longlong*",
+          "guessedPurpose": "实体/代理的大对象实例。",
+          "confidence": 0.9
+        },
+        {
+          "index": 1,
+          "type": "record*",
+          "guessedPurpose": "FUN_1404ec420 解析出的 case 0x30 记录。",
+          "confidence": 0.95
+        }
+      ],
+      "relations": [
+        "先消费 `record.+0x20 -> virtual +0x148` 与 `record.+0x54 -> virtual +0x100`",
+        "读取 `record.+0x50 -> FUN_1405040c0`，并把返回 handler 的 `+0xe0` 置 `0x80`",
+        "调用 `FUN_14053d9b0(param_1, handler, record+0x28)`；当前这条 `record.+0x28` 分支比 `+0x58/+0x70/+0x88` 更像真正的业务描述子入口",
+        "当 `record.+0x4c` 与当前实体状态不同时，还会走 `FUN_1416d35a0 -> virtual +0x678 -> virtual +0x3b0 -> virtual +0x4a0` 的附加同步分支",
+        "随后才调用实体对象 virtual +0x4b0/+0x770/+0x778",
+        "与 FUN_1404090a0 共享 +0x770 -> +0x778 的后段形状",
+        "与 FUN_140404980 / FUN_14051dfb0 共享同一小族 +0x4b0 / +0x778 复用模式",
+        "同一共享接口表中 +0x4d0 对应 FUN_140511840",
+        "`+0x638` 当前更像容器而不是单一子对象"
+      ]
+    },
+    {
+      "address": "FUN_1405040c0",
+      "guessedName": "CreateOrLookupPackageHandlerByKey",
+      "guessedNameConfidence": 0.78,
+      "purpose": "根据 32 位 key 从 DAT_142b195d8 全局哈希注册表中查找一个 `IPToStateMapEntry`-like 原型/描述项；若命中则构造一个 0x180 的运行时 handler 对象并把命中的注册项指针挂到 `+0x178`，若已有旧 handler 还会先把它标成已失效。最新证据表明，`record.+0x50` 更像状态/包原型 key，而不是直接的动画模板 ID。",
+      "purposeConfidence": 0.86,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "longlong*",
+          "guessedPurpose": "调用宿主对象/上下文。",
+          "confidence": 0.5
+        },
+        {
+          "index": 1,
+          "type": "uint*",
+          "guessedPurpose": "来自 record.+0x50 的 key。",
+          "confidence": 0.95
+        },
+        {
+          "index": 2,
+          "type": "byte/bool",
+          "guessedPurpose": "构造或查找模式标志。",
+          "confidence": 0.41
+        }
+      ],
+      "relations": [
+        "注册表全局根：DAT_142b195d8",
+        "内部查找形状与 FUN_1403f5cd0 一致：bucket = key & 0x7ff，节点字段使用 `+0x120/+0x128/+0x38`",
+        "数据引用 `0x14261c0f8` 已被 Ghidra 标成 `IPToStateMapEntry[3]`，进一步支持这是 state-map / package-prototype 注册表",
+        "构造链涉及 FUN_140b5b4b0 / PTR_FUN_1420c2d20 / PTR_FUN_1420c2e20",
+        "新构造的 0x180 handler 会把命中的注册项保存到 `+0x178`"
+      ]
+    },
+    {
+      "address": "FUN_1403f5cd0",
+      "guessedName": "LookupStateMapEntryByKey",
+      "guessedNameConfidence": 0.72,
+      "purpose": "在 DAT_142b195d8 风格的全局哈希表中按 32 位 key 查找注册项。它先按 `key & 0x7ff` 选 bucket，再沿 `+0x128` 链表比对节点 `+0x120` 与 `+0x38` 两组 key 字段；从多个 caller 看，更像对 `IPToStateMapEntry`/状态包原型表的统一查找器。",
+      "purposeConfidence": 0.83,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "stateMapRegistry*",
+          "guessedPurpose": "DAT_142b195d8 一类的全局注册表根对象。",
+          "confidence": 0.85
+        },
+        {
+          "index": 1,
+          "type": "uint*",
+          "guessedPurpose": "要查找的 32 位状态/包 key。",
+          "confidence": 0.95
+        }
+      ],
+      "relations": [
+        "被 FUN_140524990、FUN_140506890 附近路径及多条状态/表现链复用",
+        "FUN_1405040c0 的内部查找逻辑与它同构",
+        "注册项字段当前至少可见 `+0x38 / +0x120 / +0x128` 三个关键偏移"
+      ]
+    },
+    {
+      "address": "FUN_14053d9b0",
+      "guessedName": "ProcessRecordEntryList",
+      "guessedNameConfidence": 0.88,
+      "purpose": "清空实体对象当前 `param_1+0x1b8` 运行时列表，遍历 `record.+0x28` 的重型描述子链，把每个描述子实例化成一个 runtimeNode，再对每个节点调用 `FUN_14052fb80`。当前已能确认这一步并非简单转发：它会先用 `FUN_140516bf0(..., descriptor+0x18c)` 创建/挂链节点，再用 `FUN_140532d20(runtimeNode, descriptor)` 把三段 blob、多个 dword、bool 与 `+0x198` key 集整体拷进节点。若任一节点的 `+0x184 != 0`，还会置位对象 `+0x8d5` 的 `0x10` 并触发 `FUN_1404e1de0`。",
+      "purposeConfidence": 0.93,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "longlong*",
+          "guessedPurpose": "实体/代理的大对象实例。",
+          "confidence": 0.91
+        },
+        {
+          "index": 1,
+          "type": "undefined8",
+          "guessedPurpose": "由 FUN_1405040c0 返回的 handler/描述器对象。",
+          "confidence": 0.72
+        },
+        {
+          "index": 2,
+          "type": "longlong",
+          "guessedPurpose": "record.+0x28 处的 entry 链头。",
+          "confidence": 0.95
+        }
+      ],
+      "relations": [
+        "由 `FUN_1405113e0` 调用，参数三是 `record.+0x28` 的重型描述子链头",
+        "遍历 descriptor -> `FUN_140516bf0(param_1+0x1b8, descriptor+0x18c)` -> `FUN_140532d20(runtimeNode, descriptor)` -> `FUN_14052fb80(param_1, handler, runtimeNode/descriptor-copy)`",
+        "`FUN_140516bf0` 会把 `descriptor+0x18c` 写到 `runtimeNode+0x1f0`，并按其低两位挂进 4 路分桶链",
+        "`FUN_140532d20` 会复制三段 blob（`+0x00/+0x60/+0xc0`）、`+0x180/+0x184/+0x190/+0x194`、以及 `+0x198` key 集到 runtimeNode，同时把 `runtimeNode+0x1d0` 设成 `descriptor+0x184`",
+        "这一层已经明显像“把 case 0x30 描述子实例化为运行时行为节点”，而不是单纯的参数转发"
+      ]
+    },
+    {
+      "address": "FUN_14052fb80",
+      "guessedName": "DispatchEntryToEntityVirtualApply",
+      "guessedNameConfidence": 0.91,
+      "purpose": "把单个 runtimeNode/entry 的数据整理后派发给实体对象的虚函数 `+0x4a0`。这里已经确认真正被调的是实体大对象 `param_1` 的虚表，不是小 handler 的虚表。默认路径下，它会把 runtimeNode 本体与三段 blob（`+0x60/+0xc0/+0x120`）、多个 dword（`+0x180/+0x184/+0x188/+0x18c/+0x190`）和 bool（`+0x194`）整体打包进 `virtual +0x4a0`。若 `entry.+0x1a8 != 0` 且 `FUN_14050ccc0(DAT_142b19780 + 0x390f8, entry + 0x198, entity+0x1ac4)` 命中，则还会先把 entry 本体替换成一条来自 `FUN_1416fe3e0(...)->+0x58` 的字符串资源，再参与同一调用。",
+      "purposeConfidence": 0.97,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "longlong*",
+          "guessedPurpose": "实体/代理的大对象实例。",
+          "confidence": 0.96
+        },
+        {
+          "index": 1,
+          "type": "undefined8",
+          "guessedPurpose": "handler/描述器对象，作为 apply 的第二个参数继续向下传。",
+          "confidence": 0.82
+        },
+        {
+          "index": 2,
+          "type": "entry*",
+          "guessedPurpose": "当前 entry 节点。",
+          "confidence": 0.97
+        }
+      ],
+      "relations": [
+        "由 `FUN_14053d9b0` 针对 case 0x30 runtimeNode 调用，但 `FUN_14050ccc0` 的其他 caller 表明这套 lookup+apply 逻辑属于共享 apply 框架，而非 case 0x30 独占",
+        "调用实体虚表 `+0x4a0`",
+        "默认调用形状为 `(entity, handler, entry, entry+0x60, entry+0xc0, entry+0x120, *(entry+0x180), &local_44(=+0x184), &local_48(=+0x188), *(entry+0x18c), *(entry+0x190), *(entry+0x194))`",
+        "若 `FUN_14050ccc0(..., entry+0x198, entity+0x1ac4)` 命中，则改为把 `FUN_1416fe3e0(...)->+0x58` 产生的字符串资源作为第三参数传给 `virtual +0x4a0`，并把命中项 `+0x10` 作为额外整型参数继续传下去",
+        "`FUN_14050ccc0` 本身会逆序遍历 `entry+0x198` 那棵有序树里的 `uint key`，再到 `DAT_142b19780 + 0x390f8` 指向的 0x14 桶哈希表里查找 `node+0x20 == key && node+0xc == entity+0x1ac4` 的条目；这说明 `+0x198` 更像一组按实体上下文筛选语义标签/映射项的 key 集，而不是动画数据本体",
+        "使用 `entry.+0x60/+0xc0/+0x120/+0x180/+0x184/+0x188/+0x18c/+0x190/+0x194/+0x198/+0x1a8`",
+        "当前是 case 0x30 链里最接近真正业务 apply / 动画驱动申请的桥点之一"
+      ]
+    },
+    {
+      "address": "FUN_14052f940",
+      "guessedName": "ReplayRuntimeNodeChainThroughVirtual4a0",
+      "guessedNameConfidence": 0.74,
+      "purpose": "这是 `FUN_14052fb80` 的共享批处理版本。函数会遍历 `param_1+0x1ba` 挂起的 runtimeNode 链，对每个节点重复执行与 `FUN_14052fb80` 几乎同形的 `entry.+0x198` lookup + 实体 `virtual +0x4a0` 调用流程。它说明 `FUN_14050ccc0` 这套基于 key 集与 `entity+0x1ac4` 的语义映射查找不是 case 0x30 私有逻辑，而是共享 apply 子系统的一部分。",
+      "purposeConfidence": 0.88,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "longlong*",
+          "guessedPurpose": "实体/代理的大对象实例，持有 `+0x1ba` runtimeNode 链。",
+          "confidence": 0.93
+        },
+        {
+          "index": 1,
+          "type": "undefined8",
+          "guessedPurpose": "沿用到每次 `virtual +0x4a0` 调用中的 handler/描述器对象。",
+          "confidence": 0.74
+        }
+      ],
+      "relations": [
+        "由 `0x140b612db` 调用，说明属于共享 apply 子系统而非 case 0x30 专用函数",
+        "遍历 `param_1+0x1ba` 链，对每个 runtimeNode 重复执行与 `FUN_14052fb80` 几乎相同的 `FUN_14050ccc0(..., node+0x198, entity+0x1ac4)` 与 `virtual +0x4a0` 流程",
+        "进一步证明 `+0x198` 是共享语义标签/资源映射 key 集，而不是 case 0x30 独有字段",
+        "可视为 `FUN_14052fb80` 的链式/批处理变体"
+      ]
+    },
+    {
+      "address": "FUN_140b611a0",
+      "guessedName": "DispatchSharedApplyRecordByOpcode",
+      "guessedNameConfidence": 0.78,
+      "purpose": "共享上层 apply dispatcher。函数会先解析/解析出目标对象，再按 `*param_2` 做 `switch`，并在多个分支里复用几乎同形的实体 `virtual +0x4a0` 调用模板；其中已确认至少一支还会落到 `FUN_14052f940` 这类链式 replay 逻辑。最新 callsite 上下文表明它并不属于 case 0x30 主线，而是由 `FUN_140511840 case 0x12` 遍历一条链表时对每个节点调用的共享 apply 回放层。",
+      "purposeConfidence": 0.9,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "longlong",
+          "guessedPurpose": "共享 apply 子系统上下文；当前 caller 传入 `DAT_142b19ba0 + 0xab48`。",
+          "confidence": 0.72
+        },
+        {
+          "index": 1,
+          "type": "uint*",
+          "guessedPurpose": "待解释的共享 apply 记录；`*param_2` 为 opcode，后续字段直接以 `param_2 + 2` 等形状送入 `virtual +0x4a0`。",
+          "confidence": 0.89
+        },
+        {
+          "index": 2,
+          "type": "longlong*",
+          "guessedPurpose": "跨节点复用/回写的临时链表或字符串对象头；在 caller 中对应 `&local_1540`。",
+          "confidence": 0.51
+        },
+        {
+          "index": 3,
+          "type": "char",
+          "guessedPurpose": "宽松/模式标志；在 case 0x12 caller 中来自 `local_1478`。",
+          "confidence": 0.42
+        }
+      ],
+      "relations": [
+        "由 `FUN_140511840 case 0x12` 调用：`FUN_1404eee10` 成功后遍历 `local_1468` 链，对每个节点执行 `FUN_140b611a0(DAT_142b19ba0 + 0xab48, node, &local_1540, local_1478)`",
+        "函数内部对 `*param_2` 做 `switch`；`SearchDecompile` 已确认至少有 4 处结构相近的实体 `virtual +0x4a0` 调用模板，说明它是共享 apply 接口的上层 dispatcher，而不是 case 0x30 独有逻辑",
+        "已知分支会先经 `FUN_14071ee60(DAT_142b19b38, ...)` 解析目标实体，再通过 `virtual +0x490` 或相邻上下文路径取得 handler/上下文，然后以 `param_2 + 2` 和三个临时字符串对象为核心参数调用实体 `virtual +0x4a0`",
+        "`0x140b612db` 会调用 `FUN_14052f940`，表明本函数内部至少一支会把共享记录进一步回放为 runtimeNode 链式 apply",
+        "当前最重要的结论不是它属于 case 0x30，而是它证明 `virtual +0x4a0` 是一个跨 sibling case 复用的稳定共享 apply 接口"
+      ]
+    },
+    {
+      "address": "FUN_14052cd10",
+      "guessedName": "ClearLinkedIStringNodeContainer",
+      "guessedNameConfidence": 0.62,
+      "purpose": "清空一个双向链表容器：循环摘链 `param_1[1]` 上的节点，维护头尾与计数，然后把每个节点的虚表改回 `SoeUtil::IString<char>::vftable`、对节点持有的字符串缓冲做引用计数释放，最后通过容器虚表 `+0x18` 回收节点本身。它被 `FUN_1404fb9a0` 等多个 ctor/dtor-like 包装函数调用，说明更像通用字符串/缓冲节点容器清理器，而不是 case 0x30 blob 的语义消费点。",
+      "purposeConfidence": 0.83,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "container*",
+          "guessedPurpose": "持有双向链表头尾与节点计数的容器对象；虚表 `+0x18` 负责释放单个节点。",
+          "confidence": 0.76
+        }
+      ],
+      "relations": [
+        "被 FUN_1404fb9a0 调用，用于清空其 `+0x28/+0x30` 链式子对象",
+        "也被 FUN_140512d25 / FUN_140512d94 等大量非 case 0x30 位置复用",
+        "在 FUN_140511840 内部，`0x140512d25` 与 `0x140512d94` 都只是对 `[RBP+0x168]` 临时容器的 early-exit 清理点",
+        "把节点虚表改回 SoeUtil::IString<char>::vftable，提示这层对象家族偏向通用 string/blob 所有权管理",
+        "当前应降级为 blob 容器清理层，而不是 `record.+0x58/+0x70` 的真正语义解释器"
+      ]
+    },
+    {
+      "address": "FUN_1404fbd30",
+      "guessedName": "DestroyTinyGenericObject28",
+      "guessedNameConfidence": 0.46,
+      "purpose": "一个极小的析构/释放包装：先把对象首虚表改回 `PTR_FUN_1420633d0`，若标志位允许则释放 `0x28` 字节对象本体。它只被 `0x1420c2c20` / `0x143e454e4` 这类 data 项引用，没有出现任何 case 0x30 特有逻辑。",
+      "purposeConfidence": 0.72,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "object*",
+          "guessedPurpose": "待销毁的小对象实例。",
+          "confidence": 0.61
+        },
+        {
+          "index": 1,
+          "type": "ulonglong",
+          "guessedPurpose": "最低位表示是否连同对象内存一起释放。",
+          "confidence": 0.74
+        }
+      ],
+      "relations": [
+        "由 `0x1420c2c20 -> 0x1404fbd30` 指向，属于小对象析构表项",
+        "把首虚表恢复为 `PTR_FUN_1420633d0`，而后者有 5000+ xref，明显过于通用",
+        "当前只说明这条对象家族偏向通用析构/基类外壳，不能作为 case 0x30 blob consumer 线索"
+      ]
+    },
+    {
+      "address": "FUN_140ad4db0",
+      "guessedName": "RegisterPacketIdPathInGlobalTree",
+      "guessedNameConfidence": 0.72,
+      "purpose": "把「包类型 id + 名字/族字符串」登记进全局 BST：根 **`DAT_142a35ca8`**，节点 `+0x18` 为比较键（`uVar17`，由首参 `param_1` 经 **`param_1 >> 8`** 再循环 **`param_1 >>= 0x10`** 与掩码 `uVar15` 迭代构造）；节点挂 `SoeUtil::IString<char>` 路径。末尾 **`FUN_140ac6240(&PTR_PTR_142a35ca0, puVar9)`** 链到并行容器。与运行时 **直接** 调 `FUN_140511840` 无单条 CALL 边，属 **id→调试/注册表** 基础设施。日志：`dev/ghidra/analysis/output/DumpDecompile__0x140ad4db0__1__200__0__20260319_225145_383.log`、`DumpDecompile__0x140ad4db0__180__229__0__20260319_225243_281.log`。",
+      "purposeConfidence": 0.78,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "ulonglong",
+          "guessedPurpose": "复合 internal packet id（如 `0xa000f00`）；函数入口即 `param_1 >> 8` 再分段抽取。",
+          "confidence": 0.74
+        },
+        {
+          "index": 1,
+          "type": "undefined8",
+          "guessedPurpose": "族名指针（如 `\"cPacketIdCharacterBase\"`）。",
+          "confidence": 0.7
+        },
+        {
+          "index": 2,
+          "type": "undefined8",
+          "guessedPurpose": "成员名指针（如 `\"cCharacterPacketIdUpdateCharacterState\"`）。",
+          "confidence": 0.7
+        },
+        {
+          "index": 3,
+          "type": "undefined8",
+          "guessedPurpose": "占位/哨兵（注册处多为 `&DAT_142049b84`）。",
+          "confidence": 0.45
+        },
+        {
+          "index": 4,
+          "type": "undefined8",
+          "guessedPurpose": "同上占位。",
+          "confidence": 0.45
+        }
+      ],
+      "relations": [
+        "`QueryXref to 0x142a35ca8`：READ 命中含 **`FUN_140ad4db0` 体内** 与 **`FUN_140ac6170`**；WRITE 含 **`FUN_14201b8b0`**（清空树根，非分发）。",
+        "大量 **CALL** 来自各 `FUN_140ac63f8` 族批量注册（与 **`FUN_140ac86a0`** 同批）。"
+      ]
+    },
+    {
+      "address": "FUN_140ac6170",
+      "guessedName": "BuildPacketIdDisplayStringFromTree",
+      "guessedNameConfidence": 0.68,
+      "purpose": "对同一 **`DAT_142a35ca8`** BST 做与注册侧对称的遍历：首参 `param_1 >> 8` 后同样按 16 位片迭代；命中节点时 **`FUN_140306d10(param_2)`**，失败分支 **`FUN_1402ed6c0(param_2,\"%I64u\",uVar5 & 0xffff)`** 格式化数字。**xref-to 本函数仅 DATA**（虚表），说明是 **字符串/日志路径** 而非直接 gameplay dispatch。日志：`DumpDecompile__0x140ac6170__1__200__0__20260319_225326_130.log`。",
+      "purposeConfidence": 0.76,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "ulonglong",
+          "guessedPurpose": "与 `FUN_140ad4db0` 首参同族的 composite id。",
+          "confidence": 0.72
+        },
+        {
+          "index": 1,
+          "type": "undefined8",
+          "guessedPurpose": "输出/追加用的 string 或 buffer 上下文（`FUN_1402bd670` / `FUN_1402bd730`）。",
+          "confidence": 0.65
+        }
+      ],
+      "relations": [
+        "与 **`FUN_140ad4db0`** 共享 **`DAT_142a35ca8` + 移位算法**，支持「`0xa000f00` 注册名 ↔ 数值」同一命名体系。",
+        "**不**包含对 `FUN_140511840` 的调用文本（SearchDecompile 无 hit）。"
+      ]
+    },
+    {
+      "address": "FUN_140b5eb40",
+      "guessedName": "CombatTagTo521700_ChamberInterruptCallsite",
+      "guessedNameConfidence": 0.72,
+      "purpose": "薄封装：`lVar5 = (**(code **)(*param_1 + 0x2f8))()` 后 **`FUN_140521700(lVar5, &DAT_143c08b78, param_1, 0, 0xfffffffffffffffe)`**。**`DAT_143c08b78`**：`QueryXref to 0x143c08b78` 仅 **`140b5eb66`(DATA)** + **`1401d80c9`(WRITE)**；**`FUN_1401d8090`** 内 **`_DAT_143c08b78 = FUN_1402ee3a0(\"CHAMBER_INTERRUPT\",…) & 0x7fffffff`** —— 故本 callsite 是 **`CHAMBER_INTERRUPT` → `521700` 标签梯子** 的一路，**勿**与 **Character.UpdateCharacterState / `FUN_140511840`** 混为「Zone 通用包泵」。日志：`DumpDecompile__0x1401d8090__1__50__0__20260319_230320_426.log`、`QueryXref__to__0x143c08b78__20260319_230201_185.log`。",
+      "purposeConfidence": 0.88,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "longlong*",
+          "guessedPurpose": "带虚表的对象（`+0x2f8` 取上下文；`521700` 的 `param_3`）。",
+          "confidence": 0.7
+        }
+      ],
+      "relations": [
+        "**`FUN_140521700` 首部**用 **`param_3[8]`** 作 id，**`FUN_141761020(param_3)`** 表索引，**`FUN_14050bb70(param_1,&slot,id)`** 经 **`virtual +0x708`** 解析 **entity**（见 `FUN_14050bb70` 条目）。",
+        "同区 **其它 thunk**（`0x140b5ec27`、`0x140b5f007` 等 **33** 处）各自 **`CALL FUN_140521700`** 时传 **不同 `param_2`**（各 combat tag 的全局 handle）；**本符号** 仅 **`&DAT_143c08b78`** 这一路。",
+        "`QueryXref to 0x140521700` 枚举见 `recordsOverview` 新条与 `chain_graph_param_writers.json` → `FUN_140521700.relations`。",
+        "**CALL→包含函数表**（28 入口 / 34 位点）：`fun_521700_caller_thunks.json`。"
+      ]
+    },
+    {
+      "address": "FUN_14050bb70",
+      "guessedName": "ResolveEntityHandleByNumericIdViaVirtual708",
+      "guessedNameConfidence": 0.74,
+      "purpose": "在 **`FUN_140521700` 开头**被调两次：`**(**(code **)(*param_1 + 0x708))(param_1, param_3, param_3, …)` 用 **numeric id**（来自 message 上下文）查 **实体/句柄**，结果经 **`FUN_14176ae10`** 等写入 `*param_2`。`param_1` 为 **已解析的 entity**（`521700` 首参）。日志：`DumpDecompile__0x14050bb70__1__100__0__20260319_230241_420.log`。",
+      "purposeConfidence": 0.8,
+      "parameters": [
+        {
+          "index": 0,
+          "type": "longlong*",
+          "guessedPurpose": "World/entity 根对象，提供 **`+0x708`** 查找。",
+          "confidence": 0.72
+        },
+        {
+          "index": 1,
+          "type": "undefined8*",
+          "guessedPurpose": "输出槽位指针（`521700` 中 `&local_460` / `&local_488`）。",
+          "confidence": 0.78
+        },
+        {
+          "index": 2,
+          "type": "undefined4",
+          "guessedPurpose": "目标 id（多来自 **`param_3[8]`**，可被 **`FUN_141761020` 子表 `+0x48`** 覆盖）。",
+          "confidence": 0.76
+        }
+      ],
+      "relations": [
+        "**`FUN_141761020`**：`*(int *)(param_1+100)` 为索引，`*(longlong *)(param_1+0x30)+i*0x20` 行内 **`+0x18`** 为附加上下文指针。日志：`DumpDecompile__0x141761020__1__80__0__20260319_230251_049.log`。"
+      ]
+    },
+    {
+      "address": "FUN_1401d8090",
+      "guessedName": "InitGlobalHandle_CHAMBER_INTERRUPT",
+      "guessedNameConfidence": 0.9,
+      "purpose": "静态初始化：`_DAT_143c08b78 = FUN_1402ee3a0(\"CHAMBER_INTERRUPT\",0xffffffff,0,0,0,0) & 0x7fffffff`；`_DAT_143c08b7c = 0`。供 **`FUN_140521700`** 比较链与 **`FUN_140b5eb40`** 传入的 **`&DAT_143c08b78`** 对齐。",
+      "purposeConfidence": 0.92,
+      "parameters": [],
+      "relations": [
+        "`QueryXref to 0x143c08b78`：**2 refs**（`1401d80c9` / `140b5eb66`）。"
+      ]
+    }
+  ]
+}

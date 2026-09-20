@@ -1,0 +1,2131 @@
+{
+  "tool": "audit-animal-collision-apx",
+  "assets": [
+    {
+      "file": "D:\\WindowsOnly\\Games\\H1EMU_Client\\Resources\\Assets\\unpacked\\Bear_Brown_COL.apx",
+      "bytes": 14604,
+      "header": {
+        "magic": "0x5a5b5c5d",
+        "version": 65539,
+        "numObjects": 1,
+        "dictOffset": 112,
+        "dataOffset": 424,
+        "relocOffset": 12200,
+        "targetAbi": {
+          "archType": 2,
+          "compilerType": 2,
+          "compilerVersion": 1900,
+          "osType": 0,
+          "pointerBytes": 8,
+          "alignment": 16
+        }
+      },
+      "rootObjects": [
+        {
+          "index": 0,
+          "objectOffset": 464,
+          "className": "DynamicSystemAssetParam",
+          "name": null,
+          "filename": null,
+          "header": {
+            "offset": 464,
+            "relativeDataOffset": 48,
+            "className": "DynamicSystemAssetParam",
+            "name": null,
+            "isIncluded": true,
+            "version": 0,
+            "checksumSize": 4,
+            "checksumOffset": 760,
+            "dataOffset": 512,
+            "fieldsOffset": 584
+          }
+        }
+      ],
+      "serializedObjectClassCounts": {
+        "DynamicSystemAssetParam": 2,
+        "DynamicSystemCapsuleShapeParams": 17,
+        "JointNone": 17,
+        "ModelCollision": 1,
+        "NoWheel": 17,
+        "defaultMaterial": 15
+      },
+      "modelCollisionObjectOffset": 784,
+      "modelCollisionFieldsOffset": 904,
+      "recordStride": 200,
+      "records": [
+        {
+          "recordOffset": 952,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 4448,
+          "capsuleFieldsOffset": 4568,
+          "radiusCandidate": 0.4251510500907898,
+          "heightCandidate": 0.4251510500907898,
+          "poseFieldsRaw": [
+            -0.0006429553031921387,
+            -0.538392961025238,
+            0.8421750664710999,
+            0.02956157922744751,
+            -0.13012918829917908,
+            -0.28459393978118896,
+            -0.011760741472244263
+          ],
+          "bone": "backHip_L",
+          "parentBone": "Pelvis",
+          "jointObjectOffset": 4608
+        },
+        {
+          "recordOffset": 1152,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 4864,
+          "capsuleFieldsOffset": 4984,
+          "radiusCandidate": 0.2749105393886566,
+          "heightCandidate": 0.2749105393886566,
+          "poseFieldsRaw": [
+            0.6674667596817017,
+            0.10300007462501526,
+            0.2228286862373352,
+            0.7030125260353088,
+            0.21045523881912231,
+            -0.08902916312217712,
+            -0.06831997632980347
+          ],
+          "bone": "backHip_R",
+          "parentBone": "Pelvis",
+          "jointObjectOffset": 5024
+        },
+        {
+          "recordOffset": 1352,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 5280,
+          "capsuleFieldsOffset": 5400,
+          "radiusCandidate": 0.2826292812824249,
+          "heightCandidate": 0.2826292812824249,
+          "poseFieldsRaw": [
+            -0.9455516338348389,
+            -0.31818291544914246,
+            -0.02823897823691368,
+            0.06240405514836311,
+            0.26818418502807617,
+            -0.08879914879798889,
+            0.030242502689361572
+          ],
+          "bone": "Spine01",
+          "parentBone": "NONE",
+          "jointObjectOffset": 5440
+        },
+        {
+          "recordOffset": 1552,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 5696,
+          "capsuleFieldsOffset": 5816,
+          "radiusCandidate": 0.4605632722377777,
+          "heightCandidate": 0.4605632722377777,
+          "poseFieldsRaw": [
+            -0.6328015327453613,
+            0.008426487445831299,
+            -0.05588048696517944,
+            0.7722491025924683,
+            -0.1317843347787857,
+            0.19291073083877563,
+            -0.008583441376686096
+          ],
+          "bone": "Spine02",
+          "parentBone": "Spine01",
+          "jointObjectOffset": 5856
+        },
+        {
+          "recordOffset": 1752,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 6112,
+          "capsuleFieldsOffset": 6232,
+          "radiusCandidate": 0.39810264110565186,
+          "heightCandidate": 0.39810264110565186,
+          "poseFieldsRaw": [
+            0.02376297116279602,
+            0.9199331998825073,
+            -0.3823469579219818,
+            -0.08348053693771362,
+            0.013691365718841553,
+            0.15455913543701172,
+            0.01379045844078064
+          ],
+          "bone": "Neck01",
+          "parentBone": "Spine02",
+          "jointObjectOffset": 6272
+        },
+        {
+          "recordOffset": 1952,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 6528,
+          "capsuleFieldsOffset": 6648,
+          "radiusCandidate": 0.321772038936615,
+          "heightCandidate": 0.321772038936615,
+          "poseFieldsRaw": [
+            0.16984760761260986,
+            0.9388612508773804,
+            -0.297787070274353,
+            -0.03184279799461365,
+            0.08480975031852722,
+            0.08599460124969482,
+            0.008137941360473633
+          ],
+          "bone": "Head",
+          "parentBone": "Neck01",
+          "jointObjectOffset": 6688
+        },
+        {
+          "recordOffset": 2152,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 6944,
+          "capsuleFieldsOffset": 7064,
+          "radiusCandidate": 0.2619321346282959,
+          "heightCandidate": 0.2619321346282959,
+          "poseFieldsRaw": [
+            -0.6188830137252808,
+            0.02446731925010681,
+            -0.05154290795326233,
+            0.7834082841873169,
+            -0.009443104267120361,
+            -0.02831125259399414,
+            0.02331167459487915
+          ],
+          "bone": "frontHip_R",
+          "parentBone": "Spine02",
+          "jointObjectOffset": 7104
+        },
+        {
+          "recordOffset": 2352,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 7360,
+          "capsuleFieldsOffset": 7480,
+          "radiusCandidate": 0.20895715057849884,
+          "heightCandidate": 0.20895715057849884,
+          "poseFieldsRaw": [
+            0.08285397291183472,
+            -0.015506811439990997,
+            0.34093937277793884,
+            -0.9362986087799072,
+            0.11703145503997803,
+            0.07306420803070068,
+            -0.00017896294593811035
+          ],
+          "bone": "frontKnee_R",
+          "parentBone": "frontHip_R",
+          "jointObjectOffset": 7520
+        },
+        {
+          "recordOffset": 2552,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 7776,
+          "capsuleFieldsOffset": 7896,
+          "radiusCandidate": 0.18395951390266418,
+          "heightCandidate": 0.18395951390266418,
+          "poseFieldsRaw": [
+            -0.1014995202422142,
+            -0.07147177308797836,
+            0.09402769804000854,
+            0.9877998232841492,
+            0.12779685854911804,
+            -0.033940911293029785,
+            -9.320676326751709e-05
+          ],
+          "bone": "frontHip_L",
+          "parentBone": "Spine02",
+          "jointObjectOffset": 7936
+        },
+        {
+          "recordOffset": 2752,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 8192,
+          "capsuleFieldsOffset": 8312,
+          "radiusCandidate": 0.22347982227802277,
+          "heightCandidate": 0.22347982227802277,
+          "poseFieldsRaw": [
+            -0.004287485033273697,
+            -0.12558527290821075,
+            0.9124293327331543,
+            0.38946449756622314,
+            0.0872310996055603,
+            0.09270170331001282,
+            0.009440988302230835
+          ],
+          "bone": "frontKnee_L",
+          "parentBone": "frontHip_L",
+          "jointObjectOffset": 8352
+        },
+        {
+          "recordOffset": 2952,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 8608,
+          "capsuleFieldsOffset": 8728,
+          "radiusCandidate": 0.18254956603050232,
+          "heightCandidate": 0.22701527178287506,
+          "poseFieldsRaw": [
+            -0.06194496154785156,
+            0.9939603805541992,
+            0.07433775067329407,
+            -0.051767829805612564,
+            0.11242306232452393,
+            -0.05709272623062134,
+            -0.012254536151885986
+          ],
+          "bone": "backKnee_R",
+          "parentBone": "backHip_R",
+          "jointObjectOffset": 8768
+        },
+        {
+          "recordOffset": 3152,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 9024,
+          "capsuleFieldsOffset": 9144,
+          "radiusCandidate": 0.18839474022388458,
+          "heightCandidate": 0.18839474022388458,
+          "poseFieldsRaw": [
+            -0.9978970289230347,
+            0.01615658402442932,
+            0.001906743273139,
+            -0.06274588406085968,
+            0.08168855309486389,
+            0.023450911045074463,
+            0.01818317174911499
+          ],
+          "bone": "backKnee_L",
+          "parentBone": "backHip_L",
+          "jointObjectOffset": 9184
+        },
+        {
+          "recordOffset": 3352,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 9440,
+          "capsuleFieldsOffset": 9560,
+          "radiusCandidate": 0.1968366652727127,
+          "heightCandidate": 0.1968366652727127,
+          "poseFieldsRaw": [
+            0.3039326071739197,
+            -0.0170900821685791,
+            0.10084021091461182,
+            -0.9471875429153442,
+            0.09107935428619385,
+            0.011073589324951172,
+            -0.022522956132888794
+          ],
+          "bone": "frontAnkle_R",
+          "parentBone": "frontKnee_R",
+          "jointObjectOffset": 9600
+        },
+        {
+          "recordOffset": 3552,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 9856,
+          "capsuleFieldsOffset": 9976,
+          "radiusCandidate": 0.1408953070640564,
+          "heightCandidate": 0.1408953070640564,
+          "poseFieldsRaw": [
+            0.9786650538444519,
+            -0.19451993703842163,
+            -0.020243560895323753,
+            0.06298349797725677,
+            0.08597120642662048,
+            0.0007844865322113037,
+            0.031894147396087646
+          ],
+          "bone": "frontAnkle_L",
+          "parentBone": "frontKnee_L",
+          "jointObjectOffset": 10016
+        },
+        {
+          "recordOffset": 3752,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 10272,
+          "capsuleFieldsOffset": 10392,
+          "radiusCandidate": 0.14547410607337952,
+          "heightCandidate": 0.14547410607337952,
+          "poseFieldsRaw": [
+            0.001963980495929718,
+            0.10435321182012558,
+            -0.9760479927062988,
+            -0.19088473916053772,
+            0.07948696613311768,
+            0.014831244945526123,
+            -0.0020970404148101807
+          ],
+          "bone": "backAnkle_R",
+          "parentBone": "backKnee_R",
+          "jointObjectOffset": 10432
+        },
+        {
+          "recordOffset": 3952,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 10688,
+          "capsuleFieldsOffset": 10808,
+          "radiusCandidate": 0.1441819816827774,
+          "heightCandidate": 0.1441819816827774,
+          "poseFieldsRaw": [
+            0.6290359497070312,
+            -0.21549955010414124,
+            -0.12348395586013794,
+            0.7366311550140381,
+            0.057762086391448975,
+            0.0015270709991455078,
+            0.0010281205177307129
+          ],
+          "bone": "backAnkle_L",
+          "parentBone": "backKnee_L",
+          "jointObjectOffset": 10848
+        },
+        {
+          "recordOffset": 4152,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 11104,
+          "capsuleFieldsOffset": 11224,
+          "radiusCandidate": 0.13877923786640167,
+          "heightCandidate": 0.13877923786640167,
+          "poseFieldsRaw": [
+            -0.6358814239501953,
+            0.1102440357208252,
+            -0.2922186255455017,
+            0.7057685852050781,
+            0.05139577388763428,
+            0.006941556930541992,
+            0.013213008642196655
+          ],
+          "bone": null,
+          "parentBone": null,
+          "jointObjectOffset": 11264
+        }
+      ],
+      "summary": {
+        "recordCount": 17,
+        "bones": [
+          "backHip_L",
+          "backHip_R",
+          "Spine01",
+          "Spine02",
+          "Neck01",
+          "Head",
+          "frontHip_R",
+          "frontKnee_R",
+          "frontHip_L",
+          "frontKnee_L",
+          "backKnee_R",
+          "backKnee_L",
+          "frontAnkle_R",
+          "frontAnkle_L",
+          "backAnkle_R",
+          "backAnkle_L",
+          null
+        ],
+        "radiusCandidateRange": [
+          0.13877923786640167,
+          0.4605632722377777
+        ],
+        "heightCandidateRange": [
+          0.13877923786640167,
+          0.4605632722377777
+        ],
+        "shapeClassCounts": {
+          "DynamicSystemCapsuleShapeParams": 17
+        },
+        "semanticStatus": "collision-capsule-data-recovered; melee-contact-shape-unverified"
+      }
+    },
+    {
+      "file": "D:\\WindowsOnly\\Games\\H1EMU_Client\\Resources\\Assets\\unpacked\\Wolf001_COL.apx",
+      "bytes": 20212,
+      "header": {
+        "magic": "0x5a5b5c5d",
+        "version": 65539,
+        "numObjects": 1,
+        "dictOffset": 112,
+        "dataOffset": 432,
+        "relocOffset": 16856,
+        "targetAbi": {
+          "archType": 2,
+          "compilerType": 2,
+          "compilerVersion": 1900,
+          "osType": 0,
+          "pointerBytes": 8,
+          "alignment": 16
+        }
+      },
+      "rootObjects": [
+        {
+          "index": 0,
+          "objectOffset": 464,
+          "className": "DynamicSystemAssetParam",
+          "name": null,
+          "filename": null,
+          "header": {
+            "offset": 464,
+            "relativeDataOffset": 48,
+            "className": "DynamicSystemAssetParam",
+            "name": null,
+            "isIncluded": true,
+            "version": 0,
+            "checksumSize": 4,
+            "checksumOffset": 760,
+            "dataOffset": 512,
+            "fieldsOffset": 584
+          }
+        }
+      ],
+      "serializedObjectClassCounts": {
+        "DynamicSystemAssetParam": 2,
+        "DynamicSystemCapsuleShapeParams": 24,
+        "JointNone": 24,
+        "ModelCollision": 1,
+        "NoWheel": 24,
+        "defaultMaterial": 22
+      },
+      "modelCollisionObjectOffset": 784,
+      "modelCollisionFieldsOffset": 904,
+      "recordStride": 200,
+      "records": [
+        {
+          "recordOffset": 952,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 5856,
+          "capsuleFieldsOffset": 5976,
+          "radiusCandidate": 0.14619600772857666,
+          "heightCandidate": 0.14619600772857666,
+          "poseFieldsRaw": [
+            -0.9996256828308105,
+            0.0022528469562530518,
+            -0.006468472070991993,
+            0.026495642960071564,
+            0.06463360786437988,
+            0.10669881105422974,
+            -0.0026627182960510254
+          ],
+          "bone": "RHip",
+          "parentBone": "Pelvis",
+          "jointObjectOffset": 6016
+        },
+        {
+          "recordOffset": 1152,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 6272,
+          "capsuleFieldsOffset": 6392,
+          "radiusCandidate": 0.08882329612970352,
+          "heightCandidate": 0.08882329612970352,
+          "poseFieldsRaw": [
+            0.1696936935186386,
+            -0.2367948740720749,
+            0.9163262844085693,
+            0.274733304977417,
+            0.17541491985321045,
+            -0.02664606273174286,
+            -0.032939013093709946
+          ],
+          "bone": "RR_Knee",
+          "parentBone": "RHip",
+          "jointObjectOffset": 6432
+        },
+        {
+          "recordOffset": 1352,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 6688,
+          "capsuleFieldsOffset": 6808,
+          "radiusCandidate": 0.04372606799006462,
+          "heightCandidate": 0.18555137515068054,
+          "poseFieldsRaw": [
+            -0.9825164079666138,
+            0.08533486723899841,
+            0.014043234288692474,
+            -0.16487160325050354,
+            0.13895846903324127,
+            0.016787618398666382,
+            -0.006062716245651245
+          ],
+          "bone": "LHip",
+          "parentBone": "Pelvis",
+          "jointObjectOffset": 6848
+        },
+        {
+          "recordOffset": 1552,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 7104,
+          "capsuleFieldsOffset": 7224,
+          "radiusCandidate": 0.08204320818185806,
+          "heightCandidate": 0.08204320818185806,
+          "poseFieldsRaw": [
+            0.07567954808473587,
+            -0.2854327857494354,
+            -0.9031621217727661,
+            -0.3116070032119751,
+            0.19215518236160278,
+            -0.02260594069957733,
+            0.03144969791173935
+          ],
+          "bone": "LL_Knee",
+          "parentBone": "LHip",
+          "jointObjectOffset": 7264
+        },
+        {
+          "recordOffset": 1752,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 7520,
+          "capsuleFieldsOffset": 7640,
+          "radiusCandidate": 0.047361958771944046,
+          "heightCandidate": 0.20099905133247375,
+          "poseFieldsRaw": [
+            -0.06415826082229614,
+            -0.5051407814025879,
+            0.8578087091445923,
+            0.06986379623413086,
+            0.14127729833126068,
+            0.019434213638305664,
+            -0.0030215829610824585
+          ],
+          "bone": "Spine1",
+          "parentBone": "NONE",
+          "jointObjectOffset": 7680
+        },
+        {
+          "recordOffset": 1952,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 7936,
+          "capsuleFieldsOffset": 8056,
+          "radiusCandidate": 0.1440599262714386,
+          "heightCandidate": 0.1440599262714386,
+          "poseFieldsRaw": [
+            0.9140429496765137,
+            0.002920985221862793,
+            -0.020200297236442566,
+            -0.40510374307632446,
+            -0.010238122195005417,
+            -0.07494598627090454,
+            0.0050938427448272705
+          ],
+          "bone": "Spine2",
+          "parentBone": "Spine1",
+          "jointObjectOffset": 8096
+        },
+        {
+          "recordOffset": 2152,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 8352,
+          "capsuleFieldsOffset": 8472,
+          "radiusCandidate": 0.15782906115055084,
+          "heightCandidate": 0.15782906115055084,
+          "poseFieldsRaw": [
+            0.5878005027770996,
+            -0.021397680044174194,
+            -0.00426793098449707,
+            -0.8087116479873657,
+            -0.024972975254058838,
+            -0.053716063499450684,
+            0.0012710168957710266
+          ],
+          "bone": "Spine3",
+          "parentBone": "Spine2",
+          "jointObjectOffset": 8512
+        },
+        {
+          "recordOffset": 2352,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 8768,
+          "capsuleFieldsOffset": 8888,
+          "radiusCandidate": 0.16616927087306976,
+          "heightCandidate": 0.16616927087306976,
+          "poseFieldsRaw": [
+            0.7065454125404358,
+            -0.03931927680969238,
+            -0.2202156037092209,
+            0.6713812351226807,
+            -0.048373281955718994,
+            -0.09666341543197632,
+            -0.0022325441241264343
+          ],
+          "bone": "Neck01",
+          "parentBone": "Spine3",
+          "jointObjectOffset": 8928
+        },
+        {
+          "recordOffset": 2552,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 9184,
+          "capsuleFieldsOffset": 9304,
+          "radiusCandidate": 0.13850998878479004,
+          "heightCandidate": 0.13850998878479004,
+          "poseFieldsRaw": [
+            0.6758944988250732,
+            -0.02453938126564026,
+            -0.039175063371658325,
+            0.7355474233627319,
+            0.06820571422576904,
+            -0.0752204954624176,
+            -0.002468213438987732
+          ],
+          "bone": "Neck02",
+          "parentBone": "Neck01",
+          "jointObjectOffset": 9344
+        },
+        {
+          "recordOffset": 2752,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 9600,
+          "capsuleFieldsOffset": 9720,
+          "radiusCandidate": 0.12070165574550629,
+          "heightCandidate": 0.12070165574550629,
+          "poseFieldsRaw": [
+            0.10182605683803558,
+            0.024020027369260788,
+            0.05679550766944885,
+            0.9928891658782959,
+            0.053135454654693604,
+            -0.08297213912010193,
+            0.006641611456871033
+          ],
+          "bone": "Head",
+          "parentBone": "Neck02",
+          "jointObjectOffset": 9760
+        },
+        {
+          "recordOffset": 2952,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 10016,
+          "capsuleFieldsOffset": 10136,
+          "radiusCandidate": 0.12009420990943909,
+          "heightCandidate": 0.12009420990943909,
+          "poseFieldsRaw": [
+            -0.008765911683440208,
+            0.008098727092146873,
+            -0.9773364067077637,
+            0.2113560140132904,
+            0.06859666109085083,
+            0.01602572202682495,
+            0.006583839654922485
+          ],
+          "bone": "RShoulder",
+          "parentBone": "Spine3",
+          "jointObjectOffset": 10176
+        },
+        {
+          "recordOffset": 3152,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 10432,
+          "capsuleFieldsOffset": 10552,
+          "radiusCandidate": 0.09355971217155457,
+          "heightCandidate": 0.09355971217155457,
+          "poseFieldsRaw": [
+            0.6170374155044556,
+            -0.3575025796890259,
+            0.23457704484462738,
+            -0.6606287360191345,
+            0.09555494785308838,
+            0.04518571496009827,
+            0.042157575488090515
+          ],
+          "bone": "RFLeg",
+          "parentBone": "RShoulder",
+          "jointObjectOffset": 10592
+        },
+        {
+          "recordOffset": 3352,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 10848,
+          "capsuleFieldsOffset": 10968,
+          "radiusCandidate": 0.04537004604935646,
+          "heightCandidate": 0.13164404034614563,
+          "poseFieldsRaw": [
+            0.03096623718738556,
+            0.5017601847648621,
+            -0.8635996580123901,
+            -0.03838813304901123,
+            0.12353554368019104,
+            0.0194673091173172,
+            -0.0067246705293655396
+          ],
+          "bone": "LShoulder",
+          "parentBone": "Spine3",
+          "jointObjectOffset": 11008
+        },
+        {
+          "recordOffset": 3552,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 11264,
+          "capsuleFieldsOffset": 11384,
+          "radiusCandidate": 0.09032987058162689,
+          "heightCandidate": 0.09032987058162689,
+          "poseFieldsRaw": [
+            -0.0586269274353981,
+            0.14045533537864685,
+            0.8837964534759521,
+            0.4424240291118622,
+            0.09428641200065613,
+            0.03704120218753815,
+            -0.031223461031913757
+          ],
+          "bone": "LFLeg",
+          "parentBone": "LShoulder",
+          "jointObjectOffset": 11424
+        },
+        {
+          "recordOffset": 3752,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 11680,
+          "capsuleFieldsOffset": 11800,
+          "radiusCandidate": 0.050641197711229324,
+          "heightCandidate": 0.1295807957649231,
+          "poseFieldsRaw": [
+            -0.04195190593600273,
+            0.031084703281521797,
+            -0.9985221028327942,
+            -0.015080630779266357,
+            0.11220681667327881,
+            0.009396195411682129,
+            0.007558569312095642
+          ],
+          "bone": "TailBase",
+          "parentBone": "Pelvis",
+          "jointObjectOffset": 11840
+        },
+        {
+          "recordOffset": 3952,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 12096,
+          "capsuleFieldsOffset": 12216,
+          "radiusCandidate": 0.07110068202018738,
+          "heightCandidate": 0.10261619091033936,
+          "poseFieldsRaw": [
+            -0.2520873248577118,
+            0.9666259288787842,
+            0.045429304242134094,
+            -0.004751967266201973,
+            0.0652390867471695,
+            0.05640023946762085,
+            -0.012418985366821289
+          ],
+          "bone": "Tail01",
+          "parentBone": "TailBase",
+          "jointObjectOffset": 12256
+        },
+        {
+          "recordOffset": 4152,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 12512,
+          "capsuleFieldsOffset": 12632,
+          "radiusCandidate": 0.07364094257354736,
+          "heightCandidate": 0.09503209590911865,
+          "poseFieldsRaw": [
+            0.15233692526817322,
+            -0.9883285760879517,
+            7.639116006430413e-08,
+            6.585445078144403e-08,
+            0.23044781386852264,
+            0.04372882843017578,
+            8.381903171539307e-08
+          ],
+          "bone": "Tail02",
+          "parentBone": "Tail01",
+          "jointObjectOffset": 12672
+        },
+        {
+          "recordOffset": 4352,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 12928,
+          "capsuleFieldsOffset": 13048,
+          "radiusCandidate": 0.06549844890832901,
+          "heightCandidate": 0.1913091093301773,
+          "poseFieldsRaw": [
+            0.9993868470191956,
+            0.014293372631072998,
+            -0.024561770260334015,
+            -0.020456667989492416,
+            0.28784117102622986,
+            0.016411125659942627,
+            -0.0074222031980752945
+          ],
+          "bone": "LL_Ankle",
+          "parentBone": "LL_Knee",
+          "jointObjectOffset": 13088
+        },
+        {
+          "recordOffset": 4552,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 13344,
+          "capsuleFieldsOffset": 13464,
+          "radiusCandidate": 0.035195767879486084,
+          "heightCandidate": 0.1548098623752594,
+          "poseFieldsRaw": [
+            0.01737457513809204,
+            0.7850633859634399,
+            0.6182551383972168,
+            -0.033677369356155396,
+            0.0636015236377716,
+            0.011179208755493164,
+            -0.002065591514110565
+          ],
+          "bone": "RR_Ankle",
+          "parentBone": "RR_Knee",
+          "jointObjectOffset": 13504
+        },
+        {
+          "recordOffset": 4752,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 13760,
+          "capsuleFieldsOffset": 13880,
+          "radiusCandidate": 0.03334673121571541,
+          "heightCandidate": 0.13167625665664673,
+          "poseFieldsRaw": [
+            0.10379254817962646,
+            -0.043209027498960495,
+            0.011208117008209229,
+            0.9935968518257141,
+            0.062234923243522644,
+            0.010641872882843018,
+            0.0030419528484344482
+          ],
+          "bone": "LFAnkle",
+          "parentBone": "LFLeg",
+          "jointObjectOffset": 13920
+        },
+        {
+          "recordOffset": 4952,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 14176,
+          "capsuleFieldsOffset": 14296,
+          "radiusCandidate": 0.03801046684384346,
+          "heightCandidate": 0.1067989245057106,
+          "poseFieldsRaw": [
+            -0.0015159491449594498,
+            -0.020546114072203636,
+            0.057674139738082886,
+            -0.9981229305267334,
+            0.0574382022023201,
+            0.010767504572868347,
+            0.0029640793800354004
+          ],
+          "bone": "RFAnkle",
+          "parentBone": "RFLeg",
+          "jointObjectOffset": 14336
+        },
+        {
+          "recordOffset": 5152,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 14592,
+          "capsuleFieldsOffset": 14712,
+          "radiusCandidate": 0.03756778687238693,
+          "heightCandidate": 0.10530853271484375,
+          "poseFieldsRaw": [
+            0.072370246052742,
+            -0.006486102938652039,
+            -0.05391225218772888,
+            0.9958984851837158,
+            0.05045667290687561,
+            -0.0045111775398254395,
+            -0.0022871121764183044
+          ],
+          "bone": "RR_Ball",
+          "parentBone": "RR_Ankle",
+          "jointObjectOffset": 14752
+        },
+        {
+          "recordOffset": 5352,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 15008,
+          "capsuleFieldsOffset": 15128,
+          "radiusCandidate": 0.03708590939640999,
+          "heightCandidate": 0.05218368396162987,
+          "poseFieldsRaw": [
+            0.6352375745773315,
+            -0.2755396366119385,
+            -0.33642128109931946,
+            0.6382571458816528,
+            0.005195260047912598,
+            0.014744406566023827,
+            0.0009016692638397217
+          ],
+          "bone": "LL_Ball",
+          "parentBone": "LL_Ankle",
+          "jointObjectOffset": 15168
+        },
+        {
+          "recordOffset": 5552,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 15424,
+          "capsuleFieldsOffset": 15544,
+          "radiusCandidate": 0.04032537341117859,
+          "heightCandidate": 0.04032537341117859,
+          "poseFieldsRaw": [
+            0.48636293411254883,
+            -0.17113403975963593,
+            -0.29373645782470703,
+            0.804911732673645,
+            0.005542457103729248,
+            0.007129015401005745,
+            0.0007185488939285278
+          ],
+          "bone": null,
+          "parentBone": null,
+          "jointObjectOffset": 15584
+        }
+      ],
+      "summary": {
+        "recordCount": 24,
+        "bones": [
+          "RHip",
+          "RR_Knee",
+          "LHip",
+          "LL_Knee",
+          "Spine1",
+          "Spine2",
+          "Spine3",
+          "Neck01",
+          "Neck02",
+          "Head",
+          "RShoulder",
+          "RFLeg",
+          "LShoulder",
+          "LFLeg",
+          "TailBase",
+          "Tail01",
+          "Tail02",
+          "LL_Ankle",
+          "RR_Ankle",
+          "LFAnkle",
+          "RFAnkle",
+          "RR_Ball",
+          "LL_Ball",
+          null
+        ],
+        "radiusCandidateRange": [
+          0.03334673121571541,
+          0.16616927087306976
+        ],
+        "heightCandidateRange": [
+          0.04032537341117859,
+          0.20099905133247375
+        ],
+        "shapeClassCounts": {
+          "DynamicSystemCapsuleShapeParams": 24
+        },
+        "semanticStatus": "collision-capsule-data-recovered; melee-contact-shape-unverified"
+      }
+    },
+    {
+      "file": "D:\\WindowsOnly\\Games\\H1EMU_Client\\Resources\\Assets\\unpacked\\Deer001_COL.apx",
+      "bytes": 13884,
+      "header": {
+        "magic": "0x5a5b5c5d",
+        "version": 65539,
+        "numObjects": 1,
+        "dictOffset": 112,
+        "dataOffset": 400,
+        "relocOffset": 11576,
+        "targetAbi": {
+          "archType": 2,
+          "compilerType": 2,
+          "compilerVersion": 1900,
+          "osType": 0,
+          "pointerBytes": 8,
+          "alignment": 16
+        }
+      },
+      "rootObjects": [
+        {
+          "index": 0,
+          "objectOffset": 432,
+          "className": "DynamicSystemAssetParam",
+          "name": null,
+          "filename": null,
+          "header": {
+            "offset": 432,
+            "relativeDataOffset": 48,
+            "className": "DynamicSystemAssetParam",
+            "name": null,
+            "isIncluded": true,
+            "version": 0,
+            "checksumSize": 4,
+            "checksumOffset": 728,
+            "dataOffset": 480,
+            "fieldsOffset": 552
+          }
+        }
+      ],
+      "serializedObjectClassCounts": {
+        "DynamicSystemAssetParam": 2,
+        "DynamicSystemCapsuleShapeParams": 15,
+        "DynamicSystemSphereShapeParams": 1,
+        "JointNone": 16,
+        "ModelCollision": 1,
+        "NoWheel": 16,
+        "defaultMaterial": 15
+      },
+      "modelCollisionObjectOffset": 752,
+      "modelCollisionFieldsOffset": 872,
+      "recordStride": 200,
+      "records": [
+        {
+          "recordOffset": 920,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 4288,
+          "capsuleFieldsOffset": 4408,
+          "radiusCandidate": 0.17581450939178467,
+          "heightCandidate": 0.17581450939178467,
+          "poseFieldsRaw": [
+            0.5367925763130188,
+            0.015724658966064453,
+            -0.028629034757614136,
+            -0.8430818319320679,
+            -0.015548944473266602,
+            0.0004673898220062256,
+            0.09133905172348022
+          ],
+          "bone": "RRKnee",
+          "parentBone": "Pelvis",
+          "jointObjectOffset": 4448
+        },
+        {
+          "recordOffset": 1120,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 4704,
+          "capsuleFieldsOffset": 4824,
+          "radiusCandidate": 0.078008733689785,
+          "heightCandidate": 0.23940958082675934,
+          "poseFieldsRaw": [
+            0.7411808967590332,
+            -0.08227157592773438,
+            0.02909022569656372,
+            0.6656094193458557,
+            0.11664313077926636,
+            0.008735984563827515,
+            -0.026412665843963623
+          ],
+          "bone": "RRearAnkle",
+          "parentBone": "RRKnee",
+          "jointObjectOffset": 4864
+        },
+        {
+          "recordOffset": 1320,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 5120,
+          "capsuleFieldsOffset": 5240,
+          "radiusCandidate": 0.05117909982800484,
+          "heightCandidate": 0.3564591407775879,
+          "poseFieldsRaw": [
+            0.015956252813339233,
+            0.011759914457798004,
+            0.9997982382774353,
+            -0.0032532811164855957,
+            0.13219305872917175,
+            0.012643404304981232,
+            0.010979801416397095
+          ],
+          "bone": "LLKnee",
+          "parentBone": "Pelvis",
+          "jointObjectOffset": 5280
+        },
+        {
+          "recordOffset": 1520,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 5536,
+          "capsuleFieldsOffset": 5656,
+          "radiusCandidate": 0.07842262834310532,
+          "heightCandidate": 0.23970896005630493,
+          "poseFieldsRaw": [
+            -0.038457609713077545,
+            0.04296872764825821,
+            0.9982920289039612,
+            -0.009367763996124268,
+            0.12623625993728638,
+            0.00036953389644622803,
+            -0.020333290100097656
+          ],
+          "bone": "LLearAnkle",
+          "parentBone": "LLKnee",
+          "jointObjectOffset": 5696
+        },
+        {
+          "recordOffset": 1720,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 5952,
+          "capsuleFieldsOffset": 6072,
+          "radiusCandidate": 0.050356220453977585,
+          "heightCandidate": 0.341522216796875,
+          "poseFieldsRaw": [
+            0.017657548189163208,
+            -0.7101651430130005,
+            0.7036123275756836,
+            0.01684299111366272,
+            0.13649867475032806,
+            0.0020443573594093323,
+            0.012331187725067139
+          ],
+          "bone": "Spine1",
+          "parentBone": "NONE",
+          "jointObjectOffset": 6112
+        },
+        {
+          "recordOffset": 1920,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 6368,
+          "capsuleFieldsOffset": 6488,
+          "radiusCandidate": 0.20328888297080994,
+          "heightCandidate": 0.20328888297080994,
+          "poseFieldsRaw": [
+            -0.998613178730011,
+            0.012667357921600342,
+            0.05093768239021301,
+            0.004084335640072823,
+            0.013347283005714417,
+            -0.002900034189224243,
+            -0.08922481536865234
+          ],
+          "bone": "Spine2",
+          "parentBone": "Spine1",
+          "jointObjectOffset": 6528
+        },
+        {
+          "recordOffset": 2120,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemSphereShapeParams",
+          "capsuleObjectOffset": 6784,
+          "capsuleFieldsOffset": 6904,
+          "radiusCandidate": 0.20826849341392517,
+          "heightCandidate": null,
+          "poseFieldsRaw": [
+            -0.5379201173782349,
+            -0.5379201173782349,
+            -0.45895734429359436,
+            -0.45895764231681824,
+            0.11200618743896484,
+            0.07488912343978882,
+            0.010245680809020996
+          ],
+          "bone": "Neck1",
+          "parentBone": "Spine2",
+          "jointObjectOffset": 6944
+        },
+        {
+          "recordOffset": 2320,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 7200,
+          "capsuleFieldsOffset": 7320,
+          "radiusCandidate": 0.11723317205905914,
+          "heightCandidate": 0.11723317205905914,
+          "poseFieldsRaw": [
+            -0.05090276151895523,
+            0.002334458753466606,
+            0.9981587529182434,
+            0.03290480375289917,
+            0.021096467971801758,
+            -0.007918953895568848,
+            -0.03302502632141113
+          ],
+          "bone": "Neck3",
+          "parentBone": "Neck1",
+          "jointObjectOffset": 7360
+        },
+        {
+          "recordOffset": 2520,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 7616,
+          "capsuleFieldsOffset": 7736,
+          "radiusCandidate": 0.09421491622924805,
+          "heightCandidate": 0.12935222685337067,
+          "poseFieldsRaw": [
+            -0.9992012977600098,
+            0.010676711797714233,
+            -0.03672295808792114,
+            0.011586002074182034,
+            -0.021224141120910645,
+            0.0012603998184204102,
+            -0.012177005410194397
+          ],
+          "bone": "Head",
+          "parentBone": "Neck3",
+          "jointObjectOffset": 7776
+        },
+        {
+          "recordOffset": 2720,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 8032,
+          "capsuleFieldsOffset": 8152,
+          "radiusCandidate": 0.1332578957080841,
+          "heightCandidate": 0.1332578957080841,
+          "poseFieldsRaw": [
+            -0.6481536030769348,
+            -0.3245689868927002,
+            0.3327523469924927,
+            -0.6031816005706787,
+            0.07692146301269531,
+            0.0041207075119018555,
+            -0.04713967442512512
+          ],
+          "bone": "LFLeg",
+          "parentBone": "Spine2",
+          "jointObjectOffset": 8192
+        },
+        {
+          "recordOffset": 2920,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 8448,
+          "capsuleFieldsOffset": 8568,
+          "radiusCandidate": 0.06278770416975021,
+          "heightCandidate": 0.1115029975771904,
+          "poseFieldsRaw": [
+            0.9932720065116882,
+            0.016527235507965088,
+            -0.09563997387886047,
+            0.06317299604415894,
+            0.025936543941497803,
+            -0.004033938050270081,
+            0.022917449474334717
+          ],
+          "bone": "LFKnee",
+          "parentBone": "LFLeg",
+          "jointObjectOffset": 8608
+        },
+        {
+          "recordOffset": 3120,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 8864,
+          "capsuleFieldsOffset": 8984,
+          "radiusCandidate": 0.052173007279634476,
+          "heightCandidate": 0.2617638409137726,
+          "poseFieldsRaw": [
+            -0.003487512469291687,
+            0.062015607953071594,
+            0.9980525970458984,
+            -0.005743503570556641,
+            0.10176405310630798,
+            -0.0031438246369361877,
+            -0.0023246407508850098
+          ],
+          "bone": "RFLeg",
+          "parentBone": "Spine2",
+          "jointObjectOffset": 9024
+        },
+        {
+          "recordOffset": 3320,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 9280,
+          "capsuleFieldsOffset": 9400,
+          "radiusCandidate": 0.07909571379423141,
+          "heightCandidate": 0.07909571379423141,
+          "poseFieldsRaw": [
+            0.9734309911727905,
+            0.015697449445724487,
+            -0.045314282178878784,
+            -0.22390291094779968,
+            0.04143083095550537,
+            0.00029806047677993774,
+            -0.002776414155960083
+          ],
+          "bone": "RFKnee",
+          "parentBone": "RFLeg",
+          "jointObjectOffset": 9440
+        },
+        {
+          "recordOffset": 3520,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 9696,
+          "capsuleFieldsOffset": 9816,
+          "radiusCandidate": 0.048214141279459,
+          "heightCandidate": 0.2478431761264801,
+          "poseFieldsRaw": [
+            -0.0298163965344429,
+            0.08170337975025177,
+            0.9962062835693359,
+            0.00298348069190979,
+            0.08755263686180115,
+            -0.0016364753246307373,
+            -0.011647731065750122
+          ],
+          "bone": "LFAnkle",
+          "parentBone": "LFKnee",
+          "jointObjectOffset": 9856
+        },
+        {
+          "recordOffset": 3720,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 10112,
+          "capsuleFieldsOffset": 10232,
+          "radiusCandidate": 0.04835614189505577,
+          "heightCandidate": 0.14058461785316467,
+          "poseFieldsRaw": [
+            0.7618815898895264,
+            0.007645994424819946,
+            0.03261810541152954,
+            0.6468493342399597,
+            0.024717584252357483,
+            -0.004725411534309387,
+            0.004397779703140259
+          ],
+          "bone": "RFAnkle",
+          "parentBone": "RFKnee",
+          "jointObjectOffset": 10272
+        },
+        {
+          "recordOffset": 3920,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 10528,
+          "capsuleFieldsOffset": 10648,
+          "radiusCandidate": 0.047225471585989,
+          "heightCandidate": 0.14015957713127136,
+          "poseFieldsRaw": [
+            -0.6928761005401611,
+            -0.003241807222366333,
+            -0.00012865662574768066,
+            -0.721049427986145,
+            0.02385041117668152,
+            0.0007236897945404053,
+            0.005771160125732422
+          ],
+          "bone": "Spine2",
+          "parentBone": "Neck3",
+          "jointObjectOffset": 10688
+        }
+      ],
+      "summary": {
+        "recordCount": 16,
+        "bones": [
+          "RRKnee",
+          "RRearAnkle",
+          "LLKnee",
+          "LLearAnkle",
+          "Spine1",
+          "Spine2",
+          "Neck1",
+          "Neck3",
+          "Head",
+          "LFLeg",
+          "LFKnee",
+          "RFLeg",
+          "RFKnee",
+          "LFAnkle",
+          "RFAnkle",
+          "Spine2"
+        ],
+        "radiusCandidateRange": [
+          0.047225471585989,
+          0.20826849341392517
+        ],
+        "heightCandidateRange": [
+          0.07909571379423141,
+          0.3564591407775879
+        ],
+        "shapeClassCounts": {
+          "DynamicSystemCapsuleShapeParams": 15,
+          "DynamicSystemSphereShapeParams": 1
+        },
+        "semanticStatus": "collision-capsule-data-recovered; melee-contact-shape-unverified"
+      }
+    },
+    {
+      "file": "D:\\WindowsOnly\\Games\\H1EMU_Client\\Resources\\Assets\\unpacked\\Rabbit_Tan_COL.apx",
+      "bytes": 19420,
+      "header": {
+        "magic": "0x5a5b5c5d",
+        "version": 65539,
+        "numObjects": 1,
+        "dictOffset": 112,
+        "dataOffset": 440,
+        "relocOffset": 16200,
+        "targetAbi": {
+          "archType": 2,
+          "compilerType": 2,
+          "compilerVersion": 1900,
+          "osType": 0,
+          "pointerBytes": 8,
+          "alignment": 16
+        }
+      },
+      "rootObjects": [
+        {
+          "index": 0,
+          "objectOffset": 480,
+          "className": "DynamicSystemAssetParam",
+          "name": null,
+          "filename": null,
+          "header": {
+            "offset": 480,
+            "relativeDataOffset": 48,
+            "className": "DynamicSystemAssetParam",
+            "name": null,
+            "isIncluded": true,
+            "version": 0,
+            "checksumSize": 4,
+            "checksumOffset": 776,
+            "dataOffset": 528,
+            "fieldsOffset": 600
+          }
+        }
+      ],
+      "serializedObjectClassCounts": {
+        "DynamicSystemAssetParam": 2,
+        "DynamicSystemCapsuleShapeParams": 23,
+        "JointNone": 23,
+        "ModelCollision": 1,
+        "NoWheel": 23,
+        "defaultMaterial": 21
+      },
+      "modelCollisionObjectOffset": 800,
+      "modelCollisionFieldsOffset": 920,
+      "recordStride": 200,
+      "records": [
+        {
+          "recordOffset": 968,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 5664,
+          "capsuleFieldsOffset": 5784,
+          "radiusCandidate": 0.06018849462270737,
+          "heightCandidate": 0.06018849462270737,
+          "poseFieldsRaw": [
+            0.7832954525947571,
+            -0.011003375053405762,
+            -0.022276967763900757,
+            0.6211529970169067,
+            0.008567646145820618,
+            0.013565648347139359,
+            0.004043050110340118
+          ],
+          "bone": "Spine01",
+          "parentBone": "NONE",
+          "jointObjectOffset": 5824
+        },
+        {
+          "recordOffset": 1168,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 6080,
+          "capsuleFieldsOffset": 6200,
+          "radiusCandidate": 0.07669513672590256,
+          "heightCandidate": 0.07669513672590256,
+          "poseFieldsRaw": [
+            -0.7315903902053833,
+            0.006673485040664673,
+            -0.013543814420700073,
+            0.6815774440765381,
+            0.031355492770671844,
+            0.011765949428081512,
+            -0.005372010171413422
+          ],
+          "bone": "Spine02",
+          "parentBone": "Spine01",
+          "jointObjectOffset": 6240
+        },
+        {
+          "recordOffset": 1368,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 6496,
+          "capsuleFieldsOffset": 6616,
+          "radiusCandidate": 0.056713804602622986,
+          "heightCandidate": 0.056713804602622986,
+          "poseFieldsRaw": [
+            0.7047945261001587,
+            -0.055604785680770874,
+            0.7053432464599609,
+            0.05160990357398987,
+            0.016440458595752716,
+            -0.01419704407453537,
+            0.0004190690815448761
+          ],
+          "bone": "Chest",
+          "parentBone": "Spine02",
+          "jointObjectOffset": 6656
+        },
+        {
+          "recordOffset": 1568,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 6912,
+          "capsuleFieldsOffset": 7032,
+          "radiusCandidate": 0.04548782855272293,
+          "heightCandidate": 0.051288872957229614,
+          "poseFieldsRaw": [
+            0.6951816082000732,
+            -0.013836830854415894,
+            -0.7186754941940308,
+            -0.006053298711776733,
+            0.03181903064250946,
+            -0.016880840063095093,
+            -0.005920514464378357
+          ],
+          "bone": "Head",
+          "parentBone": "Chest",
+          "jointObjectOffset": 7072
+        },
+        {
+          "recordOffset": 1768,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 7328,
+          "capsuleFieldsOffset": 7448,
+          "radiusCandidate": 0.050068072974681854,
+          "heightCandidate": 0.050068072974681854,
+          "poseFieldsRaw": [
+            0.644925057888031,
+            -0.22678250074386597,
+            -0.16707953810691833,
+            0.7104406356811523,
+            0.029192596673965454,
+            -0.007914610207080841,
+            0.004122491925954819
+          ],
+          "bone": "RT_Hip",
+          "parentBone": "Pelvis",
+          "jointObjectOffset": 7488
+        },
+        {
+          "recordOffset": 1968,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 7744,
+          "capsuleFieldsOffset": 7864,
+          "radiusCandidate": 0.034121036529541016,
+          "heightCandidate": 0.034121036529541016,
+          "poseFieldsRaw": [
+            0.41789084672927856,
+            0.514195442199707,
+            0.7006469368934631,
+            0.26469600200653076,
+            -0.024725280702114105,
+            0.02622007206082344,
+            0.0019243359565734863
+          ],
+          "bone": "RT_Knee",
+          "parentBone": "RT_Hip",
+          "jointObjectOffset": 7904
+        },
+        {
+          "recordOffset": 2168,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 8160,
+          "capsuleFieldsOffset": 8280,
+          "radiusCandidate": 0.023887408897280693,
+          "heightCandidate": 0.028075551614165306,
+          "poseFieldsRaw": [
+            0.6732984781265259,
+            0.039454132318496704,
+            -0.1382940411567688,
+            -0.7252499461174011,
+            0.03866327553987503,
+            0.0029582977294921875,
+            0.008402932435274124
+          ],
+          "bone": "LT_Hip",
+          "parentBone": "Pelvis",
+          "jointObjectOffset": 8320
+        },
+        {
+          "recordOffset": 2368,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 8576,
+          "capsuleFieldsOffset": 8696,
+          "radiusCandidate": 0.03516855835914612,
+          "heightCandidate": 0.03516855835914612,
+          "poseFieldsRaw": [
+            -0.1868087351322174,
+            -0.7310521602630615,
+            -0.49823397397994995,
+            -0.427116334438324,
+            -0.025906361639499664,
+            0.05388743057847023,
+            -0.021840114146471024
+          ],
+          "bone": "LT_Knee",
+          "parentBone": "LT_Hip",
+          "jointObjectOffset": 8736
+        },
+        {
+          "recordOffset": 2568,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 8992,
+          "capsuleFieldsOffset": 9112,
+          "radiusCandidate": 0.023743391036987305,
+          "heightCandidate": 0.023743391036987305,
+          "poseFieldsRaw": [
+            -0.6540958285331726,
+            -0.18413762748241425,
+            -0.08101841807365417,
+            -0.7291696071624756,
+            0.05487152189016342,
+            -0.016656002029776573,
+            -0.004891343414783478
+          ],
+          "bone": "LT_Clav",
+          "parentBone": "Chest",
+          "jointObjectOffset": 9152
+        },
+        {
+          "recordOffset": 2768,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 9408,
+          "capsuleFieldsOffset": 9528,
+          "radiusCandidate": 0.022687265649437904,
+          "heightCandidate": 0.022687265649437904,
+          "poseFieldsRaw": [
+            -0.3712615370750427,
+            0.49078047275543213,
+            -0.28881704807281494,
+            0.7334059476852417,
+            0.04116356372833252,
+            0.049525707960128784,
+            -0.00463499128818512
+          ],
+          "bone": "LT_Shldr",
+          "parentBone": "LT_Clav",
+          "jointObjectOffset": 9568
+        },
+        {
+          "recordOffset": 2968,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 9824,
+          "capsuleFieldsOffset": 9944,
+          "radiusCandidate": 0.01950179599225521,
+          "heightCandidate": 0.01950179599225521,
+          "poseFieldsRaw": [
+            -0.14881722629070282,
+            0.11042951047420502,
+            -0.5598392486572266,
+            0.8076131343841553,
+            0.009120479226112366,
+            0.0334620475769043,
+            0.001236051321029663
+          ],
+          "bone": "LT_Elbow",
+          "parentBone": "LT_Shldr",
+          "jointObjectOffset": 9984
+        },
+        {
+          "recordOffset": 3168,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 10240,
+          "capsuleFieldsOffset": 10360,
+          "radiusCandidate": 0.014603497460484505,
+          "heightCandidate": 0.014603497460484505,
+          "poseFieldsRaw": [
+            0.04983045905828476,
+            0.003346238285303116,
+            0.9985754489898682,
+            0.018784254789352417,
+            0.035305049270391464,
+            0.002349555492401123,
+            0.0021223947405815125
+          ],
+          "bone": "RT_Clav",
+          "parentBone": "Chest",
+          "jointObjectOffset": 10400
+        },
+        {
+          "recordOffset": 3368,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 10656,
+          "capsuleFieldsOffset": 10776,
+          "radiusCandidate": 0.022481000050902367,
+          "heightCandidate": 0.022481000050902367,
+          "poseFieldsRaw": [
+            -0.18061161041259766,
+            0.12129948288202286,
+            0.804135799407959,
+            0.5532011985778809,
+            0.028650999069213867,
+            0.04721337556838989,
+            0.008658863604068756
+          ],
+          "bone": "RT_Shldr",
+          "parentBone": "RT_Clav",
+          "jointObjectOffset": 10816
+        },
+        {
+          "recordOffset": 3568,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 11072,
+          "capsuleFieldsOffset": 11192,
+          "radiusCandidate": 0.01875678077340126,
+          "heightCandidate": 0.01875678077340126,
+          "poseFieldsRaw": [
+            0.10520298779010773,
+            0.2866472005844116,
+            0.7745105028152466,
+            0.5539849996566772,
+            0.002408936619758606,
+            0.031802669167518616,
+            0.0037666410207748413
+          ],
+          "bone": "RT_Elbow",
+          "parentBone": "RT_Shldr",
+          "jointObjectOffset": 11232
+        },
+        {
+          "recordOffset": 3768,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 11488,
+          "capsuleFieldsOffset": 11608,
+          "radiusCandidate": 0.014954661019146442,
+          "heightCandidate": 0.014954661019146442,
+          "poseFieldsRaw": [
+            -0.06834319233894348,
+            0.7022658586502075,
+            -0.706927478313446,
+            0.04904639720916748,
+            0.03208518028259277,
+            0.000971868634223938,
+            0.0006378442049026489
+          ],
+          "bone": "RT_Ear01",
+          "parentBone": "Head",
+          "jointObjectOffset": 11648
+        },
+        {
+          "recordOffset": 3968,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 11904,
+          "capsuleFieldsOffset": 12024,
+          "radiusCandidate": 0.02594917081296444,
+          "heightCandidate": 0.028827430680394173,
+          "poseFieldsRaw": [
+            -0.06144368648529053,
+            0.7406878471374512,
+            0.6673717498779297,
+            0.04713049530982971,
+            0.02903871238231659,
+            -0.0016387104988098145,
+            -0.0002753138542175293
+          ],
+          "bone": "RT_Ear02",
+          "parentBone": "RT_Ear01",
+          "jointObjectOffset": 12064
+        },
+        {
+          "recordOffset": 4168,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 12320,
+          "capsuleFieldsOffset": 12440,
+          "radiusCandidate": 0.022295041009783745,
+          "heightCandidate": 0.022295041009783745,
+          "poseFieldsRaw": [
+            0.008544325828552246,
+            0.7892999053001404,
+            0.6138292551040649,
+            0.012111246585845947,
+            0.047729507088661194,
+            -0.0007533878087997437,
+            0.0013498812913894653
+          ],
+          "bone": "LT_Ear01",
+          "parentBone": "Head",
+          "jointObjectOffset": 12480
+        },
+        {
+          "recordOffset": 4368,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 12736,
+          "capsuleFieldsOffset": 12856,
+          "radiusCandidate": 0.025106407701969147,
+          "heightCandidate": 0.025106407701969147,
+          "poseFieldsRaw": [
+            0.0319577157497406,
+            -0.8813436031341553,
+            0.47034788131713867,
+            -0.03138381242752075,
+            0.02595515549182892,
+            0.0033566057682037354,
+            0.004593938589096069
+          ],
+          "bone": "LT_Ear02",
+          "parentBone": "LT_Ear01",
+          "jointObjectOffset": 12896
+        },
+        {
+          "recordOffset": 4568,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 13152,
+          "capsuleFieldsOffset": 13272,
+          "radiusCandidate": 0.022757738828659058,
+          "heightCandidate": 0.022757738828659058,
+          "poseFieldsRaw": [
+            0.1734825074672699,
+            0.015526987612247467,
+            0.007570773363113403,
+            0.9846854209899902,
+            0.04615926742553711,
+            0.008577227592468262,
+            0.005561426281929016
+          ],
+          "bone": "LT_Ankle",
+          "parentBone": "LT_Knee",
+          "jointObjectOffset": 13312
+        },
+        {
+          "recordOffset": 4768,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 13568,
+          "capsuleFieldsOffset": 13688,
+          "radiusCandidate": 0.017916297540068626,
+          "heightCandidate": 0.03230752795934677,
+          "poseFieldsRaw": [
+            0.08121274411678314,
+            0.27412301301956177,
+            0.12995645403862,
+            0.9494062662124634,
+            0.02980029210448265,
+            0.003025699406862259,
+            -0.022264711558818817
+          ],
+          "bone": "RT_Ankle",
+          "parentBone": "RT_Knee",
+          "jointObjectOffset": 13728
+        },
+        {
+          "recordOffset": 4968,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 13984,
+          "capsuleFieldsOffset": 14104,
+          "radiusCandidate": 0.020219890400767326,
+          "heightCandidate": 0.020219890400767326,
+          "poseFieldsRaw": [
+            0.0846681296825409,
+            -0.810192346572876,
+            0.568058967590332,
+            -0.11717012524604797,
+            0.006915096193552017,
+            0.004396948963403702,
+            0.007495135068893433
+          ],
+          "bone": "RT_Wrist",
+          "parentBone": "RT_Elbow",
+          "jointObjectOffset": 14144
+        },
+        {
+          "recordOffset": 5168,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 14400,
+          "capsuleFieldsOffset": 14520,
+          "radiusCandidate": 0.013896720483899117,
+          "heightCandidate": 0.024652833119034767,
+          "poseFieldsRaw": [
+            -0.1185418963432312,
+            0.6657487154006958,
+            0.7317113876342773,
+            -0.08558526635169983,
+            0.013001710176467896,
+            0.0018526911735534668,
+            -0.0011995509266853333
+          ],
+          "bone": "LT_Wrist",
+          "parentBone": "LT_Elbow",
+          "jointObjectOffset": 14560
+        },
+        {
+          "recordOffset": 5368,
+          "shapeKindRaw": 1,
+          "shapeScaleRaw": 10.0,
+          "shapeClass": "DynamicSystemCapsuleShapeParams",
+          "capsuleObjectOffset": 14816,
+          "capsuleFieldsOffset": 14936,
+          "radiusCandidate": 0.01225141528993845,
+          "heightCandidate": 0.0251928698271513,
+          "poseFieldsRaw": [
+            -0.08243229985237122,
+            0.6094303131103516,
+            -0.7775585651397705,
+            0.13115820288658142,
+            0.01489102840423584,
+            0.0007243454456329346,
+            -0.000230446457862854
+          ],
+          "bone": null,
+          "parentBone": null,
+          "jointObjectOffset": 14976
+        }
+      ],
+      "summary": {
+        "recordCount": 23,
+        "bones": [
+          "Spine01",
+          "Spine02",
+          "Chest",
+          "Head",
+          "RT_Hip",
+          "RT_Knee",
+          "LT_Hip",
+          "LT_Knee",
+          "LT_Clav",
+          "LT_Shldr",
+          "LT_Elbow",
+          "RT_Clav",
+          "RT_Shldr",
+          "RT_Elbow",
+          "RT_Ear01",
+          "RT_Ear02",
+          "LT_Ear01",
+          "LT_Ear02",
+          "LT_Ankle",
+          "RT_Ankle",
+          "RT_Wrist",
+          "LT_Wrist",
+          null
+        ],
+        "radiusCandidateRange": [
+          0.01225141528993845,
+          0.07669513672590256
+        ],
+        "heightCandidateRange": [
+          0.014603497460484505,
+          0.07669513672590256
+        ],
+        "shapeClassCounts": {
+          "DynamicSystemCapsuleShapeParams": 23
+        },
+        "semanticStatus": "collision-capsule-data-recovered; melee-contact-shape-unverified"
+      }
+    }
+  ]
+}

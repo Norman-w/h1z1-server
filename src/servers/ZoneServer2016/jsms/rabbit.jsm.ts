@@ -17,6 +17,10 @@ import type { ZoneServer2016 } from "../zoneserver";
 import { NavManager } from "../../../utils/recast";
 const debug = require("debug")("ai");
 import { getDistance2d } from "../../../utils/utils";
+import { isThreatToPassive } from "./factions";
+
+const WANDER_SPEED = 1.75;
+const FLEE_SPEED = 5.0;
 
 export const enum RabbitTransitions {
   Idle = "idle",
@@ -84,10 +88,37 @@ function moveToward(
   npc: Npc,
   target: Float32Array,
   server: ZoneServer2016
-): void {
-  if (!npc.navAgent) return;
-  const navTarget = server.navManager.getClosestNavPointVec3(target);
-  npc.navAgent.requestMoveTarget(navTarget);
+): boolean {
+  if (!npc.navAgent) return false;
+  try {
+    const navTarget = server.navManager.getClosestNavPointVec3(target);
+    // Preserve the server/client locomotion contract when Recast rejects a
+    // target: no accepted path means no flee speed or sprint stance.
+    if (npc.navAgent.requestMoveTarget(navTarget) === false) {
+      npc.stopMovement();
+      return false;
+    }
+    return true;
+  } catch {
+    // Treat an off-mesh projection like an explicit Recast rejection.
+    npc.stopMovement();
+    return false;
+  }
+}
+
+function installFleeTarget(rabbit: RabbitInstance): boolean {
+  if (!rabbit.threatPos) return false;
+  const fleeTarget = pickFleePoint(
+    rabbit.npc,
+    rabbit.server,
+    rabbit.threatPos
+  );
+  if (!fleeTarget || !moveToward(rabbit.npc, fleeTarget, rabbit.server)) {
+    rabbit.targetPos = null;
+    return false;
+  }
+  rabbit.targetPos = fleeTarget;
+  return true;
 }
 
 function findThreat(
@@ -98,6 +129,8 @@ function findThreat(
   const pos = rabbit.npc.state.position;
   const cx = Math.floor(pos[0] / sz);
   const cz = Math.floor(pos[2] / sz);
+  let nearest: Float32Array | null = null;
+  let nearestDistance = radius;
   for (let dx = -1; dx <= 1; dx++) {
     for (let dz = -1; dz <= 1; dz++) {
       const bucket = rabbit.server.aiTargetSpatialMap.get(
@@ -105,14 +138,16 @@ function findThreat(
       );
       if (!bucket) continue;
       for (const entry of bucket) {
-        if (entry.faction === rabbit.npc.faction) continue;
-        if (getDistance2d(pos, entry.position) < radius) {
-          return entry.position;
+        if (!isThreatToPassive(entry.faction)) continue;
+        const distance = getDistance2d(pos, entry.position);
+        if (distance < nearestDistance) {
+          nearest = entry.position;
+          nearestDistance = distance;
         }
       }
     }
   }
-  return null;
+  return nearest;
 }
 
 export function createRabbit(npc: Npc, server: ZoneServer2016): RabbitInstance {
@@ -120,6 +155,12 @@ export function createRabbit(npc: Npc, server: ZoneServer2016): RabbitInstance {
     {
       [RabbitTransitions.Idle]: (dt: number) => {
         rabbit.stateTimer += dt;
+        // Idle has no nav target.  Keep the client locomotion input at zero
+        // instead of leaving the previous wander speed attached to a
+        // standing stance; ExpectedSpeed is consumed by the native graph
+        // independently of the next position sample.
+        rabbit.npc.setLocomotionMode?.("walk");
+        rabbit.npc.setSpeed(0);
         if (rabbit.fleeCooldown > 0) rabbit.fleeCooldown -= dt;
 
         const idleThreat = findThreat(rabbit, 10);
@@ -136,6 +177,17 @@ export function createRabbit(npc: Npc, server: ZoneServer2016): RabbitInstance {
 
       [RabbitTransitions.Wander]: (dt: number) => {
         rabbit.stateTimer += dt;
+        rabbit.npc.setLocomotionMode?.("walk");
+        // A failed/late patrol query leaves Wander without a target.  Do not
+        // advertise a moving gait for that one-tick gap: the native graph
+        // would receive walk intent while the authoritative nav agent has no
+        // destination, which is the same stationary-walk/slide edge we avoid
+        // for the other animals.
+        if (!rabbit.targetPos) {
+          rabbit.event(RabbitEvents.Arrived);
+          return;
+        }
+        rabbit.npc.setSpeed(WANDER_SPEED);
         if (rabbit.fleeCooldown > 0) rabbit.fleeCooldown -= dt;
 
         const wanderThreat = findThreat(rabbit, 20);
@@ -162,6 +214,9 @@ export function createRabbit(npc: Npc, server: ZoneServer2016): RabbitInstance {
         }
 
         if (!fleeThreat || rabbit.stateTimer >= 10) {
+          // Let CalmedDown own the sprint -> idle edge.  Advertising another
+          // flee speed before stopMovement() would briefly re-enter the run
+          // graph after the threat was already gone.
           rabbit.event(RabbitEvents.CalmedDown);
           return;
         }
@@ -169,17 +224,18 @@ export function createRabbit(npc: Npc, server: ZoneServer2016): RabbitInstance {
         const arrivedAtFlee =
           rabbit.targetPos != null &&
           getDistance2d(rabbit.npc.state.position, rabbit.targetPos) < 3;
-        if (arrivedAtFlee && rabbit.threatPos) {
-          const fleeTarget = pickFleePoint(
-            rabbit.npc,
-            rabbit.server,
-            rabbit.threatPos
-          );
-          if (fleeTarget) {
-            rabbit.targetPos = fleeTarget;
-            moveToward(rabbit.npc, fleeTarget, rabbit.server);
-          }
+        if (!rabbit.targetPos || arrivedAtFlee) {
+          installFleeTarget(rabbit);
         }
+        if (!rabbit.targetPos) {
+          // Do not advertise a sprint without an accepted flee path.  This
+          // keeps a failed nav request from becoming an in-place run/slide.
+          rabbit.npc.setLocomotionMode?.("walk");
+          rabbit.npc.setSpeed(0);
+          return;
+        }
+        rabbit.npc.setLocomotionMode?.("sprint");
+        rabbit.npc.setSpeed(FLEE_SPEED);
       }
     },
     [
@@ -189,10 +245,22 @@ export function createRabbit(npc: Npc, server: ZoneServer2016): RabbitInstance {
         to: RabbitTransitions.Wander,
         EnterTransition: () => {
           rabbit.stateTimer = 0;
+          rabbit.npc.setLocomotionMode?.("walk");
+          // Publish the walk speed only after a valid patrol target and nav
+          // request have both been accepted.
+          rabbit.npc.setSpeed(0);
           const pt = pickWanderPoint(rabbit.server, rabbit.wanderOrigin);
           if (pt) {
             rabbit.targetPos = pt;
-            moveToward(rabbit.npc, pt, rabbit.server);
+            if (moveToward(rabbit.npc, pt, rabbit.server)) {
+              rabbit.npc.setSpeed(WANDER_SPEED);
+            } else {
+              rabbit.targetPos = null;
+              rabbit.npc.setSpeed(0);
+            }
+          } else {
+            rabbit.targetPos = null;
+            rabbit.npc.setSpeed(0);
           }
         }
       },
@@ -201,7 +269,13 @@ export function createRabbit(npc: Npc, server: ZoneServer2016): RabbitInstance {
         from: [RabbitTransitions.Wander],
         to: RabbitTransitions.Idle,
         EnterTransition: () => {
+          // Arriving or calming cancels the previous flee path.  Without an
+          // explicit stop the nav target survives the FSM transition and the
+          // rabbit keeps sliding while its logical state is Idle.
+          rabbit.npc.stopMovement();
           rabbit.stateTimer = 0;
+          rabbit.npc.setLocomotionMode?.("walk");
+          rabbit.npc.setSpeed(0);
           rabbit.idleDuration = pickIdleDuration();
           rabbit.targetPos = null;
           rabbit.wanderOrigin =
@@ -214,16 +288,14 @@ export function createRabbit(npc: Npc, server: ZoneServer2016): RabbitInstance {
         to: RabbitTransitions.Flee,
         EnterTransition: () => {
           rabbit.stateTimer = 0;
-          if (rabbit.threatPos) {
-            const fleeTarget = pickFleePoint(
-              rabbit.npc,
-              rabbit.server,
-              rabbit.threatPos
-            );
-            if (fleeTarget) {
-              rabbit.targetPos = fleeTarget;
-              moveToward(rabbit.npc, fleeTarget, rabbit.server);
-            }
+          rabbit.npc.stopMovement();
+          rabbit.targetPos = null;
+          if (installFleeTarget(rabbit)) {
+            rabbit.npc.setLocomotionMode?.("sprint");
+            rabbit.npc.setSpeed(FLEE_SPEED);
+          } else {
+            rabbit.npc.setLocomotionMode?.("walk");
+            rabbit.npc.setSpeed(0);
           }
         }
       },
@@ -232,7 +304,10 @@ export function createRabbit(npc: Npc, server: ZoneServer2016): RabbitInstance {
         from: [RabbitTransitions.Flee],
         to: RabbitTransitions.Idle,
         EnterTransition: () => {
+          rabbit.npc.stopMovement();
           rabbit.stateTimer = 0;
+          rabbit.npc.setLocomotionMode?.("walk");
+          rabbit.npc.setSpeed(0);
           rabbit.idleDuration = pickIdleDuration();
           rabbit.fleeCooldown = 4;
           rabbit.threatPos = null;
@@ -256,6 +331,10 @@ export function createRabbit(npc: Npc, server: ZoneServer2016): RabbitInstance {
   rabbit.idleDuration = pickIdleDuration();
   rabbit.fleeCooldown = 0;
   rabbit.threatPos = null;
-  npc.setSpeed(5.0);
+  rabbit.npc.setLocomotionMode?.("walk");
+  // The initial FSM state is Idle, so do not advertise a walking speed until
+  // FinishedIdle installs the first wander target.
+  npc.initializeAnimation?.("Idle");
+  npc.setSpeed(0);
   return rabbit;
 }

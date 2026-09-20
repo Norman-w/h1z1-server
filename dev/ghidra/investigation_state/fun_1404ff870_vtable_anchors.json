@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 2,
+  "updatedAt": "2026-03-20",
+  "supplement": "2026-03-20：6×DATA 的 **语义拆分**（pdata / EH IP map / 真实 vtable）与 **520e20→4e57d0** 示例链 → **`fun_1404ff870_dataref_breakdown_20260320.json`**",
+  "function": "FUN_1404ff870",
+  "entryVa": "1404ff870",
+  "signatureNote": "void (longlong *param_1, char param_2, longlong param_3) — 反编译 **795 行**；前段大量姿态/矩阵与宿主对象逻辑，**约 680 行起** 才密集用 `param_1+0xa3` 驱动 `0x8cf/0x8d1/0x8d2/0x8d6` 等。",
+  "fullDecompile": {
+    "totalLines": 795,
+    "command": "PyGhidraCli DumpDecompile 0x1404ff870 resolve",
+    "log": "dev/ghidra/analysis/output/DumpDecompile__0x1404ff870__resolve__20260320_083035_502.log"
+  },
+  "entryGuardsDecompile": [
+    "若 `*(longlong *)(param_3 + 8) == 0` → 立即 return（param_3 为带 float@+4 与指针@+8 的上下文块）。",
+    "若 `param_1[0x724]` 非空且 `!= DAT_142b249a0` 且 **`(*(byte *)(param_1 + 0x35b) & 1) == 0`** → return（**UCS 队列写的 `0x35b` bit0 与此函数是否继续执行相关**；与「仅 0x8cf 来自 0xa3」并行存在门控）。",
+    "virtual `+0x200` 非零 → `FUN_140500c10` 并 return。",
+    "`entity+0x8d5` bit1 置位 → return。"
+  ],
+  "entityWritesFrom0xa3": [
+    { "maskExpr": "(*(uint *)(param_1+0xa3) >> 2) & …", "target": "FUN_1405341b0 第二实参（过滤后）", "note": "非直接写内存，经 helper" },
+    { "maskExpr": "(*(uint *)(param_1+0xa3) >> 1) & 1", "target": "entity+0x8cf bit3 (0x08)", "clear": "& 0xf7", "set": "| 8" },
+    { "maskExpr": "(*(uint *)(param_1+0xa3) >> 0xc) & 1", "target": "entity+0x8cf bit2 (0x04)", "clear": "& 0xfb", "set": "| 4" },
+    { "maskExpr": "(*(uint *)(param_1+0xa3) >> 0x13) & …", "target": "FUN_1405340f0 第二实参", "note": "经 helper" },
+    { "maskExpr": "(*(uint *)(param_1+0xa3) >> 9) & 1", "target": "entity+0x8d1 bit5 (0x20)" },
+    { "maskExpr": "(*(uint *)(param_1+0xa3) >> 0xe) & 1", "target": "entity+0x8d6 bit7 (0x80)" },
+    { "maskExpr": "(*(uint *)(param_1+0xa3) >> 0xf) & 1", "target": "entity+0x8d2 bit3 (0x08)" },
+    { "maskExpr": "(*(byte *)(param_1+0x51a) & 1)", "target": "entity+0x8d2 bit4 (0x10)", "note": "非来自 0xa3，同簇条件写" },
+    { "maskExpr": "(*(uint *)(param_1+0xa3) >> 0x11) & 1", "target": "entity+0x8d2 bit2 (0x04)" },
+    { "maskExpr": "(*(uint *)(param_1+0xa3) >> 0x12) & 1", "target": "entity+0x8d2 bit1 (0x02)" },
+    { "maskExpr": "CONCAT31(>>(0xe), ~(byte)(>>(6)))", "target": "FUN_140534040 第二实参", "note": "另一分支内打包调用" }
+  ],
+  "equivalentInvestigation0xa3": {
+    "findMemoryRefsLimitation": "`FindMemoryRefsByOffset 0xa3 load` 在本函数体内 **0 命中**：反编译里的 `*(uint *)(param_1+0xa3)` 在汇编中常为 **LEA + [base+0xa3]**，脚本只匹配「操作数字面位移 0xa3」，会漏读。见 **re-track §re-4 工具备忘**。",
+    "falsePositiveStores": "在 **`0x140400000..0x140600000`** 与扩大至 **`0x140000000..0x140800000`** 的 **`store` 扫描**均只命中 **3 条 `MOV byte [RSP+0xa3], …`**（`FUN_14050c220` / `FUN_140524f60` / `FUN_14053b5c0`），已核对为 **发包序列化栈槽**，**非** `entity+0xa3`。",
+    "wideScanLog": "dev/ghidra/analysis/output/FindMemoryRefsByOffset__0xa3__store__0x140000000__0x140800000__20260320_083204_793.log",
+    "recommendedTools": [
+      "对本函数用 **`SearchDecompile 0x1404ff870 0xa3 30`** 或 **`DumpDecompile … resolve` 明文** 枚举所有 `param_1+0xa3` 读点",
+      "Listing 全文扫 **`FindListingPattern +0xa3 <start> <end>`**（`dev/ghidra/FindListingPattern.py`），补 **`FindMemoryRefsByOffset` 漏 LEA/操作数表示**；再人工排除 RSP 局部",
+      "在 Ghidra GUI 对 **`entity+0xa3`** 做 **References** 或对 **DWORD 写** 按基址寄存器过滤"
+    ],
+    "cursorTranscriptNote": "工作区 `agent-transcripts/*.jsonl` 对 `FindMemoryRefs`/`0xa3` **无明文命中**；等价结论已写在 **`re-track-update-character-state-chain.md`**（§re-4 **0xa3 写入者** + **工具备忘**）。"
+  },
+  "pyghidra": {
+    "queryXrefToEntry": {
+      "log": "dev/ghidra/analysis/output/QueryXref__to__0x1404ff870__20260320_000625_166.log",
+      "unconditionalCallSites": 0,
+      "dataPointerSites": 6,
+      "dataAddresses": [
+        "143e4591c",
+        "142620320",
+        "1420c1f58",
+        "1420eb218",
+        "14214e0f0",
+        "1421513c0"
+      ],
+      "interpretation": "无指向入口的 UNCONDITIONAL_CALL；仅全局 DATA 槽存函数指针 → **经虚表 / IPToStateMapEntry 类表 / 其它 fn-ptr 表间接调用**。上溯需在 Ghidra 中对上述地址做 *References* 或找包含它们的结构体首址。"
+    },
+    "queryXrefTo1420bec08": {
+      "log": "dev/ghidra/analysis/output/QueryXref__to__0x1420bec08__20260320_083211_325.log",
+      "refCount": 0,
+      "note": "指向 `IPToStateMapEntry_ARRAY` 父指针的 `1420bec08` 在导出工程上 **0 xref**；可能为未解析重定位/结构内嵌，需在 Ghidra GUI 对 **`142620320`** 所在内存块做 *Reference Manager*。"
+    },
+    "searchDecompile8cf": "dev/ghidra/analysis/output/SearchDecompile__0x1404ff870__0x8cf__20__20260320_000643_743.log",
+    "dumpDecompileHeadOnly": "dev/ghidra/analysis/output/DumpDecompile__0x1404ff870__1__80__20260320_000628_114.log",
+    "scanMemoryPattern": "槽址 `QueryXref to` 常为 0：CLI `ScanMemoryPattern both 1420c1f58 max=800 block=rdata`（`dev/ghidra/ScanMemoryPattern.py`）"
+  },
+  "symbolsCrossRef": {
+    "142620320": "IPToStateMapEntry_ARRAY_142620320（export symbols.json）；DATA 引用来自 `1420bec08`（xref 计数见上）。"
+  },
+  "openQuestionLink": "谁 **写 `entity+0xa3`（DWORD）**、谁 **经虚表调用本函数** — 仍待闭合（open-questions.md #2）。全函数反编译显示 **`0x35b` bit0** 参与 **入口早退**，与 UCS 队列消费存在 **逻辑耦合**，但 **0xa3 仍无 store 扫描命中**。"
+}

@@ -1255,7 +1255,7 @@ export interface CharacterSeekTarget {
   initSpeed?: number;
   acceleration?: number;
   speed?: number;
-  turn?: number;
+  unknown8?: number;
   yRot?: number;
   rotation?: Float32Array;
 }

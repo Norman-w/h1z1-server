@@ -31,6 +31,14 @@ const debug = require("debug")("nav");
 
 const MAX_OBSTACLE = 20000;
 const MAX_PENDING_OBSTACLE = 50;
+// Recast's random-point query is only used to de-stack ambient spawns.  On
+// the imported 2016 mesh it can occasionally return a point far outside the
+// requested radius (the observed failure was ~15 m for a 0.5 m query), which
+// publishes a first-frame teleport and looks like an NPC sliding out of its
+// spawn pose.  Never allow that query to change the authoritative spawn
+// location by more than a small tolerance.
+const INITIAL_AGENT_RANDOM_RADIUS = 0.5;
+const MAX_INITIAL_AGENT_OFFSET = 1.5;
 
 export class NavManager {
   navmesh!: NavMesh;
@@ -184,7 +192,19 @@ export class NavManager {
     return NavManager.navToGame(n.nearestPoint);
   }
 
-  createAgent(gamePos: Float32Array): CrowdAgent {
+  /**
+   * Create a crowd agent for an entity.
+   *
+   * Ambient callers may still opt into the small random de-stack offset, but
+   * production NPCs must start at the same nav point as their replicated
+   * `state.position`.  Otherwise the first interpolated crowd sample moves the
+   * entity before its FSM has requested locomotion, which presents as a spawn
+   * slide/teleport and also poisons the first measured gait speed.
+   */
+  createAgent(
+    gamePos: Float32Array,
+    options: { preserveSpawn?: boolean } = {}
+  ): CrowdAgent {
     const navPosition = this.getClosestNavPointVec3(gamePos);
     debug(
       `createAgent: navPos=[${navPosition.x.toFixed(2)}, ${navPosition.y.toFixed(2)}, ${navPosition.z.toFixed(2)}]`
@@ -194,7 +214,10 @@ export class NavManager {
       randomPoint: initialAgentPosition,
       success,
       status
-    } = this.navMeshQuery.findRandomPointAroundCircle(navPosition, 0.5);
+    } = this.navMeshQuery.findRandomPointAroundCircle(
+      navPosition,
+      INITIAL_AGENT_RANDOM_RADIUS
+    );
 
     if (!success) {
       debug(
@@ -202,7 +225,23 @@ export class NavManager {
       );
     }
 
-    const spawnPoint = success ? initialAgentPosition : navPosition;
+    const randomPointOffset = initialAgentPosition
+      ? Math.hypot(
+          initialAgentPosition.x - navPosition.x,
+          initialAgentPosition.y - navPosition.y,
+          initialAgentPosition.z - navPosition.z
+        )
+      : Number.POSITIVE_INFINITY;
+    const useRandomPoint =
+      !options.preserveSpawn &&
+      success &&
+      randomPointOffset <= MAX_INITIAL_AGENT_OFFSET;
+    if (success && !useRandomPoint) {
+      debug(
+        `createAgent: rejected random spawn offset ${randomPointOffset.toFixed(2)}m (limit ${MAX_INITIAL_AGENT_OFFSET.toFixed(2)}m), using navPosition directly`
+      );
+    }
+    const spawnPoint = useRandomPoint ? initialAgentPosition : navPosition;
     const agent = this.crowd.addAgent(spawnPoint, {
       radius: 0.3,
       height: 2,

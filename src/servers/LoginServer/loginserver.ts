@@ -567,30 +567,42 @@ export class LoginServer extends EventEmitter {
   }
 
   async LoginRequest(client: Client, request: LoginRequest) {
-    let authKey, gameVersion;
+    let authKey: string;
+    let gameVersion: number;
     let sessionIdString = request.sessionId;
-    // In case of shitty json formatting
     sessionIdString = sessionIdString.replaceAll("\\", "");
-    try {
-      if (sessionIdString.length > 100) {
-        throw new Error("sessionIdString too long");
-      }
-      const sessionIdObject = JSON.parse(sessionIdString);
-      authKey = sessionIdObject.sessionId;
-      gameVersion = sessionIdObject.gameVersion;
-      if (!authKey || !gameVersion) {
-        throw new Error("Invalid sessionId");
-      }
-    } catch (e) {
-      console.error(e);
-      authKey = sessionIdString;
+    if (sessionIdString.length > 100) {
+      authKey = sessionIdString.slice(0, 100);
       gameVersion =
         client.protocolName === "LoginUdp_9"
           ? GAME_VERSIONS.H1Z1_15janv_2015
           : GAME_VERSIONS.H1Z1_6dec_2016;
-      //console.warn(
-      //  "Your session id is not a valid json string, please update your launcher to avoid this warning"
-      //);
+    } else if (
+      sessionIdString === "0" ||
+      sessionIdString === "" ||
+      /^\d+$/.test(sessionIdString)
+    ) {
+      authKey = sessionIdString || "0";
+      gameVersion = GAME_VERSIONS.H1Z1_6dec_2016;
+    } else {
+      try {
+        const sessionIdObject = JSON.parse(sessionIdString);
+        authKey = String(sessionIdObject?.sessionId ?? sessionIdString);
+        gameVersion = Number(sessionIdObject?.gameVersion) || GAME_VERSIONS.H1Z1_6dec_2016;
+        if (!authKey) {
+          authKey = sessionIdString;
+          gameVersion =
+            client.protocolName === "LoginUdp_9"
+              ? GAME_VERSIONS.H1Z1_15janv_2015
+              : GAME_VERSIONS.H1Z1_6dec_2016;
+        }
+      } catch {
+        authKey = sessionIdString;
+        gameVersion =
+          client.protocolName === "LoginUdp_9"
+            ? GAME_VERSIONS.H1Z1_15janv_2015
+            : GAME_VERSIONS.H1Z1_6dec_2016;
+      }
     }
     client.authKey = String(authKey);
     client.gameVersion = gameVersion;

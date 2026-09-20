@@ -1,0 +1,4 @@
+build/
+.cmake-portable/
+_deps/
+build-log.txt

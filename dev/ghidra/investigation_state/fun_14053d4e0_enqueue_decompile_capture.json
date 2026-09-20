@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-03-21",
+  "centerLink": "见 dev/README.md：僵尸追人攻击；UCS case9 → 队列 0x1170 → 526310/91ee40 → 4ff870 驱动 0x8cf",
+  "function": "FUN_14053d4e0",
+  "entryVa": "14053d4e0",
+  "captureNote": "PyGhidra 守护进程曾将本反编译 stdout 误入 ScanMemoryPattern 日志；内容已与符号表一致，重跑 `DumpDecompile 0x14053d4e0 1 25` 可核对。",
+  "sourceLogHint": "dev/ghidra/analysis/output/ScanMemoryPattern__both__1420c1f58__max_60__block_rdata__20260320_125433_365.log",
+  "decompile": {
+    "signature": "void FUN_14053d4e0(longlong param_1,int *param_2,undefined8 param_3,undefined8 param_4,longlong *param_5)",
+    "steps": [
+      "读全局 DAT_142b19780：`*(DAT_142b19780+0x38bf0) == *param_5` 且 `*(byte*)(DAT_142b19780+0x3b9f0) != 0` 时，用 FUN_14032fd30(&param_5) 与 `*(int*)(lVar1+0x3b9dc)` 累加写 *param_2",
+      "FUN_1404eb0f0(param_1 + 0x1170, param_2, param_3, param_4, plVar2) — 入队/写 0x1170 邻域",
+      "FUN_1404e1de0(param_1) — 通知全局链表（re-track 已记）"
+    ],
+    "noEntity0xa3Here": "本函数未见 entity+0xa3；0xa3 消费在 FUN_1404ff870"
+  },
+  "pyghidraOps": [
+    "Daemon 串台或 result parse error 时：单发命令、必要时重启 PyGhidra 工程守护进程",
+    "ScanMemoryPattern 已移除对 MemoryBlock.isEmpty() 的调用（API 不存在）"
+  ]
+}

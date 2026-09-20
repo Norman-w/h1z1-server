@@ -28,6 +28,48 @@
 Based on the work of [jseidelin](https://github.com/jseidelin) on [soe-network](https://github.com/psemu/soe-network),
 h1z1-server is a library that emulates an H1Z1: Just Survive server.
 
+## Current NPC movement analysis (2026-09-13)
+
+The repository's current temporary TypeScript paths are being audited separately from
+the original client protocol: ordinary NPCs broadcast `PlayerUpdatePosition`, while
+`PlayerUpdateManagedPosition` currently handles projectiles/vehicles and vehicle
+managed-object bookkeeping. Fixed-client analysis also shows a shared native
+managed-position apply boundary with object/state/control gates. These are read-only
+analysis results, not a gameplay fix or acceptance claim; see
+`tools/task-01a06a01/shared-npc-progress-20260913.md` and the accompanying audits.
+
+The separate fixed-client `ResponseControl` route is also byte-closed through its
+parser, active-control table bookkeeping and manager callback. It remains distinct
+from position commit and does not by itself prove NPC ownership, Spawn completion, or
+animation/root-motion correctness.
+
+The current acceptance scope now distinguishes startup warmup from in-range transitions:
+the temporary AI targets within a 100 m radius and classifies melee at 2.5 m; a restarted
+attack-to-chase route primes one server tick before attempting a new position packet. The
+existing `/ztest` recipe is limited to 6–12 m, so it does not establish an original-game
+off-screen spawn policy. Startup sliding is recorded for now; in-range pose/position
+handoffs remain the must-fix native evidence target.
+The saved replay contains four such attack-to-chase transitions at 2.55–2.75 m; the
+server is stationary on each transition sample and advances on the following sample, while
+the corresponding native readiness fields remain unverified.
+
+The current native lead is a state handoff, not a timing tweak: the fixed client decompile
+shows `FUN_14053fde0` selecting locomotion/pose indices from entity state bytes plus a
+movement predicate, while `Character.UpdateCharacterState` case 9 queues state changes that
+are later merged per tick. The temporary AI currently does not send that UCS state handoff;
+the `0x35b → 0xa3 → 0x8cf` bridge and live pose readiness remain open. See
+`tools/task-01a06a01/native-animation-state-handoff-0913-audit.json`.
+The fixed-image `+0x518` writer scan is recorded separately in
+`tools/task-01a06a01/native-0518-writer-boundary-0913-audit.json`; its negative result
+does not close alias/computed/indirect writers.
+The newly closed v270 input seam binds entity-vtable `+0x270` to a parsed-input/spawn
+record consumer; it is not yet a proven UCS or per-frame animation entry. See
+`tools/task-01a06a01/native-v270-input-bridge-0913-audit.json`.
+The upstream D7 `cPacketIdAddLightweightNpc` route now shows that this slot is reached after
+object creation and before post-spawn record submission, so it is classified as an
+initialization handoff rather than the in-range chase/turn animation loop. See
+`tools/task-01a06a01/native-v270-spawn-path-0913-audit.json`.
+
 ## Motivation
 
 A redditor said : "It's just matter of effort and to have enough people of with interest towards having such private servers to the respected game.
@@ -189,3 +231,9 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 This project is licensed under the terms of the GNU General Public License v3.0. See the [LICENSE](LICENSE) file for details.
 
+The fixed-client audit now also closes the v178 local-matrix staging edge: `FUN_1404ff870`
+materializes `entity+0x400`, builds a local matrix through `0x1404f3300`, and submits it to
+`0x1417f51a0`, where record mode `+0x160` gates a write of the first 16 bytes to the working
+buffer `+0x10`. This is a client-native local-matrix/record boundary, not evidence that the
+temporary server TypeScript should send per-frame animation commands. The downstream reader
+and the in-range `0x35b -> 0xa3 -> 0x8cf` readiness bridge remain open.

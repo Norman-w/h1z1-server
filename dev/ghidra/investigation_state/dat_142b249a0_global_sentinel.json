@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-03-19",
+  "address": "142b249a0",
+  "symbol": "DAT_142b249a0",
+  "summary": "全局 QWORD 槽，运行时值为 0；作空指针/句柄哨兵，在大量分支中与缓存槽比较或复位。",
+  "ghidraDescribeAddress": {
+    "codeUnit": "undefined8 0000000000000000h",
+    "log": "dev/ghidra/analysis/output/DescribeAddress__0x142b249a0__20260319_235454_373.log"
+  },
+  "queryXrefTo": {
+    "refCount": 132,
+    "predominant": "READ",
+    "log": "dev/ghidra/analysis/output/QueryXref__to__0x142b249a0__20260319_235453_549.log",
+    "note": "含 FUN_140511840 区内多处 READ（如 1405118dc 等），与 case 9 从该槽取 QWORD 写入栈再传入 FUN_14053d4e0 的 param_5 一致。"
+  },
+  "ucsCase9Enqueue": {
+    "role": "Listing 中 `MOV RAX,[0x142b249a0]` → `[RBP+0xd0]` → 作为 `FUN_14053d4e0` 的 `*param_5` 来源；入队节点最后一 QWORD 为 0。",
+    "wireImplication": "该字段不承载「额外 entity/target ID」；与 22B wire 无单独字节对应，属客户端固定哨兵。"
+  },
+  "crossRefs": [
+    "dev/ghidra/investigation_state/re-track-update-character-state-chain.md §re-9 §6",
+    "dev/ghidra/investigation_state/chain_eliminated.json（entity+0xf60 与 State_Grappling 复位语境）"
+  ]
+}

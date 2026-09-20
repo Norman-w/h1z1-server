@@ -76,7 +76,8 @@ export const enum Events {
   DoneAttacking = "doneAttacking",
   StartScreaming = "startScreaming",
   DoneScreaming = "doneScreaming",
-  StartRising = "startRising"
+  StartRising = "startRising",
+  DoneRising = "doneRising"
 }
 
 export interface ScreamerInstance extends JSM<Events> {
@@ -87,6 +88,10 @@ export interface ScreamerInstance extends JSM<Events> {
   lastNoisePos: Float32Array | null;
   stateTimer: number;
   targetCharacterId: string | null;
+  /** Horizontal direction captured when the current melee swing starts. */
+  attackForward: [number, number] | null;
+  attackDamageApplied: boolean;
+  attackEnvelopeWasActive: boolean;
   wanderOrigin: Float32Array;
   armsFreed: boolean;
   screamCooldownTimer: number;
@@ -98,7 +103,10 @@ const BASE_SPEED = 1.5;
 const MAX_SPEED = 4.0;
 const AGITATION_DECAY_RATE = 1;
 const AGITATION_INITIAL = 50;
-const SCREAM_DURATION = 3;
+// ThirdPersonZombieScreamerPhysicsX64.mrn exposes the Scream leaf as 100
+// frames at 30 FPS.  This is the fallback for lightweight fixtures; real
+// Npc instances resolve the same clock through getAnimationDurationMs().
+const SCREAM_DURATION = 10 / 3;
 const SCREAM_RADIUS = 50;
 const PLAYER_DETECT_RADIUS = 25;
 const SCREAM_COOLDOWN = 20;
@@ -133,10 +141,25 @@ function moveToward(
   npc: Npc,
   target: Float32Array,
   server: ZoneServer2016
-): void {
-  if (!npc.navAgent) return;
-  const navTarget = server.navManager.getClosestNavPointVec3(target);
-  npc.navAgent.requestMoveTarget(navTarget);
+): boolean {
+  if (!npc.navAgent) {
+    npc.setLocomotionMode?.("walk");
+    npc.stopMovement();
+    return false;
+  }
+  try {
+    const navTarget = server.navManager.getClosestNavPointVec3(target);
+    if (npc.navAgent.requestMoveTarget(navTarget) === false) {
+      npc.setLocomotionMode?.("walk");
+      npc.stopMovement();
+      return false;
+    }
+  } catch {
+    npc.setLocomotionMode?.("walk");
+    npc.stopMovement();
+    return false;
+  }
+  return true;
 }
 
 function hasLineOfSight(
@@ -161,6 +184,13 @@ function tryDetectPlayer(screamer: ScreamerInstance): boolean {
       if (!bucket) continue;
       for (const entry of bucket) {
         if (entry.faction !== Factions.HUMAN) continue;
+        const player = screamer.server._characters[entry.id];
+        if (
+          player &&
+          (!player.isAlive || player.isVanished || player.isHidden)
+        ) {
+          continue;
+        }
         if (getDistance2d(pos, entry.position) >= PLAYER_DETECT_RADIUS)
           continue;
         if (!hasLineOfSight(screamer.server, pos, entry.position)) continue;
@@ -185,6 +215,40 @@ function applyAgitation(screamer: ScreamerInstance): void {
   screamer.npc.setSpeed(speed);
 }
 
+function getMeleeRange(screamer: ScreamerInstance): number {
+  return screamer.npc.getMeleeAttackRange?.(2) ?? 2;
+}
+
+function getMeleeAttackDuration(screamer: ScreamerInstance): number {
+  return screamer.npc.getMeleeAttackAnimationDuration?.(1) ?? 1;
+}
+
+function getActionDuration(
+  screamer: ScreamerInstance,
+  animationName: ScreamerAnimations,
+  fallbackSeconds: number
+): number {
+  const durationMs = screamer.npc.getAnimationDurationMs?.(animationName);
+  return Number.isFinite(durationMs) && (durationMs as number) > 0
+    ? (durationMs as number) / 1000
+    : fallbackSeconds;
+}
+
+function getAttackForward(
+  npc: Npc,
+  targetPosition: Float32Array
+): [number, number] | null {
+  const yaw = npc.state.yaw;
+  if (Number.isFinite(yaw)) {
+    const forward: [number, number] = [Math.sin(yaw), Math.cos(yaw)];
+    if (Math.hypot(forward[0], forward[1]) > Number.EPSILON) return forward;
+  }
+  const dx = targetPosition[0] - npc.state.position[0];
+  const dz = targetPosition[2] - npc.state.position[2];
+  const length = Math.hypot(dx, dz);
+  return length > Number.EPSILON ? [dx / length, dz / length] : null;
+}
+
 function decayAgitation(screamer: ScreamerInstance, dt: number): void {
   screamer.agitation = Math.max(
     0,
@@ -193,16 +257,40 @@ function decayAgitation(screamer: ScreamerInstance, dt: number): void {
 }
 
 function enterWander(screamer: ScreamerInstance): void {
+  // The screamer can leave a sprint chase or melee state while still moving;
+  // cancel that nav request before returning to the walk graph.
+  screamer.npc.stopMovement();
   screamer.stateTimer = 0;
   screamer.agitation = AGITATION_INITIAL;
   screamer.targetCharacterId = null;
+  screamer.attackForward = null;
+  screamer.npc.setLookAtCharacter?.(null);
+  screamer.npc.setCombatAnimationMode?.(false);
+  screamer.npc.setLocomotionMode?.("walk");
+  // Queue the sleeping/reset loop before any active scream/attack one-shot
+  // expires.  A lost target during a special action must not leave a late
+  // observer or the current client stuck on the previous pose.
+  screamer.npc.setAnimation(ScreamerAnimations.ScreamerReset);
   screamer.npc.lookAtTarget = null;
   screamer.lastNoisePos = null;
   screamer.wanderOrigin = screamer.npc.state.position.slice() as Float32Array;
+  screamer.targetPos = null;
+  const activeAction = screamer.npc.getAnimationRuntimeState?.().activeAnimation;
+  if (activeAction) {
+    screamer.npc.setSpeed(0);
+    return;
+  }
   const pt = pickPatrolPoint(screamer.server, screamer.wanderOrigin);
   if (pt) {
     screamer.targetPos = pt;
-    moveToward(screamer.npc, pt, screamer.server);
+    if (moveToward(screamer.npc, pt, screamer.server)) {
+      applyAgitation(screamer);
+    } else {
+      screamer.targetPos = null;
+      screamer.npc.setSpeed(0);
+    }
+  } else {
+    screamer.npc.setSpeed(0);
   }
 }
 
@@ -282,6 +370,13 @@ export function createScreamer(
             if (!bucket) continue;
             for (const entry of bucket) {
               if (entry.faction !== Factions.HUMAN) continue;
+              const player = screamer.server._characters[entry.id];
+              if (
+                player &&
+                (!player.isAlive || player.isVanished || player.isHidden)
+              ) {
+                continue;
+              }
               if (getDistance2d(pos, entry.position) >= PLAYER_DETECT_RADIUS)
                 continue;
               if (!hasLineOfSight(screamer.server, pos, entry.position))
@@ -296,12 +391,54 @@ export function createScreamer(
 
       [Transitions.Rising]: (dt: number) => {
         screamer.stateTimer += dt;
+        screamer.npc.setCombatAnimationMode?.(false);
+        screamer.npc.setLocomotionMode?.("walk");
+        screamer.npc.stopMovement();
+
+        // The wake-up clip is a real one-shot.  Re-running detection on every
+        // Rising tick used to fire StartScreaming a few frames after
+        // ScreamerRise, replacing the rise packet before the NPC had stood up.
+        // Keep detection behind the clip boundary: the target acquired in
+        // Sleep remains the candidate, and a target that disappears during
+        // the rise simply falls back to the normal wander handoff.
+        const riseClipActive =
+          screamer.npc.isAnimationActive?.(ScreamerAnimations.ScreamerRise) ??
+          false;
+        const riseDuration = getActionDuration(
+          screamer,
+          ScreamerAnimations.ScreamerRise,
+          1.5
+        );
+        if (screamer.stateTimer < riseDuration || riseClipActive) return;
+
         if (tryDetectPlayer(screamer)) return;
+
+        const target = getChaseTarget(screamer);
+        if (
+          target &&
+          target.isAlive &&
+          !target.isVanished &&
+          !target.isHidden &&
+          getDistance2d(
+            screamer.npc.state.position,
+            target.state.position
+          ) < PLAYER_DETECT_RADIUS &&
+          hasLineOfSight(
+            screamer.server,
+            screamer.npc.state.position,
+            target.state.position
+          )
+        ) {
+          screamer.event(Events.StartScreaming);
+        } else {
+          screamer.event(Events.DoneRising);
+        }
       },
 
       [Transitions.Wander]: (dt: number) => {
         screamer.stateTimer += dt;
-        applyAgitation(screamer);
+        screamer.npc.setCombatAnimationMode?.(false);
+        screamer.npc.setLocomotionMode?.("walk");
 
         if (tryDetectPlayer(screamer)) return;
 
@@ -320,33 +457,79 @@ export function createScreamer(
           const pt = pickPatrolPoint(screamer.server, screamer.wanderOrigin);
           if (pt) {
             screamer.targetPos = pt;
-            moveToward(screamer.npc, pt, screamer.server);
+            // Recast must accept the target before the walk graph advertises
+            // a positive speed.  Publishing agitation first lets a failed
+            // patrol request briefly run the client in place and was the
+            // remaining source of a visible slide in the screamer branch.
+            if (!moveToward(screamer.npc, pt, screamer.server)) {
+              screamer.targetPos = null;
+              screamer.npc.setSpeed(0);
+            } else {
+              applyAgitation(screamer);
+            }
+          } else {
+            screamer.targetPos = null;
+            screamer.npc.stopMovement();
           }
+        } else {
+          // The existing target was accepted on the previous tick.  It is
+          // safe to refresh the authored walk speed while that target is
+          // still active; a new target always takes the guarded path above.
+          applyAgitation(screamer);
         }
       },
       [Transitions.Screaming]: (dt: number) => {
+        screamer.npc.setCombatAnimationMode?.(false);
+        screamer.npc.setLocomotionMode?.("walk");
         screamer.stateTimer += dt;
         pushScreamSound(screamer);
         const chaseTarget = getChaseTarget(screamer);
-        if (
-          !chaseTarget ||
-          !chaseTarget.isAlive ||
-          chaseTarget.isVanished ||
-          chaseTarget.isHidden
-        ) {
-          screamer.event(Events.LostPlayer);
-          return;
+        const screamClipActive =
+          screamer.npc.isAnimationActive?.(ScreamerAnimations.Scream) ??
+          false;
+        // Losing the player must not cut the scream one-shot.  Finish the
+        // authored vocal/action clip first, then choose chase or wander from
+        // the target that is still available at that boundary.
+        if (chaseTarget) {
+          screamer.npc.setLookAtCharacter?.(screamer.targetCharacterId);
         }
-
-        if (screamer.stateTimer >= SCREAM_DURATION) {
+        const screamDuration = getActionDuration(
+          screamer,
+          ScreamerAnimations.Scream,
+          SCREAM_DURATION
+        );
+        if (screamer.stateTimer < screamDuration || screamClipActive) return;
+        if (
+          chaseTarget &&
+          chaseTarget.isAlive &&
+          !chaseTarget.isVanished &&
+          !chaseTarget.isHidden
+        ) {
           screamer.event(Events.DoneScreaming);
+        } else {
+          screamer.event(Events.LostPlayer);
         }
       },
 
       [Transitions.Chase]: (dt: number) => {
         screamer.stateTimer += dt;
         screamer.screamCooldownTimer += dt;
-        applyAgitation(screamer);
+
+        // Health can free the screamer's arms while it is already moving.
+        // Untie is a one-shot graph edge; do not let the next chase tick
+        // replace it with sprint locomotion or KnifeSlash.
+        if (
+          screamer.armsFreed &&
+          (screamer.npc.isAnimationActive?.(ScreamerAnimations.Untie) ?? false)
+        ) {
+          screamer.npc.stopMovement();
+          screamer.npc.setCombatAnimationMode?.(false);
+          screamer.npc.setLocomotionMode?.("walk");
+          return;
+        }
+
+        screamer.npc.setCombatAnimationMode?.(true);
+        screamer.npc.setLocomotionMode?.("sprint");
 
         const chaseTarget = getChaseTarget(screamer);
         if (
@@ -384,23 +567,48 @@ export function createScreamer(
               screamer.server,
               chaseTarget.state.position
             );
-            moveToward(screamer.npc, screamer.targetPos, screamer.server);
+            if (
+              screamer.targetPos &&
+              moveToward(screamer.npc, screamer.targetPos, screamer.server)
+            ) {
+              applyAgitation(screamer);
+            } else {
+              screamer.targetPos = null;
+              screamer.npc.setSpeed(0);
+            }
+          } else {
+            applyAgitation(screamer);
           }
           return;
         }
 
         // Phase 2 (arms freed): melee.
         screamer.npc.lookAtTarget = chaseTarget.state.position;
-        if (chaseDist < 2) {
+        if (chaseDist < getMeleeRange(screamer)) {
           screamer.event(Events.ReachPlayer);
         } else {
-          moveToward(screamer.npc, chaseTarget.state.position, screamer.server);
+          if (moveToward(screamer.npc, chaseTarget.state.position, screamer.server)) {
+            applyAgitation(screamer);
+          } else {
+            screamer.npc.setSpeed(0);
+          }
         }
       },
 
       [Transitions.Attack]: (dt: number) => {
         screamer.stateTimer += dt;
-        applyAgitation(screamer);
+
+        if (
+          screamer.armsFreed &&
+          (screamer.npc.isAnimationActive?.(ScreamerAnimations.Untie) ?? false)
+        ) {
+          screamer.npc.stopMovement();
+          screamer.npc.setCombatAnimationMode?.(false);
+          screamer.npc.setLocomotionMode?.("walk");
+          return;
+        }
+
+        screamer.npc.setCombatAnimationMode?.(true);
 
         const attackTarget = getChaseTarget(screamer);
         if (!attackTarget || !attackTarget.isAlive) {
@@ -411,42 +619,134 @@ export function createScreamer(
           screamer.event(Events.LostPlayer);
           return;
         }
+        screamer.npc.setLookAtCharacter?.(screamer.targetCharacterId);
         screamer.npc.lookAtTarget = attackTarget.state.position;
-        moveToward(screamer.npc, attackTarget.state.position, screamer.server);
+        screamer.npc.lookAt(attackTarget.state.position, dt);
         const attackDist = getDistance(
           screamer.npc.state.position,
           attackTarget.state.position
         );
-        if (attackDist >= 2) {
-          screamer.event(Events.PlayerBacked);
-        } else if (screamer.stateTimer > 2) {
-          screamer.event(Events.StartAttacking);
+        const meleeRange = getMeleeRange(screamer);
+        if (attackDist >= meleeRange) {
+          screamer.npc.setLocomotionMode?.("sprint");
+          const accepted = moveToward(
+            screamer.npc,
+            attackTarget.state.position,
+            screamer.server
+          );
+          if (accepted) {
+            applyAgitation(screamer);
+            screamer.event(Events.PlayerBacked);
+          } else {
+            screamer.event(Events.LostPlayer);
+          }
+        } else {
+          screamer.npc.setLocomotionMode?.("walk");
+          screamer.npc.stopMovement();
+          const inStrikeEnvelope =
+            screamer.npc.isMeleeTargetInEnvelope?.(
+              attackTarget.state.position
+            ) ?? true;
+          const unobstructed =
+            screamer.npc.hasMeleeLineOfSight?.(attackTarget.state.position) ?? true;
+          if (screamer.stateTimer > 2 && inStrikeEnvelope && unobstructed) {
+            screamer.event(Events.StartAttacking);
+          }
         }
       },
 
       [Transitions.Attacking]: (dt: number) => {
-        screamer.stateTimer += dt * 2;
+        const stateTimerBefore = screamer.stateTimer;
+        screamer.npc.setCombatAnimationMode?.(true);
+        screamer.npc.setLocomotionMode?.("walk");
+        screamer.stateTimer += dt;
 
         const attackTarget = getChaseTarget(screamer);
-        if (attackTarget) {
-          screamer.npc.lookAt(attackTarget.state.position, dt);
+        if (attackTarget && screamer.targetCharacterId) {
+          screamer.npc.setLookAtCharacter?.(screamer.targetCharacterId);
         }
 
-        if (screamer.stateTimer >= 2) {
-          if (attackTarget) {
+        const attackClipState = screamer.npc.isAnimationActive?.(
+          ScreamerAnimations.KnifeSlash
+        );
+        const attackDuration = getMeleeAttackDuration(screamer);
+        const contactWindow = screamer.npc.getMeleeContactWindow?.();
+        const contactStart = contactWindow
+          ? attackDuration * contactWindow.startFraction
+          : attackDuration;
+        const contactEnd = contactWindow
+          ? attackDuration * contactWindow.endFraction
+          : attackDuration;
+        const contactActive =
+          (attackClipState ?? true) &&
+          stateTimerBefore < attackDuration &&
+          stateTimerBefore <= contactEnd &&
+          screamer.stateTimer >= contactStart;
+        if (!screamer.attackDamageApplied && contactActive) {
+          if (
+            attackTarget?.isAlive &&
+            !attackTarget.isVanished &&
+            !attackTarget.isHidden
+          ) {
             const attackDist = getDistance(
               screamer.npc.state.position,
               attackTarget.state.position
             );
+            const meleeRange = getMeleeRange(screamer);
             const facingTarget = isFacingTarget(
               screamer.npc.state.position,
               screamer.npc.state.yaw ?? 0,
               attackTarget.state.position
             );
-            if (attackDist <= 2 && facingTarget) {
+            const inStrikeEnvelope =
+              screamer.npc.isMeleeTargetInEnvelope?.(
+                attackTarget.state.position,
+                screamer.npc.state.position,
+                screamer.attackForward ?? undefined
+              ) ??
+              (attackDist <= meleeRange && facingTarget);
+            const unobstructed =
+              screamer.npc.hasMeleeLineOfSight?.(attackTarget.state.position) ??
+              true;
+            const crossedContactEnd =
+              stateTimerBefore < contactEnd && screamer.stateTimer > contactEnd;
+            if (
+              inStrikeEnvelope &&
+              unobstructed &&
+              (!crossedContactEnd || screamer.attackEnvelopeWasActive)
+            ) {
               screamer.npc.applyDamage(screamer.targetCharacterId!);
+              screamer.attackDamageApplied = true;
             }
+            screamer.attackEnvelopeWasActive = inStrikeEnvelope;
+          } else {
+            screamer.attackEnvelopeWasActive = false;
           }
+        } else if (attackTarget?.isAlive) {
+          const attackDist = getDistance(
+            screamer.npc.state.position,
+            attackTarget.state.position
+          );
+          const meleeRange = getMeleeRange(screamer);
+          const facingTarget = isFacingTarget(
+            screamer.npc.state.position,
+            screamer.npc.state.yaw ?? 0,
+            attackTarget.state.position
+          );
+          screamer.attackEnvelopeWasActive =
+            screamer.npc.isMeleeTargetInEnvelope?.(
+              attackTarget.state.position,
+              screamer.npc.state.position,
+              screamer.attackForward ?? undefined
+            ) ?? (attackDist <= meleeRange && facingTarget);
+        } else {
+          screamer.attackEnvelopeWasActive = false;
+        }
+
+        if (
+          screamer.stateTimer >= attackDuration &&
+          !(attackClipState ?? false)
+        ) {
           screamer.event(Events.DoneAttacking);
         }
       }
@@ -462,11 +762,27 @@ export function createScreamer(
         }
       },
       {
+        eventId: Events.DoneRising,
+        from: [Transitions.Rising],
+        to: Transitions.Wander,
+        EnterTransition: () => {
+          screamer.stateTimer = 0;
+          screamer.targetCharacterId = null;
+          screamer.npc.setLookAtCharacter?.(null);
+          screamer.npc.setCombatAnimationMode?.(false);
+          screamer.npc.setLocomotionMode?.("walk");
+          screamer.npc.setAnimation(ScreamerAnimations.ScreamerReset);
+          screamer.wanderOrigin = screamer.npc.state.position.slice() as Float32Array;
+          screamer.targetPos = null;
+        }
+      },
+      {
         eventId: Events.StartScreaming,
         from: [Transitions.Wander, Transitions.Chase, Transitions.Rising],
         to: Transitions.Screaming,
         EnterTransition: () => {
           screamer.npc.stopMovement();
+          screamer.npc.setLocomotionMode?.("walk");
           screamer.npc.playAnimation(ScreamerAnimations.Scream);
           screamer.stateTimer = 0;
           screamAtNearbyZombies(screamer);
@@ -481,10 +797,16 @@ export function createScreamer(
           screamer.stateTimer = 0;
           screamer.screamCooldownTimer = 0;
           screamer.targetPos = null;
-          applyAgitation(screamer);
+          screamer.npc.setLookAtCharacter?.(screamer.targetCharacterId);
+          screamer.npc.setCombatAnimationMode?.(true);
+          screamer.npc.setLocomotionMode?.("sprint");
           const target = getChaseTarget(screamer);
-          if (target)
-            moveToward(screamer.npc, target.state.position, screamer.server);
+          if (
+            target &&
+            moveToward(screamer.npc, target.state.position, screamer.server)
+          ) {
+            applyAgitation(screamer);
+          }
         }
       },
       {
@@ -492,6 +814,8 @@ export function createScreamer(
         from: [Transitions.Chase],
         to: Transitions.Attack,
         EnterTransition: () => {
+          screamer.npc.stopMovement();
+          screamer.npc.setLocomotionMode?.("walk");
           screamer.stateTimer = 2;
         }
       },
@@ -510,13 +834,35 @@ export function createScreamer(
         eventId: Events.PlayerBacked,
         from: [Transitions.Attack],
         to: Transitions.Chase,
-        EnterTransition: undefined
+        EnterTransition: () => {
+          screamer.npc.setCombatAnimationMode?.(true);
+          screamer.npc.setLocomotionMode?.("sprint");
+          const chaseTarget = getChaseTarget(screamer);
+          if (
+            chaseTarget &&
+            moveToward(
+              screamer.npc,
+              chaseTarget.state.position,
+              screamer.server
+            )
+          ) {
+            applyAgitation(screamer);
+          }
+        }
       },
       {
         eventId: Events.StartAttacking,
         from: [Transitions.Attack],
         to: Transitions.Attacking,
         EnterTransition: () => {
+          screamer.npc.stopMovement();
+          screamer.npc.setLocomotionMode?.("walk");
+          const target = getChaseTarget(screamer);
+          screamer.attackForward = target
+            ? getAttackForward(screamer.npc, target.state.position)
+            : null;
+          screamer.attackDamageApplied = false;
+          screamer.attackEnvelopeWasActive = false;
           screamer.npc.playAnimation(ScreamerAnimations.KnifeSlash);
           screamer.stateTimer = 0;
         }
@@ -526,6 +872,10 @@ export function createScreamer(
         from: [Transitions.Attacking],
         to: Transitions.Attack,
         EnterTransition: () => {
+          screamer.attackForward = null;
+          screamer.attackDamageApplied = false;
+          screamer.attackEnvelopeWasActive = false;
+          screamer.npc.setAnimation(ScreamerAnimations.ScreamerReset);
           screamer.stateTimer = 2;
         }
       },
@@ -557,14 +907,18 @@ export function createScreamer(
   screamer.server = server;
   screamer.agitation = AGITATION_INITIAL;
   screamer.wanderOrigin = npc.state.position.slice() as Float32Array;
+  npc.setLocomotionMode?.("walk");
   screamer.targetPos = null;
   screamer.lastNoisePos = null;
   screamer.stateTimer = 0;
   screamer.targetCharacterId = null;
+  screamer.attackForward = null;
+  screamer.attackDamageApplied = false;
+  screamer.attackEnvelopeWasActive = false;
   screamer.armsFreed = false;
   screamer.screamCooldownTimer = 0;
 
-  npc.setAnimation(ScreamerAnimations.ScreamerReset);
+  npc.initializeAnimation?.(ScreamerAnimations.ScreamerReset);
 
   return screamer;
 }

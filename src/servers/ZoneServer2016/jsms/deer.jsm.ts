@@ -17,6 +17,10 @@ import type { ZoneServer2016 } from "../zoneserver";
 import { NavManager } from "../../../utils/recast";
 const debug = require("debug")("ai");
 import { getDistance2d } from "../../../utils/utils";
+import { isThreatToPassive } from "./factions";
+
+const WANDER_SPEED = 3.0;
+const FLEE_SPEED = 7.0;
 
 export const enum AnimalsAnimation {
   Idle = "Idle",
@@ -91,10 +95,34 @@ function moveToward(
   npc: Npc,
   target: Float32Array,
   server: ZoneServer2016
-): void {
-  if (!npc.navAgent) return;
-  const navTarget = server.navManager.getClosestNavPointVec3(target);
-  npc.navAgent.requestMoveTarget(navTarget);
+): boolean {
+  if (!npc.navAgent) return false;
+  try {
+    const navTarget = server.navManager.getClosestNavPointVec3(target);
+    // Recast returns false when it cannot install the target.  A passive
+    // animal must remain stopped in that case instead of advertising flee
+    // sprint while its authoritative position does not advance.
+    if (npc.navAgent.requestMoveTarget(navTarget) === false) {
+      npc.stopMovement();
+      return false;
+    }
+    return true;
+  } catch {
+    // A missing/off-mesh projection is also a failed flee installation.
+    npc.stopMovement();
+    return false;
+  }
+}
+
+function installFleeTarget(deer: DeerInstance): boolean {
+  if (!deer.threatPos) return false;
+  const fleeTarget = pickFleePoint(deer.npc, deer.server, deer.threatPos);
+  if (!fleeTarget || !moveToward(deer.npc, fleeTarget, deer.server)) {
+    deer.targetPos = null;
+    return false;
+  }
+  deer.targetPos = fleeTarget;
+  return true;
 }
 
 function findThreat(deer: DeerInstance, radius: number): Float32Array | null {
@@ -102,6 +130,8 @@ function findThreat(deer: DeerInstance, radius: number): Float32Array | null {
   const pos = deer.npc.state.position;
   const cx = Math.floor(pos[0] / sz);
   const cz = Math.floor(pos[2] / sz);
+  let nearest: Float32Array | null = null;
+  let nearestDistance = radius;
   for (let dx = -1; dx <= 1; dx++) {
     for (let dz = -1; dz <= 1; dz++) {
       const bucket = deer.server.aiTargetSpatialMap.get(
@@ -109,14 +139,16 @@ function findThreat(deer: DeerInstance, radius: number): Float32Array | null {
       );
       if (!bucket) continue;
       for (const entry of bucket) {
-        if (entry.faction === deer.npc.faction) continue;
-        if (getDistance2d(pos, entry.position) < radius) {
-          return entry.position;
+        if (!isThreatToPassive(entry.faction)) continue;
+        const distance = getDistance2d(pos, entry.position);
+        if (distance < nearestDistance) {
+          nearest = entry.position;
+          nearestDistance = distance;
         }
       }
     }
   }
-  return null;
+  return nearest;
 }
 
 export function createDeer(npc: Npc, server: ZoneServer2016): DeerInstance {
@@ -143,7 +175,15 @@ export function createDeer(npc: Npc, server: ZoneServer2016): DeerInstance {
           const pt = pickPatrolPoint(deer.server, deer.wanderOrigin);
           if (pt) {
             deer.targetPos = pt;
-            moveToward(deer.npc, pt, deer.server);
+            if (moveToward(deer.npc, pt, deer.server)) {
+              deer.npc.setSpeed(WANDER_SPEED);
+            } else {
+              deer.targetPos = null;
+              deer.npc.setSpeed(0);
+            }
+          } else {
+            deer.targetPos = null;
+            deer.npc.setSpeed(0);
           }
         }
       },
@@ -157,6 +197,10 @@ export function createDeer(npc: Npc, server: ZoneServer2016): DeerInstance {
         }
 
         if (!fleeThreat || deer.stateTimer >= 10) {
+          // Do not publish one more sprint intent on the same tick that the
+          // threat has disappeared.  The transition's stopMovement() is the
+          // single sprint -> idle handoff; sending FLEE_SPEED first creates a
+          // transient run/slide before the zero-speed packet.
           deer.event(DeerEvents.CalmedDown);
           return;
         }
@@ -164,17 +208,18 @@ export function createDeer(npc: Npc, server: ZoneServer2016): DeerInstance {
         const arrivedAtFlee =
           deer.targetPos != null &&
           getDistance2d(deer.npc.state.position, deer.targetPos) < 3;
-        if (arrivedAtFlee && deer.threatPos) {
-          const fleeTarget = pickFleePoint(
-            deer.npc,
-            deer.server,
-            deer.threatPos
-          );
-          if (fleeTarget) {
-            deer.targetPos = fleeTarget;
-            moveToward(deer.npc, fleeTarget, deer.server);
-          }
+        if (!deer.targetPos || arrivedAtFlee) {
+          installFleeTarget(deer);
         }
+        if (!deer.targetPos) {
+          // A missing nav agent/target is not a valid run state.  Keep the
+          // animal standing until a real flee path can be installed.
+          deer.npc.setLocomotionMode?.("walk");
+          deer.npc.setSpeed(0);
+          return;
+        }
+        deer.npc.setLocomotionMode?.("sprint");
+        deer.npc.setSpeed(FLEE_SPEED);
       }
     },
     [
@@ -184,16 +229,14 @@ export function createDeer(npc: Npc, server: ZoneServer2016): DeerInstance {
         to: DeerTransitions.Flee,
         EnterTransition: () => {
           deer.stateTimer = 0;
-          if (deer.threatPos) {
-            const fleeTarget = pickFleePoint(
-              deer.npc,
-              deer.server,
-              deer.threatPos
-            );
-            if (fleeTarget) {
-              deer.targetPos = fleeTarget;
-              moveToward(deer.npc, fleeTarget, deer.server);
-            }
+          deer.npc.stopMovement();
+          deer.targetPos = null;
+          if (installFleeTarget(deer)) {
+            deer.npc.setLocomotionMode?.("sprint");
+            deer.npc.setSpeed(FLEE_SPEED);
+          } else {
+            deer.npc.setLocomotionMode?.("walk");
+            deer.npc.setSpeed(0);
           }
         }
       },
@@ -202,16 +245,27 @@ export function createDeer(npc: Npc, server: ZoneServer2016): DeerInstance {
         from: [DeerTransitions.Flee],
         to: DeerTransitions.Wander,
         EnterTransition: () => {
+          // Flee can be moving when the threat leaves.  Stop the old sprint
+          // target before handing the animal back to the walk graph.
+          deer.npc.stopMovement();
           deer.patrolTimer = 0;
           deer.stateTimer = 0;
+          deer.npc.setLocomotionMode?.("walk");
+          deer.npc.setSpeed(0);
           deer.fleeCooldown = 4;
           deer.threatPos = null;
+          deer.targetPos = null;
           deer.wanderOrigin = deer.npc.state.position.slice() as Float32Array;
           const pt = pickPatrolPoint(deer.server, deer.wanderOrigin);
           if (pt) {
             deer.targetPos = pt;
-            moveToward(deer.npc, pt, deer.server);
+            if (moveToward(deer.npc, pt, deer.server)) {
+              deer.npc.setSpeed(WANDER_SPEED);
+            } else {
+              deer.targetPos = null;
+            }
           }
+          if (!deer.targetPos) deer.npc.setSpeed(0);
         }
       }
     ],
@@ -229,6 +283,11 @@ export function createDeer(npc: Npc, server: ZoneServer2016): DeerInstance {
   deer.stateTimer = 0;
   deer.fleeCooldown = 0;
   deer.threatPos = null;
-  npc.setSpeed(5.5);
+  deer.npc.setLocomotionMode?.("walk");
+  // Wander has no target until the first successful patrol lookup.  Publish
+  // zero until then so a freshly spawned deer cannot advertise walking while
+  // its position is still stationary.
+  npc.initializeAnimation?.(AnimalsAnimation.Idle);
+  npc.setSpeed(0);
   return deer;
 }

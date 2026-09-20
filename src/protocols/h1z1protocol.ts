@@ -21,9 +21,24 @@ import {
   getPacketTypeBytes,
   lz4_decompress
 } from "../utils/utils";
+import { expandH1emuUpdateCharacterStatePackToClient1080 } from "../utils/characterUpdateCharacterStateWire2016";
 import { GatewayChannels } from "h1emu-core";
 
+/**
+ * `pack()` 的旧兼容选项。
+ *
+ * 2016 客户端实际消费的 `Character.UpdateCharacterState` 是原生 case9 的
+ * 22B 完整 wire（2B opcode + 8B characterId + 12B states/gameTime）。该选项
+ * 只为诊断/开发工具保留，用来取得未校验的 schema 完整包。
+ */
+export interface H1Z1PackOptions {
+  /** 仅返回 H1EMU schema 的 22B 完整包，不执行生产校验函数。 */
+  h1emuUcsSchemaPackOnly?: boolean;
+}
+
 export interface UpdatePositionObject {
+  /** Local parse failure marker, never a wire field. */
+  parseError?: boolean;
   raw: Buffer;
   flags: any;
   sequenceTime: any; // similar to simestamp, allows us to delay/synchronize this packet
@@ -365,7 +380,11 @@ export class H1Z1Protocol {
     };
   }
 
-  pack(packetName: string, object: any = {}): Buffer | null {
+  pack(
+    packetName: string,
+    object: any = {},
+    _options?: H1Z1PackOptions
+  ): Buffer | null {
     const H1Z1Packets = this.H1Z1Packets;
     const packetType: number = H1Z1Packets.PacketTypes[packetName];
     const packet = H1Z1Packets.Packets[packetType];
@@ -402,6 +421,21 @@ export class H1Z1Protocol {
         "Unknown or unhandled zone packet type: " + packetType
       );
       return null;
+    }
+    if (
+      data &&
+      this.protocolName === "ClientProtocol_1080" &&
+      packetName === "Character.UpdateCharacterState" &&
+      !_options?.h1emuUcsSchemaPackOnly
+    ) {
+      const normalized = expandH1emuUpdateCharacterStatePackToClient1080(data);
+      if (!normalized) {
+        console.error(
+          "Could not validate Character.UpdateCharacterState ClientProtocol_1080 case9 wire"
+        );
+        return null;
+      }
+      return normalized;
     }
     return data;
   }
@@ -576,6 +610,7 @@ const generateDummyPosUpdate = function (): UpdatePositionObject {
   dummyObj.flags = 0;
   dummyObj.sequenceTime = 0;
   dummyObj.unknown3_int8 = 0;
+  dummyObj.parseError = true;
   return dummyObj;
 };
 
@@ -585,9 +620,6 @@ const parseUpdatePositionData = function (data: Buffer, offset: number) {
   try {
     obj["flags"] = data.readUInt16LE(offset);
     offset += 2;
-
-    // return spammed junk before parsing
-    if (obj.flags == 513) return generateDummyPosUpdate();
 
     obj["sequenceTime"] = data.readUInt32LE(offset);
     offset += 4;

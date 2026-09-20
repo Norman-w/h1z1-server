@@ -21,7 +21,7 @@ import {
   NpcIds,
   StringIds
 } from "../models/enums";
-import { Npc } from "./npc";
+import { Npc, ZOMBIE_NATIVE_MELEE_CONTACT_WINDOW } from "./npc";
 import { LoadoutContainer } from "../classes/loadoutcontainer";
 import { Lootbag } from "./lootbag";
 import { createZombie } from "../jsms/zombie.jsm";
@@ -51,6 +51,7 @@ export class PrototypeZombie extends Npc {
     this.health = 30000;
     this.materialType = MaterialTypes.ZOMBIE;
     this.npcMeleeDamage = 5000;
+    this.meleeContactWindow = { ...ZOMBIE_NATIVE_MELEE_CONTACT_WINDOW };
     this.npcId = prototypeNpcId;
     this.faction = Factions.ZOMBIE;
     this.nameId = StringIds.ZOMBIE_WALKER;

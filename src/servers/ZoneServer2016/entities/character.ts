@@ -60,6 +60,7 @@ import {
   AccessedCharacterBeginCharacterAccess,
   AccessedCharacterEndCharacterAccess,
   AddLightweightPc,
+  CharacterPlayAnimation,
   CharacterWeaponStance,
   ClientUpdateDamageInfo,
   ClientUpdateModifyMovementSpeed,
@@ -84,7 +85,55 @@ import { ProjectileEntity } from "./projectileentity";
 import { ChallengeType } from "../managers/challengemanager";
 import { LootableConstructionEntity } from "./lootableconstructionentity";
 import { PluginManager } from "../managers/pluginmanager";
+import type { MountedPositionSource } from "../../../utils/mountedPosition";
 const stats = PluginManager.loadServerData("2016/sampleData/stats.json");
+
+/**
+ * The native player melee-flinch path quantizes the relative heading into
+ * four 90-degree sectors before writing the FlinchDirection graph parameter.
+ * These constants mirror FUN_14051fb40 in the 2016 client:
+ *   (targetYaw - sourceYaw) * 57.2958 - 135, wrapped to [0, 360), multiplied
+ *   by -1/90, truncated toward zero, then wrapped back into [0, 3].
+ * The negative scale and truncation order matter: using a positive floor-like
+ * division mirrors only two of the four directions. Keeping this conversion
+ * here means Character.PlayAnimation supplies the same directional input as
+ * the native damage path instead of a guessed animation variant or a fixed
+ * distance/angle value.
+ */
+const NATIVE_FLINCH_DIRECTION_DEGREES_PER_RADIAN = 180 / Math.PI;
+const NATIVE_FLINCH_DIRECTION_OFFSET_DEGREES = 135;
+const NATIVE_FLINCH_DIRECTION_SECTOR_DEGREES = 90;
+const NATIVE_FLINCH_DIRECTION_SECTOR_COUNT = 4;
+/** DAT_1420c4a50 in the retail client (ReadMemory: -0.011111111). */
+const NATIVE_FLINCH_DIRECTION_SECTOR_SCALE = -1 /
+  NATIVE_FLINCH_DIRECTION_SECTOR_DEGREES;
+
+function getNativeFlinchDirection(
+  targetYaw: number | undefined,
+  sourceYaw: number | undefined
+): number | undefined {
+  if (!Number.isFinite(targetYaw) || !Number.isFinite(sourceYaw)) {
+    return undefined;
+  }
+
+  let relativeDegrees =
+    (targetYaw! - sourceYaw!) * NATIVE_FLINCH_DIRECTION_DEGREES_PER_RADIAN -
+    NATIVE_FLINCH_DIRECTION_OFFSET_DEGREES;
+  relativeDegrees %= NATIVE_FLINCH_DIRECTION_SECTOR_DEGREES *
+    NATIVE_FLINCH_DIRECTION_SECTOR_COUNT;
+  if (relativeDegrees < 0) relativeDegrees += 360;
+
+  // FUN_14051fb40 uses CVTTSS2SI after multiplying by the negative
+  // 1/90 constant, i.e. truncation toward zero rather than floor().
+  let direction = Math.trunc(
+    relativeDegrees * NATIVE_FLINCH_DIRECTION_SECTOR_SCALE
+  );
+  if (direction < 0) direction += NATIVE_FLINCH_DIRECTION_SECTOR_COUNT;
+  return Math.max(
+    0,
+    Math.min(NATIVE_FLINCH_DIRECTION_SECTOR_COUNT - 1, direction)
+  );
+}
 
 interface CharacterStates {
   invincibility: boolean;
@@ -223,6 +272,10 @@ export class Character2016 extends BaseFullCharacter {
 
   /** Handles the current position of the player */
   positionUpdate?: positionUpdate;
+
+  /** Source of the last mounted world-position handoff used by AI targeting. */
+  lastMountedPositionSource?: MountedPositionSource;
+  lastMountedPositionSequenceTime?: number;
 
   /** Admin tools */
   tempGodMode = false;
@@ -1053,6 +1106,109 @@ export class Character2016 extends BaseFullCharacter {
     return this.godMode || this.tempGodMode;
   }
 
+  /**
+   * Send the existing client-side damage feedback without changing resources.
+   * This is intentionally separate from `damage()`: replay diagnostics can
+   * observe the client presentation while godMode still protects health and
+   * OnMeleeHit's bleed side effect. A successful return means sendData was
+   * reached, not that the client rendered or accepted the packet.
+   */
+  sendDamageFeedback(server: ZoneServer2016, damageInfo: DamageInfo): boolean {
+    const client = server.getClientByCharId(this.characterId);
+    if (!client) return false;
+    const sourceEntity = server.getEntity(damageInfo.entity);
+    const orientation = calculateOrientation(
+      this.state.position,
+      sourceEntity?.state.position || this.state.position
+    );
+    server.sendData<ClientUpdateDamageInfo>(client, "ClientUpdate.DamageInfo", {
+      transientId: 0,
+      orientationToSource: orientation,
+      unknownDword2: 100
+    });
+    return true;
+  }
+
+  /**
+   * Trigger the native player flinch graph for an NPC melee contact.
+   *
+   * `ClientUpdate.DamageInfo` is the HUD/directional damage signal; it does
+   * not select the character's MalePhysics flinch branch.  The client graph
+   * exposes `Flinch` as its public event.  `MeleeFlinch` belongs to the
+   * shared animal graph and is not the player graph's event name.  Send the
+   * player event only after the server has accepted an NPC contact (the
+   * caller also uses it for the protected/god-mode replay path).  This is
+   * deliberately separate from health mutation and from generic damage
+   * feedback: projectiles, gas and environmental damage must not be
+   * mislabeled as a melee flinch.
+   */
+  sendNpcMeleeFlinch(
+    server: ZoneServer2016,
+    damageInfo: DamageInfo
+  ): boolean {
+    const client = server.getClientByCharId(this.characterId);
+    if (
+      !client ||
+      client.isLoading !== false ||
+      this.isAlive === false ||
+      this.isRespawning
+    ) {
+      return false;
+    }
+
+    const sourceEntity =
+      typeof server.getEntity === "function"
+        ? server.getEntity(damageInfo.entity)
+        : undefined;
+    const sourceYaw = (
+      sourceEntity as unknown as { state?: { yaw?: number } } | undefined
+    )?.state?.yaw;
+    const flinchDirection = getNativeFlinchDirection(
+      (this as unknown as { state?: { yaw?: number } }).state?.yaw,
+      sourceYaw
+    );
+
+    const packet: CharacterPlayAnimation = {
+      characterId: this.characterId,
+      animationName: "Flinch",
+      unm4: 0,
+      unknownDword1: 0,
+      unknownByte1: 0,
+      // The player graph owns FlinchDirection/weapon-class selection.  When
+      // both headings are available, provide the same four-sector direction
+      // that the native FUN_14051fb40 damage path computes.  Keep the generic
+      // event when a source has no character heading (e.g. a test double or a
+      // non-character damage source) rather than inventing a direction.
+      unknownDword2: 0,
+      animationType:
+        flinchDirection === undefined ? "" : "FlinchDirection",
+      unknownByte1xda: 0,
+      unknownDword3: flinchDirection ?? 0
+    };
+    // Character.PlayAnimation is an observable character action, not a
+    // private HUD event.  The old NPC path sent it only to the victim's own
+    // connection, so every other client kept seeing the player stand still
+    // even though the victim received the packet.  Use the normal spawned
+    // entity broadcast so the owner and all current observers share one
+    // reliable event.  Keep the direct-send fallback for isolated protocol
+    // doubles that do not implement the zone broadcast helper.
+    if (typeof server.sendDataToAllWithSpawnedEntity === "function") {
+      server.sendDataToAllWithSpawnedEntity<CharacterPlayAnimation>(
+        server._characters,
+        this.characterId,
+        "Character.PlayAnimation",
+        packet
+      );
+    } else {
+      server.sendData<CharacterPlayAnimation>(
+        client,
+        "Character.PlayAnimation",
+        packet
+      );
+    }
+    return true;
+  }
+
   clearReloadTimeout() {
     const weaponItem = this.getEquippedWeapon();
     if (!weaponItem || !weaponItem.weapon || !weaponItem.weapon.reloadTimer)
@@ -1755,15 +1911,7 @@ export class Character2016 extends BaseFullCharacter {
       ResourceIds.HEALTH
     );
 
-    const orientation = calculateOrientation(
-      this.state.position,
-      sourceEntity?.state.position || this.state.position // send damaged screen effect during falling/hunger etc
-    );
-    server.sendData<ClientUpdateDamageInfo>(client, "ClientUpdate.DamageInfo", {
-      transientId: 0,
-      orientationToSource: orientation,
-      unknownDword2: 100
-    });
+    this.sendDamageFeedback(server, damageInfo);
     server.sendChatText(client, `Received ${damage} damage`);
 
     const damageRecord = server.generateDamageRecord(

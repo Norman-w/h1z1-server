@@ -9,3 +9,13 @@ bin/*.exe
 config.yaml
 /navMeshDump.obj
 *.tsbuildinfo
+
+# Ghidra / PyGhidra runtime artifacts
+hs_err_pid*.log
+nul
+dev/ghidra/__pycache__/
+dev/ghidra/analysis/output/
+dev/ghidra/analysis/server/
+dev/ghidra/project/*.lock
+dev/ghidra/project/*.lock~
+dev/ghidra/project/**/*.ps

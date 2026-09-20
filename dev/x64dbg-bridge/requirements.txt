@@ -1,0 +1,2 @@
+# 与 x64dbg Automate 插件 green_pepe 协议对齐；需将插件解压到 x64 的 plugins 目录
+x64dbg_automate>=0.7.6,<0.8

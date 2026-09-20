@@ -20,7 +20,8 @@ import {
   NpcIds,
   StringIds
 } from "../models/enums";
-import { Npc } from "./npc";
+import { ANIMAL_NATIVE_LOCOMOTION_PROFILE, Npc } from "./npc";
+import { ANIMAL_PROFILE_IDS } from "./animalprofiles";
 import { createWolf } from "../jsms/wolf.jsm";
 import { Factions } from "../jsms/factions";
 
@@ -45,6 +46,26 @@ export class Wolf extends Npc {
     this.health = 7500;
     this.materialType = MaterialTypes.FLESH;
     this.npcMeleeDamage = 2000;
+    this.nativeMeleeCapability = "attacker";
+    this.profileId = ANIMAL_PROFILE_IDS.WOLF;
+    this.nativeLocomotionProfile = ANIMAL_NATIVE_LOCOMOTION_PROFILE;
+    // Keep the spawn/late-observer reset clip available without relying on
+    // the optional AI FSM being enabled.
+    this.initializeAnimation("Idle");
+    // AnimalsX64.mrn: Animals_Wolf001_AttackB = 50 frames at 30 FPS.
+    // AnimalsPhysics' KnifeSlash event uses this actor resource for Wolf001;
+    // keep the wire clock on the selected clip rather than the generic 1430ms
+    // player-weapon compatibility value.
+    this.nativeMeleeAnimationDurationMs = 1667;
+    this.nativeMeleeAnimationSource = "Animals_Wolf001_AttackB";
+    // AnimalsX64 exposes Wolf001 FlinchB as the resource-side candidate for
+    // the shared MeleeFlinch event (30 frames).
+    this.nativeMeleeFlinchAnimationDurationMs = 1000;
+    // AnimalsPhysicsX64.mrn Wolf001 SwingContact interval: 0.26–0.74.
+    this.meleeContactWindow = {
+      startFraction: 0.259999,
+      endFraction: 0.740001
+    };
     this.npcId = NpcIds.WOLF;
     this.faction = Factions.WOLF;
     this.nameId = StringIds.WOLF;

@@ -454,6 +454,7 @@ export class WorldObjectManager {
         existingNpcPositions,
         this.npcSpawnRadius,
         this.chanceNpc,
+        this.chanceRabbit,
         this.chanceScreamer,
         this.chanceGasser,
         this.chanceExploder,
@@ -644,6 +645,26 @@ export class WorldObjectManager {
       case ModelIds.ZOMBIE_FEMALE_WALKER:
       case ModelIds.ZOMBIE_MALE_WALKER:
         switch (npcId) {
+          case NpcIds.PROTOTYPE_ASSAULT_ZOMBIE:
+          case NpcIds.PROTOTYPE_HUNTER_ZOMBIE:
+          case NpcIds.PROTOTYPE_SNIPER_ZOMBIE:
+            // Prototype zombies use the same Zombie001 animation graph and
+            // FSM as a walker, but carry their own health/loadout/loot
+            // contract.  Route them through the concrete entity here so a
+            // caller using the normal factory cannot silently downgrade a
+            // prototype to a plain ZombieWalker (and lose its animation
+            // lifecycle when it is spawned outside the map bootstrap).
+            npc = new PrototypeZombie(
+              characterId,
+              transientId,
+              modelId,
+              position,
+              rotation,
+              server,
+              spawnerId,
+              npcId
+            );
+            break;
           case NpcIds.EXPLODER:
             npc = new Exploder(
               characterId,
@@ -1503,7 +1524,11 @@ export class WorldObjectManager {
         }
         if (!spawn) continue;
         const spawnchance = Math.floor(Math.random() * 100) + 1; // temporary spawnchance
-        if (spawnchance <= this.chanceNpc) {
+        const spawnChance =
+          spawnerType.actorDefinition === "NPCSpawner_Rabbit001.adr"
+            ? this.chanceRabbit
+            : this.chanceNpc;
+        if (spawnchance <= spawnChance) {
           const screamerChance = Math.floor(Math.random() * 1000) + 1; // temporary spawnchance
           if (screamerChance <= this.chanceScreamer) {
             authorizedModelId.push(9667);

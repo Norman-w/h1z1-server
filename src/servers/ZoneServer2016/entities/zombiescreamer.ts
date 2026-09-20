@@ -25,7 +25,7 @@ import {
   NpcIds,
   StringIds
 } from "../models/enums";
-import { Npc } from "./npc";
+import { Npc, ZOMBIE_NATIVE_MELEE_CONTACT_WINDOW } from "./npc";
 import { LoadoutContainer } from "../classes/loadoutcontainer";
 import { Lootbag } from "./lootbag";
 import {
@@ -56,12 +56,17 @@ export class ZombieScreamer extends Npc {
     );
     this.materialType = MaterialTypes.ZOMBIE;
     this.npcMeleeDamage = 3000;
+    this.meleeContactWindow = { ...ZOMBIE_NATIVE_MELEE_CONTACT_WINDOW };
     this.maxHealth = 30000;
     this.health = this.maxHealth;
     this.npcId = NpcIds.ZOMBIE;
     this.faction = Factions.ZOMBIE;
     this.nameId = StringIds.BANSHEE;
     this.rewardItems = [{ itemDefId: Items.BRAIN_INFECTED, weight: 10 }];
+    // Keep the screamer's sleeping/reset graph valid even when AI is disabled
+    // or before createScreamer installs its FSM.  The FSM re-primes the same
+    // clip after wiring its state object.
+    this.initializeAnimation(ScreamerAnimations.ScreamerReset);
     if (!process.env.DISABLE_AI && server.aiEnabled) {
       this.fsm = createScreamer(this, server);
     }

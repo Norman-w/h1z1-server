@@ -137,12 +137,13 @@ export class GatewayServer extends EventEmitter {
   sendTunnelData(
     soeClientId: string,
     tunnelData: Buffer,
-    channel: SOEOutputChannels
+    channel: SOEOutputChannels,
+    gatewayChannel = 0
   ) {
     debug("Sending tunnel data to client");
     const data = this._protocol.pack_tunnel_data_packet_for_client(
       tunnelData,
-      0
+      gatewayChannel
     );
     if (data) {
       const client = this._soeServer.getSoeClient(soeClientId);

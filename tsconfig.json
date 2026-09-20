@@ -19,5 +19,11 @@
     "experimentalDecorators": true,
     "types": ["node"]
   },
-  "include": ["src/"]
+  "include": ["src/"],
+  "exclude": [
+    "src/servers/ZoneServer2016/managers/devhttpserver.ts",
+    "src/servers/ZoneServer2016/test-zombie-*.ts",
+    "src/servers/ZoneServer2016/test-zombie-native-capture.js",
+    "src/servers/ZoneServer2016/test-zombie-recording.js"
+  ]
 }

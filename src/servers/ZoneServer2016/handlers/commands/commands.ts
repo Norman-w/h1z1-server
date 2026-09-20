@@ -77,6 +77,7 @@ import { DeerEvents } from "../../jsms/deer.jsm";
 import { ZombieEvents } from "../../jsms/zombie.jsm";
 import { Wolf } from "../../entities/wolf";
 import { Bear } from "../../entities/bear";
+import type { AnimalTestType } from "../../managers/animaltestharness";
 import { writeFileSync } from "node:fs";
 import { PluginManager } from "../../managers/pluginmanager";
 const itemDefinitions = PluginManager.loadServerData(
@@ -2329,6 +2330,44 @@ export const commands: Array<Command> = [
         client,
         `Spawned ${count} ${args[0]} around your position`
       );
+    }
+  },
+  {
+    name: "ztest",
+    permissionLevel: PermissionLevels.ADMIN,
+    execute: (server: ZoneServer2016, client: Client, args: Array<string>) => {
+      const command = (args[0] || "flat").toLowerCase();
+      try {
+        if (command === "stop") {
+          const removed = server.animalTestHarness.stop();
+          server.sendChatText(client, `[ztest] removed ${removed} test animal(s)`);
+          return;
+        }
+        if (command === "status") {
+          server.sendChatText(client, `[ztest] ${JSON.stringify(server.animalTestHarness.status())}`);
+          return;
+        }
+        if (command !== "flat" && command !== "slope") {
+          server.sendChatText(client, "[ztest] usage: /ztest flat|slope|stop|status [type] [distance] [height]");
+          return;
+        }
+        const type = (args[1] || "zombie") as AnimalTestType;
+        const distance = args[2] === undefined ? 8 : Number(args[2]);
+        const height = args[3] === undefined ? (command === "slope" ? 1 : 0) : Number(args[3]);
+        const result = server.animalTestHarness.spawn(
+          client,
+          type,
+          distance,
+          height,
+          command === "flat"
+        );
+        server.sendChatText(client, `[ztest] ${JSON.stringify(result)}`);
+      } catch (error) {
+        server.sendChatText(
+          client,
+          `[ztest] ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }
   },
   {

@@ -29,6 +29,7 @@ import {
   ZombieOneshotAnim,
   ZombieTransitions,
   ZombieEvents,
+  shouldFinishZombieStumble,
   type ZombieInstance
 } from "./zombie.jsm";
 
@@ -63,10 +64,28 @@ function moveToward(
   npc: Npc,
   target: Float32Array,
   server: ZoneServer2016
-): void {
-  if (!npc.navAgent) return;
-  const navTarget = server.navManager.getClosestNavPointVec3(target);
-  npc.navAgent.requestMoveTarget(navTarget);
+): boolean {
+  if (!npc.navAgent) {
+    npc.setLocomotionMode?.("walk");
+    npc.stopMovement();
+    return false;
+  }
+  try {
+    const navTarget = server.navManager.getClosestNavPointVec3(target);
+    if (npc.navAgent.requestMoveTarget(navTarget) === false) {
+      // Do not leave the ranged/melee chase speed advertised after a rejected
+      // target; that renders an in-place run while the server has no path.
+      npc.setLocomotionMode?.("walk");
+      npc.stopMovement();
+      return false;
+    }
+  } catch {
+    // An off-mesh projection is the same failed target installation.
+    npc.setLocomotionMode?.("walk");
+    npc.stopMovement();
+    return false;
+  }
+  return true;
 }
 
 function listenToSounds(gasser: ZombieInstance, sounds: Sound[]): Sound | null {
@@ -94,17 +113,66 @@ function listenToSounds(gasser: ZombieInstance, sounds: Sound[]): Sound | null {
 function applyDamageToTarget(zombie: ZombieInstance): void {
   if (!zombie.targetCharacterId) return;
   const character = zombie.server._characters[zombie.targetCharacterId];
-  if (character) {
+  if (character?.isAlive) {
     zombie.npc.applyDamage(zombie.targetCharacterId);
     return;
   }
   const targetNpc = zombie.server._npcs[zombie.targetCharacterId];
   if (targetNpc && targetNpc.isAlive) {
-    targetNpc.damage(zombie.server, {
+    const damageInfo = {
       entity: zombie.npc.characterId,
       damage: zombie.npc.npcMeleeDamage
-    });
+    };
+    if (typeof targetNpc.applyNpcMeleeHit === "function") {
+      targetNpc.applyNpcMeleeHit(zombie.server, damageInfo);
+    } else {
+      // Lightweight AI doubles may not expose the presentation-aware hook.
+      targetNpc.damage(zombie.server, damageInfo);
+    }
   }
+}
+
+function getMeleeRange(gasser: ZombieInstance): number {
+  return (
+    gasser.npc.getMeleeAttackRange?.(MELEE_SLASH_RANGE) ?? MELEE_SLASH_RANGE
+  );
+}
+
+function getMeleeAttackDuration(gasser: ZombieInstance): number {
+  return gasser.npc.getMeleeAttackAnimationDuration?.(1) ?? 1;
+}
+
+function getActionDuration(
+  gasser: ZombieInstance,
+  animationName: ZombieOneshotAnim
+): number {
+  const durationMs = gasser.npc.getAnimationDurationMs?.(animationName);
+  if (Number.isFinite(durationMs) && (durationMs as number) > 0) {
+    return (durationMs as number) / 1000;
+  }
+  return 1;
+}
+
+/** Keep recovery poses stationary until their public one-shot clocks finish. */
+function isGasserRecoveryAnimationActive(gasser: ZombieInstance): boolean {
+  const active = gasser.npc.getAnimationRuntimeState?.().activeAnimation;
+  return active === ZombieOneshotAnim.EatingDone ||
+    active === ZombieOneshotAnim.CoverEarsDone;
+}
+
+function getAttackForward(
+  npc: Npc,
+  targetPosition: Float32Array
+): [number, number] | null {
+  const yaw = npc.state.yaw;
+  if (Number.isFinite(yaw)) {
+    const forward: [number, number] = [Math.sin(yaw), Math.cos(yaw)];
+    if (Math.hypot(forward[0], forward[1]) > Number.EPSILON) return forward;
+  }
+  const dx = targetPosition[0] - npc.state.position[0];
+  const dz = targetPosition[2] - npc.state.position[2];
+  const length = Math.hypot(dx, dz);
+  return length > Number.EPSILON ? [dx / length, dz / length] : null;
 }
 
 function shouldOverrideAction(sound: Sound | null): boolean {
@@ -319,22 +387,50 @@ function tickTimers(gasser: ZombieInstance, dt: number): void {
 }
 
 function enterWander(gasser: ZombieInstance): void {
+  // Do not carry a gas/melee chase impulse into the normal walk state.
+  gasser.npc.stopMovement();
   gasser.stateTimer = 0;
   gasser.agitation = AGITATION_INITIAL;
   gasser.targetCharacterId = null;
+  gasser.attackForward = null;
+  gasser.npc.setLookAtCharacter?.(null);
+  gasser.npc.setCombatAnimationMode?.(false);
+  gasser.npc.setLocomotionMode?.("walk");
+  // Queue the normal loop before a recovery one-shot expires.  Without this
+  // edge an EatingDone transition can restore the previous Eating clip and
+  // leave a live Gasser visibly frozen in its feeding pose.
+  gasser.npc.setAnimation(ZombieLoopingAnim.Idle);
   gasser.npc.lookAtTarget = null;
   gasser.wanderOrigin = gasser.npc.state.position.slice() as Float32Array;
+  gasser.targetPos = null;
+  if (isGasserRecoveryAnimationActive(gasser)) {
+    // EatingDone/CoverEarsDone are graph recovery edges.  Do not install a
+    // patrol target until the client has returned to the persistent loop.
+    gasser.npc.setSpeed(0);
+    return;
+  }
   const pt = pickPatrolPoint(gasser.server, gasser.wanderOrigin);
   if (pt) {
     gasser.targetPos = pt;
-    moveToward(gasser.npc, pt, gasser.server);
+    if (moveToward(gasser.npc, pt, gasser.server)) {
+      applyAgitation(gasser);
+    } else {
+      gasser.targetPos = null;
+      gasser.npc.setSpeed(0);
+    }
+  } else {
+    gasser.npc.setSpeed(0);
   }
 }
 
 function enterFeed(gasser: ZombieInstance): void {
   gasser.npc.stopMovement();
+  gasser.npc.setCombatAnimationMode?.(false);
+  gasser.npc.setLocomotionMode?.("walk");
   gasser.stateTimer = 0;
   gasser.targetCharacterId = null;
+  gasser.attackForward = null;
+  gasser.npc.setLookAtCharacter?.(null);
   gasser.npc.lookAtTarget = null;
   gasser.isEatingCorpse = false;
 }
@@ -350,12 +446,25 @@ function decayAgitation(gasser: ZombieInstance, dt: number) {
 }
 
 export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
+  // The three Gasser actions share one FSM state, but only KnifeSlash is a
+  // melee strike. Keep the action edge separate so Spit/GasConvulse cannot
+  // fall through to the melee damage branch at the end of the shared state.
+  let attackAction: "melee" | "spit" | "gas" = "melee";
+  // GasConvulse is followed by a short Stagger_Light recovery clip.  Keep
+  // that handoff in the FSM instead of a wall-clock timeout: a delayed AI
+  // tick, an interrupted action, or a late observer must not inject Stagger
+  // into the next attack state.
+  let gasStaggerStarted = false;
+
   const gasser = new JSM(
     {
       [ZombieTransitions.Wander]: (dt: number) => {
         if (gasser.isCoveringEars) {
           gasser.coverEarsTimer += dt;
-          if (gasser.coverEarsTimer >= 3) {
+          const coverEarsClipActive =
+            gasser.npc.isAnimationActive?.(ZombieOneshotAnim.CoverEars) ??
+            false;
+          if (gasser.coverEarsTimer >= 3 && !coverEarsClipActive) {
             gasser.isCoveringEars = false;
             gasser.npc.playAnimation(ZombieOneshotAnim.CoverEarsDone);
             enterWander(gasser);
@@ -363,8 +472,14 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
           return;
         }
 
+        if (isGasserRecoveryAnimationActive(gasser)) {
+          gasser.npc.stopMovement();
+          gasser.npc.setLocomotionMode?.("walk");
+          gasser.npc.setSpeed(0);
+          return;
+        }
+
         tickTimers(gasser, dt);
-        applyAgitation(gasser);
 
         if (trySeePlayer(gasser)) return;
         if (trySmellCorpse(gasser)) return;
@@ -391,8 +506,18 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
           const pt = pickPatrolPoint(gasser.server, gasser.wanderOrigin);
           if (pt) {
             gasser.targetPos = pt;
-            moveToward(gasser.npc, pt, gasser.server);
+            if (!moveToward(gasser.npc, pt, gasser.server)) {
+              gasser.targetPos = null;
+              gasser.npc.setSpeed(0);
+            } else {
+              applyAgitation(gasser);
+            }
+          } else {
+            gasser.targetPos = null;
+            gasser.npc.stopMovement();
           }
+        } else {
+          applyAgitation(gasser);
         }
       },
 
@@ -412,7 +537,8 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
       },
       [ZombieTransitions.Investigate]: (dt: number) => {
         tickTimers(gasser, dt);
-        applyAgitation(gasser);
+        gasser.npc.setCombatAnimationMode?.(false);
+        gasser.npc.setLocomotionMode?.("walk");
 
         if (trySeePlayer(gasser)) return;
         if (trySmellCorpse(gasser)) return;
@@ -430,6 +556,12 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
           return;
         }
 
+        if (gasser.targetPos != null) {
+          applyAgitation(gasser);
+        } else {
+          gasser.npc.setSpeed(0);
+        }
+
         const nearestSound = listenToSounds(gasser, gasser.server.sounds);
         if (nearestSound) {
           gasser.lastNoisePos = nearestSound.position;
@@ -438,20 +570,26 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
             return;
           }
           gasser.stateTimer = 0;
-          moveToward(gasser.npc, nearestSound.position, gasser.server);
+          gasser.targetPos = nearestSound.position;
+          if (!moveToward(gasser.npc, gasser.targetPos, gasser.server)) {
+            gasser.targetPos = null;
+            gasser.npc.setSpeed(0);
+          } else {
+            applyAgitation(gasser);
+          }
         }
       },
 
       [ZombieTransitions.Chase]: (dt: number) => {
         tickTimers(gasser, dt);
+        gasser.npc.setCombatAnimationMode?.(true);
+        gasser.npc.setLocomotionMode?.("sprint");
         const nearestSound = listenToSounds(gasser, gasser.server.sounds);
         if (nearestSound && shouldOverrideAction(nearestSound)) {
           gasser.lastNoisePos = nearestSound.position;
           gasser.event(ZombieEvents.HearNoise);
           return;
         }
-        applyAgitation(gasser);
-
         const chaseTarget = getChaseTarget(gasser);
         if (
           !chaseTarget ||
@@ -462,6 +600,7 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
           gasser.event(ZombieEvents.LostPlayer);
           return;
         }
+        gasser.npc.setLookAtCharacter?.(gasser.targetCharacterId);
 
         chargeGas(gasser);
 
@@ -480,11 +619,17 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
             gasser.event(ZombieEvents.StartStumble);
             return;
           }
-          moveToward(gasser.npc, chaseTarget.position, gasser.server);
+          if (!moveToward(gasser.npc, chaseTarget.position, gasser.server)) {
+            gasser.npc.setSpeed(0);
+          } else {
+            applyAgitation(gasser);
+          }
         }
       },
 
       [ZombieTransitions.Stumble]: (dt: number) => {
+        gasser.npc.setCombatAnimationMode?.(false);
+        gasser.npc.setLocomotionMode?.("walk");
         const nearestSound = listenToSounds(gasser, gasser.server.sounds);
         if (nearestSound && shouldOverrideAction(nearestSound)) {
           gasser.lastNoisePos = nearestSound.position;
@@ -492,21 +637,20 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
           return;
         }
         gasser.stateTimer += dt;
-        if (gasser.stateTimer >= 5) {
+        if (shouldFinishZombieStumble(gasser)) {
           gasser.event(ZombieEvents.StumbleTimeout);
         }
       },
 
       [ZombieTransitions.Attack]: (dt: number) => {
         tickTimers(gasser, dt);
+        gasser.npc.setCombatAnimationMode?.(true);
         const nearestSound = listenToSounds(gasser, gasser.server.sounds);
         if (nearestSound && shouldOverrideAction(nearestSound)) {
           gasser.lastNoisePos = nearestSound.position;
           gasser.event(ZombieEvents.HearNoise);
           return;
         }
-        applyAgitation(gasser);
-
         const attackTarget = getChaseTarget(gasser);
         if (!attackTarget || !attackTarget.isAlive) {
           if (gasser.hunger >= 30) {
@@ -520,62 +664,187 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
           gasser.event(ZombieEvents.LostPlayer);
           return;
         }
+        gasser.npc.setLookAtCharacter?.(gasser.targetCharacterId);
 
         chargeGas(gasser);
 
         gasser.npc.lookAtTarget = attackTarget.position;
-        moveToward(gasser.npc, attackTarget.position, gasser.server);
+        gasser.npc.lookAt(attackTarget.position, dt);
         const attackDist = getDistance(
           gasser.npc.state.position,
           attackTarget.position
         );
+        const meleeRange = getMeleeRange(gasser);
         if (attackDist > GAS_SPIT_RANGE) {
-          gasser.event(ZombieEvents.PlayerBacked);
-        } else if (gasser.lastAttackTime > 2) {
-          if (
-            attackDist <= MELEE_SLASH_RANGE &&
-            gasser.ChargeGas >= 100 &&
-            Math.random() < 0.3
-          ) {
-            gasser.event(ZombieEvents.ReleaseGas);
-          } else if (attackDist <= MELEE_SLASH_RANGE) {
-            gasser.event(ZombieEvents.StartAttacking);
+          gasser.npc.setLocomotionMode?.("sprint");
+          if (moveToward(gasser.npc, attackTarget.position, gasser.server)) {
+            applyAgitation(gasser);
+            gasser.event(ZombieEvents.PlayerBacked);
+          } else {
+            gasser.npc.setSpeed(0);
+          }
+        } else if (attackDist > meleeRange) {
+          // Reaching the gas envelope does not mean the gasser is in melee
+          // range.  Keep closing with the nav agent until the configured
+          // weapon envelope is reached; otherwise it can remain in Attack at
+          // 2..10m with maxSpeed=0 and never start a valid action.
+          gasser.npc.setLocomotionMode?.("sprint");
+          if (moveToward(gasser.npc, attackTarget.position, gasser.server)) {
+            applyAgitation(gasser);
+          } else {
+            gasser.npc.setSpeed(0);
+          }
+        } else {
+          // The gasser is inside its action envelope (melee or gas).  It must
+          // hold position while the selected action starts; only the chase
+          // branch above should publish sprint movement.
+          gasser.npc.setLocomotionMode?.("walk");
+          gasser.npc.stopMovement();
+          const inStrikeEnvelope =
+            gasser.npc.isMeleeTargetInEnvelope?.(attackTarget.position) ?? true;
+          const unobstructed =
+            gasser.npc.hasMeleeLineOfSight?.(attackTarget.position) ?? true;
+          if (gasser.lastAttackTime > 2) {
+            if (
+              attackDist <= meleeRange &&
+              inStrikeEnvelope &&
+              unobstructed &&
+              gasser.ChargeGas >= 100 &&
+              Math.random() < 0.3
+            ) {
+              gasser.event(ZombieEvents.ReleaseGas);
+            } else if (attackDist <= meleeRange && inStrikeEnvelope && unobstructed) {
+              gasser.event(ZombieEvents.StartAttacking);
+            }
           }
         }
       },
 
       [ZombieTransitions.Attacking]: (dt: number) => {
+        const stateTimerBefore = gasser.stateTimer;
         gasser.hunger = Math.min(100, gasser.hunger + dt * 2);
-        gasser.stateTimer += dt * 2;
+        // All three actions are driven by the same client one-shot clock.
+        // Advancing non-melee actions at 2x made the server enter the
+        // recovery branch before Spit/GasConvulse had elapsed; the active
+        // clip guard hid the error for production Npcs but left the FSM's
+        // phase and diagnostics one action ahead.  Keep one authoritative
+        // seconds clock and resolve the selected clip's duration below.
+        gasser.stateTimer += dt;
         gasser.lastAttackTime += dt;
+        gasser.npc.setCombatAnimationMode?.(true);
         chargeGas(gasser);
-        const nearestSound = listenToSounds(gasser, gasser.server.sounds);
-        if (nearestSound && shouldOverrideAction(nearestSound)) {
-          gasser.lastNoisePos = nearestSound.position;
-          gasser.event(ZombieEvents.HearNoise);
+
+        // Do not interrupt KnifeSlash, Spit, or GasConvulse with a sound
+        // transition.  The old branch could replace the active graph event
+        // and install a chase target before SwingContact/convulsion finished;
+        // consume the sound from Attack after this one-shot has handed back
+        // to its persistent loop.
+
+        const attackTarget = getChaseTarget(gasser);
+        if (attackTarget && gasser.targetCharacterId) {
+          gasser.npc.setLookAtCharacter?.(gasser.targetCharacterId);
+        }
+
+        const attackAnimation =
+          attackAction === "melee"
+            ? ZombieOneshotAnim.KnifeSlash
+            : attackAction === "spit"
+              ? ZombieOneshotAnim.Spit
+              : gasStaggerStarted
+              ? ZombieOneshotAnim.Stagger_Light
+                : ZombieOneshotAnim.GasConvulse;
+        const attackDuration =
+          attackAction === "melee"
+            ? getMeleeAttackDuration(gasser)
+            : getActionDuration(gasser, attackAnimation);
+        const attackClipState = gasser.npc.isAnimationActive?.(attackAnimation);
+
+        if (
+          attackAction === "gas" &&
+          !gasStaggerStarted &&
+          gasser.stateTimer >= attackDuration &&
+          !(attackClipState ?? false)
+        ) {
+          // The gas cloud was emitted on ReleaseGas.  Only after the native
+          // convulsion clock has ended may the recovery clip begin.
+          gasStaggerStarted = true;
+          gasser.stateTimer = 0;
+          gasser.npc.playAnimation(ZombieOneshotAnim.Stagger_Light);
           return;
         }
 
-        const attackTarget = getChaseTarget(gasser);
-        if (attackTarget) {
-          gasser.npc.lookAt(attackTarget.position, dt);
-        }
-
-        if (gasser.stateTimer >= 2) {
-          if (attackTarget) {
+        if (attackAction === "melee") {
+          const contactWindow = gasser.npc.getMeleeContactWindow?.();
+          const contactStart = contactWindow
+            ? attackDuration * contactWindow.startFraction
+            : attackDuration;
+          const contactEnd = contactWindow
+            ? attackDuration * contactWindow.endFraction
+            : attackDuration;
+          const contactActive =
+            (attackClipState ?? true) &&
+            stateTimerBefore < attackDuration &&
+            stateTimerBefore <= contactEnd &&
+            gasser.stateTimer >= contactStart;
+          if (!gasser.attackDamageApplied && contactActive) {
+            if (
+              attackTarget?.isAlive &&
+              !attackTarget.isVanished &&
+              !attackTarget.isHidden
+            ) {
+              const facingTarget = isFacingTarget(
+                gasser.npc.state.position,
+                gasser.npc.state.yaw ?? 0,
+                attackTarget.position
+              );
+              const inStrikeEnvelope =
+                gasser.npc.isMeleeTargetInEnvelope?.(
+                  attackTarget.position,
+                  gasser.npc.state.position,
+                  gasser.attackForward ?? undefined
+                ) ??
+                (getDistance(
+                  gasser.npc.state.position,
+                  attackTarget.position
+                ) <= getMeleeRange(gasser) && facingTarget);
+              const unobstructed =
+                gasser.npc.hasMeleeLineOfSight?.(attackTarget.position) ?? true;
+              const crossedContactEnd =
+                stateTimerBefore < contactEnd && gasser.stateTimer > contactEnd;
+              if (
+                inStrikeEnvelope &&
+                unobstructed &&
+                (!crossedContactEnd || gasser.attackEnvelopeWasActive)
+              ) {
+                applyDamageToTarget(gasser);
+                gasser.attackDamageApplied = true;
+              }
+              gasser.attackEnvelopeWasActive = inStrikeEnvelope;
+            } else {
+              gasser.attackEnvelopeWasActive = false;
+            }
+          } else if (attackTarget?.isAlive) {
             const facingTarget = isFacingTarget(
               gasser.npc.state.position,
               gasser.npc.state.yaw ?? 0,
               attackTarget.position
             );
-            if (
-              getDistance(gasser.npc.state.position, attackTarget.position) <=
-                MELEE_SLASH_RANGE &&
-              facingTarget
-            ) {
-              applyDamageToTarget(gasser);
-            }
+            gasser.attackEnvelopeWasActive =
+              gasser.npc.isMeleeTargetInEnvelope?.(
+                attackTarget.position,
+                gasser.npc.state.position,
+                gasser.attackForward ?? undefined
+              ) ??
+              (getDistance(
+                gasser.npc.state.position,
+                attackTarget.position
+              ) <= getMeleeRange(gasser) && facingTarget);
+          } else {
+            gasser.attackEnvelopeWasActive = false;
           }
+        }
+
+        if (gasser.stateTimer >= attackDuration && !(attackClipState ?? false)) {
           gasser.event(ZombieEvents.DoneAttacking);
         }
       },
@@ -583,19 +852,21 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
       [ZombieTransitions.Feed]: (dt: number) => {
         gasser.stateTimer += dt;
         gasser.lastAttackTime += dt;
+        gasser.npc.setCombatAnimationMode?.(false);
+        gasser.npc.setLocomotionMode?.("walk");
         const nearestSound = listenToSounds(gasser, gasser.server.sounds);
         if (nearestSound && shouldOverrideAction(nearestSound)) {
           gasser.lastNoisePos = nearestSound.position;
           gasser.event(ZombieEvents.HearNoise);
           return;
         }
-        applyAgitation(gasser);
 
         if (gasser.corpseTargetId) {
           const corpse = gasser.server._characters[gasser.corpseTargetId];
           if (!corpse || corpse.isAlive) {
             gasser.corpseTargetId = null;
             gasser.isEatingCorpse = false;
+            gasser.npc.setLookAtCharacter?.(null);
             gasser.event(ZombieEvents.DoneFeeding);
             return;
           }
@@ -606,7 +877,11 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
             );
             if (dist > 2) {
               gasser.npc.lookAtTarget = corpse.state.position;
-              moveToward(gasser.npc, corpse.state.position, gasser.server);
+              if (moveToward(gasser.npc, corpse.state.position, gasser.server)) {
+                applyAgitation(gasser);
+              } else {
+                gasser.npc.setSpeed(0);
+              }
               return;
             }
             gasser.npc.lookAtTarget = null;
@@ -615,6 +890,7 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
         }
 
         if (!gasser.isEatingCorpse) {
+          gasser.npc.setSpeed(0);
           // wait for the nav agent to fully decelerate before starting the anim
           const vel = gasser.npc.navAgent?.velocity();
           const speed = vel ? Math.sqrt(vel.x * vel.x + vel.z * vel.z) : 0;
@@ -622,6 +898,8 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
           gasser.npc.setAnimation(ZombieLoopingAnim.Eating);
           gasser.isEatingCorpse = true;
           gasser.stateTimer = 0;
+        } else {
+          gasser.npc.setSpeed(0);
         }
 
         gasser.hunger = Math.max(0, gasser.hunger - dt * 15);
@@ -649,13 +927,22 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
         to: ZombieTransitions.Investigate,
         EnterTransition: () => {
           gasser.stateTimer = 0;
+          gasser.npc.setLocomotionMode?.("walk");
           gasser.targetCharacterId = null;
+          gasser.npc.setLookAtCharacter?.(null);
           gasser.corpseTargetId = null;
           gasser.isEatingCorpse = false;
           gasser.npc.lookAtTarget = null;
+          gasser.npc.setLookAtCharacter?.(null);
           gasser.targetPos = gasser.lastNoisePos;
-          if (gasser.targetPos)
-            moveToward(gasser.npc, gasser.targetPos, gasser.server);
+          if (gasser.targetPos) {
+            if (!moveToward(gasser.npc, gasser.targetPos, gasser.server)) {
+              gasser.targetPos = null;
+              gasser.npc.setSpeed(0);
+            } else {
+              applyAgitation(gasser);
+            }
+          }
         }
       },
       {
@@ -666,7 +953,17 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
           ZombieTransitions.Idle
         ],
         to: ZombieTransitions.Chase,
-        EnterTransition: undefined
+        EnterTransition: () => {
+          gasser.npc.setCombatAnimationMode?.(true);
+          gasser.npc.setLocomotionMode?.("sprint");
+          const chaseTarget = getChaseTarget(gasser);
+          if (chaseTarget) {
+            gasser.npc.setLookAtCharacter?.(gasser.targetCharacterId);
+            if (moveToward(gasser.npc, chaseTarget.position, gasser.server)) {
+              applyAgitation(gasser);
+            }
+          }
+        }
       },
       {
         eventId: ZombieEvents.SmellCorpse,
@@ -690,6 +987,8 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
         from: [ZombieTransitions.Chase],
         to: ZombieTransitions.Attack,
         EnterTransition: () => {
+          gasser.npc.stopMovement();
+          gasser.npc.setLocomotionMode?.("walk");
           gasser.lastAttackTime = 2;
         }
       },
@@ -699,15 +998,20 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
         to: ZombieTransitions.Stumble,
         EnterTransition: () => {
           gasser.npc.stopMovement();
+          gasser.npc.setLocomotionMode?.("walk");
           gasser.stateTimer = 0;
-          const anims = [
+          const anims: Array<
+            | ZombieOneshotAnim.StumbleA
+            | ZombieOneshotAnim.StumbleB
+            | ZombieOneshotAnim.StumbleC
+          > = [
             ZombieOneshotAnim.StumbleA,
             ZombieOneshotAnim.StumbleB,
             ZombieOneshotAnim.StumbleC
           ];
-          gasser.npc.playAnimation(
-            anims[Math.floor(Math.random() * anims.length)]
-          );
+          const selected = anims[Math.floor(Math.random() * anims.length)];
+          gasser.stumbleAnimation = selected;
+          gasser.npc.playAnimation(selected);
         }
       },
       {
@@ -716,9 +1020,15 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
         to: ZombieTransitions.Chase,
         EnterTransition: () => {
           gasser.stateTimer = 0;
+          gasser.stumbleAnimation = undefined;
+          gasser.npc.setCombatAnimationMode?.(true);
+          gasser.npc.setLocomotionMode?.("sprint");
           const chaseTarget = getChaseTarget(gasser);
           if (chaseTarget) {
-            moveToward(gasser.npc, chaseTarget.position, gasser.server);
+            gasser.npc.setLookAtCharacter?.(gasser.targetCharacterId);
+            if (moveToward(gasser.npc, chaseTarget.position, gasser.server)) {
+              applyAgitation(gasser);
+            }
           }
         }
       },
@@ -727,6 +1037,16 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
         from: [ZombieTransitions.Attack],
         to: ZombieTransitions.Attacking,
         EnterTransition: () => {
+          attackAction = "melee";
+          gasStaggerStarted = false;
+          gasser.npc.stopMovement();
+          gasser.npc.setLocomotionMode?.("walk");
+          const target = getChaseTarget(gasser);
+          gasser.attackForward = target
+            ? getAttackForward(gasser.npc, target.position)
+            : null;
+          gasser.attackDamageApplied = false;
+          gasser.attackEnvelopeWasActive = false;
           gasser.npc.playAnimation(ZombieOneshotAnim.KnifeSlash);
           gasser.stateTimer = 0;
           gasser.lastAttackTime = 0;
@@ -737,6 +1057,13 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
         from: [ZombieTransitions.Attack],
         to: ZombieTransitions.Attacking,
         EnterTransition: () => {
+          attackAction = "spit";
+          gasStaggerStarted = false;
+          gasser.attackForward = null;
+          gasser.attackDamageApplied = false;
+          gasser.attackEnvelopeWasActive = false;
+          gasser.npc.stopMovement();
+          gasser.npc.setLocomotionMode?.("walk");
           gasser.npc.playAnimation(ZombieOneshotAnim.Spit);
           gasser.stateTimer = 0;
           gasser.lastAttackTime = 0;
@@ -747,13 +1074,17 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
         from: [ZombieTransitions.Attack],
         to: ZombieTransitions.Attacking,
         EnterTransition: () => {
+          attackAction = "gas";
+          gasser.attackForward = null;
+          gasser.attackDamageApplied = false;
+          gasser.attackEnvelopeWasActive = false;
           gasser.npc.stopMovement();
+          gasser.npc.setLocomotionMode?.("walk");
           gasser.npc.lookAtTarget = null;
+          gasser.npc.setLookAtCharacter?.(null);
           gasser.npc.playAnimation(ZombieOneshotAnim.GasConvulse);
           spawnGasCloud(gasser);
-          setTimeout(() => {
-            gasser.npc.playAnimation(ZombieOneshotAnim.Stagger_Light); // after gas release, play stagger animation to fix animation beeing stuck in gas convulse animation
-          }, 5000);
+          gasStaggerStarted = false;
           gasser.ChargeGas = 0;
           gasser.stateTimer = 0;
           gasser.lastAttackTime = 2;
@@ -764,6 +1095,14 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
         from: [ZombieTransitions.Attacking],
         to: ZombieTransitions.Attack,
         EnterTransition: () => {
+          gasser.attackForward = null;
+          gasser.attackDamageApplied = false;
+          gasser.attackEnvelopeWasActive = false;
+          gasStaggerStarted = false;
+          // Spit/GasConvulse and KnifeSlash are all one-shot graph events.
+          // Their shared Attacking state must end on a persistent reset rather
+          // than leaving the last action pose latched for current observers.
+          gasser.npc.setAnimation(ZombieLoopingAnim.Idle);
           gasser.lastAttackTime = 2;
         }
       },
@@ -781,7 +1120,17 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
         eventId: ZombieEvents.PlayerBacked,
         from: [ZombieTransitions.Attack],
         to: ZombieTransitions.Chase,
-        EnterTransition: undefined
+        EnterTransition: () => {
+          gasser.npc.setCombatAnimationMode?.(true);
+          gasser.npc.setLocomotionMode?.("sprint");
+          const chaseTarget = getChaseTarget(gasser);
+          if (chaseTarget) {
+            gasser.npc.setLookAtCharacter?.(gasser.targetCharacterId);
+            if (moveToward(gasser.npc, chaseTarget.position, gasser.server)) {
+              applyAgitation(gasser);
+            }
+          }
+        }
       },
       {
         eventId: ZombieEvents.PlayerKilled,
@@ -815,6 +1164,7 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
           gasser.isCoveringEars = true;
           gasser.coverEarsTimer = 0;
           gasser.targetCharacterId = null;
+          gasser.npc.setLookAtCharacter?.(null);
           gasser.npc.lookAtTarget = null;
           gasser.wanderOrigin =
             gasser.npc.state.position.slice() as Float32Array;
@@ -834,16 +1184,32 @@ export function createGasser(npc: Npc, server: ZoneServer2016): ZombieInstance {
   gasser.id = npc.characterId;
   gasser.npc = npc;
   gasser.server = server;
+  gasser.npc.initializeAnimation?.(ZombieLoopingAnim.Idle);
   gasser.hunger = 0;
   gasser.agitation = AGITATION_INITIAL;
+  // Configure the initial patrol before requesting its target.  Do not publish
+  // a walk speed until Recast accepts the target, so an off-mesh spawn stays
+  // in a standing graph instead of running in place for one observer frame.
+  gasser.npc.setLocomotionMode?.("walk");
   gasser.wanderOrigin = npc.state.position.slice() as Float32Array;
   const initialPatrol = pickPatrolPoint(server, npc.state.position);
   gasser.targetPos = initialPatrol;
   if (initialPatrol) {
-    moveToward(npc, initialPatrol, server);
+    if (moveToward(npc, initialPatrol, server)) {
+      applyAgitation(gasser);
+    } else {
+      gasser.targetPos = null;
+      npc.setSpeed(0);
+    }
+  } else {
+    npc.setSpeed(0);
   }
   gasser.lastNoisePos = null;
   gasser.targetCharacterId = null;
+  gasser.attackForward = null;
+  gasser.attackDamageApplied = false;
+  gasser.attackEnvelopeWasActive = false;
+  gasStaggerStarted = false;
   gasser.corpseTargetId = null;
   gasser.isEatingCorpse = false;
   gasser.stateTimer = 0;

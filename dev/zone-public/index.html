@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zone 开发工具 - 客户端列表 / 僵尸 / 代发包</title>
+  <style>
+    :root { --bg: #1a1b26; --panel: #24283b; --text: #c0caf5; --accent: #7aa2f7; --muted: #565f89; }
+    * { box-sizing: border-box; }
+    body { font-family: ui-sans-serif, system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 1rem; min-height: 100vh; }
+    h1 { font-size: 1.25rem; margin: 0 0 1rem; color: var(--accent); }
+    section { background: var(--panel); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+    section h2 { font-size: 0.9rem; margin: 0 0 0.5rem; color: var(--muted); font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--muted); }
+    th { color: var(--muted); font-weight: 600; }
+    tr:hover { background: rgba(122, 162, 247, 0.08); }
+    button { background: var(--accent); color: var(--bg); border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    button:hover { filter: brightness(1.1); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.secondary { background: var(--muted); }
+    .ucs-actions button { cursor: pointer; position: relative; z-index: 2; pointer-events: auto; }
+    .ucs-block { position: relative; z-index: 1; overflow: visible; }
+    input, select, textarea { background: var(--bg); color: var(--text); border: 1px solid var(--muted); padding: 0.5rem; border-radius: 6px; width: 100%; max-width: 40rem; font-family: inherit; }
+    textarea { min-height: 120px; resize: vertical; }
+    label { display: block; margin-bottom: 0.25rem; font-size: 0.85rem; color: var(--muted); }
+    .row { margin-bottom: 0.75rem; }
+    .status { font-size: 0.8rem; color: var(--muted); margin-top: 0.5rem; }
+    .error { color: #f7768e; }
+    .ok { color: #9ece6a; }
+    .targetHint { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.25rem; }
+    .flex { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .test-spawned-badge { background: rgba(158, 206, 106, 0.2); color: #9ece6a; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.9rem; border: 1px solid rgba(158, 206, 106, 0.4); }
+    .test-spawned-badge strong { font-family: ui-monospace, monospace; }
+  </style>
+</head>
+<body>
+  <h1>Zone 开发工具</h1>
+
+  <section>
+    <h2>角色信息 <span class="status" id="clientsStatus">每 2s 刷新</span></h2>
+    <table id="clientsTable" style="margin-top: 0.5rem;">
+      <thead>
+        <tr><th>sessionId</th><th>characterId</th><th>name</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div class="targetHint" id="targetHint"></div>
+  </section>
+
+  <section style="border: 1px solid var(--accent);">
+    <h2>文字消息测试</h2>
+    <p style="font-size: 0.85rem; color: var(--muted); margin: 0 0 0.75rem;">若 117 包对僵尸/对自己都没任何动画：先点下面任一按钮，看<strong>游戏里</strong>是否出现对应文字。若<strong>出现了</strong>，说明客户端在收包并处理，问题在 PlayAnimation 的前置或格式；若<strong>没出现</strong>，说明包没进客户端处理或通道有问题。</p>
+    <div class="flex" style="gap: 0.75rem; flex-wrap: wrap;">
+      <button type="button" id="btnVerifyChat">发一条可见消息（Chat.ChatText）</button>
+      <button type="button" id="btnVerifyTextAlert">发一条可见消息（ClientUpdate.TextAlert）</button>
+    </div>
+    <div class="status" id="verifyChannelStatus" style="margin-top: 0.5rem;"></div>
+  </section>
+
+  <section>
+    <h2>服务器转发原始包测试</h2>
+    <div class="row">
+      <label for="preset">预设</label>
+      <select id="preset">
+        <option value="">无（手动填包名和 data）</option>
+        <option value="Chat.ChatText">Chat.ChatText</option>
+        <option value="Character.PlayAnimation">Character.PlayAnimation（僵尸动画，填 characterId 等）</option>
+        <option value="playanim-self">对自己发 PlayAnimation（characterId=self，立刻看自己角色是否播动画）</option>
+        <option value="turn">转圈 (Character.PlayAnimation + State_Turning)</option>
+        <option value="Character.ManagedObject">Character.ManagedObject（车辆式 control 诊断）</option>
+        <option value="set-state">set-state（UpdateCharacterState，最近 NPC，填后点发送）</option>
+      </select>
+    </div>
+    <div class="row">
+      <label for="packetName">包名 (packet)</label>
+      <input id="packetName" type="text" placeholder="例如 Character.PlayAnimation" />
+    </div>
+    <div class="row" id="targetRow">
+      <label for="target">接收端（仅多个游戏连接同时在线时需填）</label>
+      <input id="target" type="text" placeholder="只有一个连接时自动发往该客户端；填 sessionId / 角色名 / 玩家 characterId" />
+    </div>
+    <div class="row">
+      <label for="dataJson">data（JSON 对象）</label>
+      <textarea id="dataJson" placeholder='{"characterId": "僵尸ID 或 self（对自己）", "animationName": "State_Turning"}'></textarea>
+    </div>
+    <button type="button" id="btnSend">发送</button>
+    <div class="status" id="sendStatus"></div>
+  </section>
+
+  <section>
+    <h2>服务端转发原始 raw 测试</h2>
+    <p style="font-size: 0.85rem; color: var(--muted); margin: 0 0 0.75rem;">绕过协议序列化，直接发送你提供的原始十六进制字节。用于排查服务端构建包是否正确。curl 端口同本页，见启动日志 <code>[DevHttp] listening on http://127.0.0.1:PORT</code></p>
+    <div class="flex" style="gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
+      <button type="button" id="btnFillChatRaw">填充 Chat.ChatText 验证 raw</button>
+    </div>
+    <div class="row">
+      <label for="rawHex">原始 hex（完整包：opcode + payload，无空格或 0x 前缀）</label>
+      <textarea id="rawHex" placeholder="0f0af2eb53835892956300000000000000000000010000000004000001000000" style="min-height: 80px; font-family: ui-monospace, monospace;"></textarea>
+    </div>
+    <button type="button" id="btnSendRaw">发送 raw</button>
+    <div class="status" id="sendRawStatus"></div>
+    <div class="targetHint" style="margin-top: 0.5rem; font-family: ui-monospace, monospace; font-size: 0.72rem;" id="curlHint">
+      <div>curl -X POST http://127.0.0.1:<span id="apiPort">13371</span>/api/send-raw -H "Content-Type: application/json" -d '{"rawHex":"0f0a..."}'</div>
+      <div style="margin-top:0.25rem">curl -X POST http://127.0.0.1:<span id="apiPortUcs">13371</span>/api/npcs/send-update-character-state -H "Content-Type: application/json" -d "{}"</div>
+      <div style="margin-top:0.25rem">curl -X POST http://127.0.0.1:<span id="apiPortUcs">13371</span>/api/npcs/send-update-character-state -H "Content-Type: application/json" -d "{\"characterId\":\"self\"}"</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>临时僵尸驱动测试</h2>
+    <div class="row">
+      <div class="test-spawned-badge">
+        当前测试僵尸 ID：<strong id="testZombieId">（暂无，请用测试命令刷一只）</strong>
+      </div>
+    </div>
+    <p class="targetHint" style="margin-top: 0.5rem;">
+      <strong>spawnedEntities：</strong>测试僵尸在 <code>test-zombie-in-front.ts</code> 里已对<strong>刷怪客户端</strong>执行 <code>client.spawnedEntities.add(zombie)</code>（与「只加物品」不同，僵尸引用已在 Set 里）。
+      <code>sendDataToAllWithSpawnedEntity</code> 用 <code>_npcs[id]</code> 与 Set 里引用比对，故单客户端实验可收到。
+      多玩家时其他客户端若未 <code>add</code> 同一只 <code>Npc</code> 则收不到本广播。
+    </p>
+    <p class="targetHint" style="margin-top: 0.35rem;">
+      <strong>UpdateCharacterState 能给僵尸用吗：</strong>首刷 <code>sendStandardFullNpcInit</code> 已对 NPC 发过同名包；逆向主线按 <code>characterId</code> 进 character 包泵，NPC/PC 同源可能，但 proxied NPC 是否完整走 case9/MRN 仍以实机为准。
+    </p>
+    <p class="targetHint" style="margin-top: 0.5rem;">下面两排：第一排目标为<strong>测试僵尸</strong>（默认 <code>characterId: test</code>）；第二排目标为<strong>当前连接角色自己</strong>（<code>characterId: self</code>），用于和僵尸对照。UCS case9 sweep 亦支持 <code>characterId: self</code>（POST <code>/api/npcs/ucs-case9-sweep</code>，需能解析接收端）。</p>
+    <div class="flex" style="gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
+      <button type="button" id="btnSendUcsNpcSendData" title="POST /api/npcs/send-update-character-state">sendData：测试僵尸 UpdateCharacterState（Zone 32B）</button>
+      <button type="button" id="btnSetState">RAW填充 UCS（hidesHeat：优先 32B case9 桥接）</button>
+      <button type="button" id="btnFillUcsHidesHeat" title="GET /api/npcs/ucs-case9-from-h1emu?hidesHeat=1">RAW填充 UCS 32B（仅 hidesHeat，schema→wire）</button>
+      <button type="button" id="btnActivateProfile0">ActivateProfile selector=0（后台封包·僵尸）</button>
+      <button type="button" id="btnActivateProfileSweep">ActivateProfile sweep 1-49（后台封包·僵尸）</button>
+    </div>
+    <div class="flex" style="gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
+      <button type="button" id="btnSendUcsSelfSendData" title="POST send-update-character-state + characterId:self">sendData：自己 UpdateCharacterState（Zone 32B）</button>
+      <button type="button" id="btnActivateProfile0Self">ActivateProfile selector=0（后台封包·自己）</button>
+      <button type="button" id="btnActivateProfileSweepSelf">ActivateProfile sweep 1-49（后台封包·自己）</button>
+    </div>
+
+    <div class="row ucs-block" style="margin-top: 1rem; border-top: 1px solid var(--muted); padding-top: 0.75rem;">
+      <label>UCS case9（re-track 22B）— 测试僵尸状态掩码</label>
+      <p style="font-size: 0.85rem; color: var(--muted); margin: 0 0 0.5rem;">目标为上方<strong>当前测试僵尸 ID</strong>，<code>characterId</code> 与 <code>gameTime</code> 由服务端自动填入（与 Zone 其它封包一致）。仅需填 <strong>Q1</strong>（掩码，十进制或 0x）。「填充」会写入上一区块的「原始 hex」框，再点该区块的「发送 raw」即可；扫位由后台直接发往接收端。<strong>测 states6 / hidesHeat</strong>：用上一排「RAW填充 UCS（hidesHeat）」或「仅 hidesHeat」——发往客户端需 <strong>32B</strong>（opcode+charId+22B），勿只用短 schema 包。</p>
+      <div class="flex" style="gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+        <input id="ucsQ1" type="text" placeholder="Q1 掩码（十进制或 0x…）" style="max-width: 14rem;" value="1" title="Q1 → entity+0x35b" />
+      </div>
+      <div class="flex ucs-actions" style="gap: 0.5rem; flex-wrap: wrap;">
+        <button type="button" id="btnFillUcsCase9">填充 UCS 32B 到上方「原始 hex」</button>
+        <button type="button" id="btnUcsSweepLow">后台发：Q1 逐 bit 0–31</button>
+        <button type="button" id="btnUcsSweepHigh">后台发：Q1 逐 bit 32–63</button>
+        <button type="button" id="btnUcsSweepLowSelf" title="characterId=self，对照玩家是否同样出现 5141A0 喂参错层">给自己：Q1 逐 bit 0–31</button>
+        <button type="button" id="btnUcsSweepHighSelf" title="同上">给自己：Q1 逐 bit 32–63</button>
+      </div>
+      <div class="status" id="ucsDevStatus" style="margin-top: 0.5rem;"></div>
+    </div>
+    <div class="status" id="setStateStatus" style="margin-top: 0.5rem;"></div>
+  </section>
+
+  <script>
+    // 页面从 file:// 或非 DevHttp 端口(13371)打开时，API 需用绝对地址
+    const API_BASE = (typeof location !== 'undefined' && (location.protocol === 'file:' || location.port !== '13371'))
+      ? 'http://127.0.0.1:13371'
+      : '';
+    const POLL_INTERVAL_MS = 2000;
+
+    let clientsList = [];
+    let testZombieId = '';
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s == null ? '' : String(s);
+      return div.innerHTML;
+    }
+
+    async function fetchClients() {
+      const tbody = document.querySelector('#clientsTable tbody');
+      const status = document.getElementById('clientsStatus');
+      const targetHint = document.getElementById('targetHint');
+      const targetRow = document.getElementById('targetRow');
+      try {
+        const r = await fetch(API_BASE + '/api/clients');
+        if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+        const { clients } = await r.json();
+        clientsList = clients;
+        status.textContent = `共 ${clients.length} 个客户端，每 ${POLL_INTERVAL_MS / 1000}s 刷新`;
+        status.className = 'status ok';
+        tbody.innerHTML = '';
+        clients.forEach(c => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${escapeHtml(c.sessionId)}</td><td>${escapeHtml(c.characterId)}</td><td>${escapeHtml(c.name)}</td>`;
+          tbody.appendChild(tr);
+        });
+        if (clients.length === 1) {
+          targetHint.textContent = '当前仅 1 个客户端，发送时将自动发往该客户端。';
+          targetRow.style.display = 'none';
+        } else if (clients.length > 1) {
+          targetHint.textContent = '多个客户端同时在线，请在下方填写「接收端」。';
+          targetRow.style.display = 'block';
+        } else {
+          targetHint.textContent = '暂无在线客户端。';
+          targetRow.style.display = 'block';
+        }
+      } catch (e) {
+        status.textContent = '失败: ' + e.message;
+        status.className = 'status error';
+        targetHint.textContent = '';
+      }
+    }
+
+    async function fetchTestZombie() {
+      const idEl = document.getElementById('testZombieId');
+      try {
+        const r = await fetch(API_BASE + '/api/npcs/last-test');
+        if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+        const { lastSpawnedCharacterId } = await r.json();
+        testZombieId = (lastSpawnedCharacterId && String(lastSpawnedCharacterId).trim()) || '';
+        idEl.textContent = testZombieId || '（暂无，请用测试命令刷一只）';
+      } catch (e) {
+        idEl.textContent = '（获取失败）';
+        testZombieId = '';
+      }
+    }
+
+    const PRESETS = {
+      'Chat.ChatText': {
+        packet: 'Chat.ChatText',
+        data: { message: '来自开发工具的消息' }
+      },
+      'Character.PlayAnimation': {
+        packet: 'Character.PlayAnimation',
+        data: {
+          characterId: '0',
+          animationName: 'IdleAnim',
+          unm4: 0,
+          unknownDword1: 1430,
+          unknownByte1: 0,
+          unknownDword2: 1430,
+          animationType: '',
+          unknownByte1xda: 0,
+          unknownDword3: 1430
+        }
+      },
+      'playanim-self': {
+        packet: 'Character.PlayAnimation',
+        data: {
+          characterId: 'self',
+          animationName: 'IdleAnim',
+          unm4: 0,
+          unknownDword1: 1430,
+          unknownByte1: 0,
+          unknownDword2: 1430,
+          animationType: 'Movement',
+          unknownByte1xda: 0,
+          unknownDword3: 1430
+        }
+      },
+      'turn': {
+        packet: 'Character.PlayAnimation',
+        data: {
+          characterId: '',
+          animationName: 'State_Turning',
+          unm4: 0,
+          unknownDword1: 1430,
+          unknownByte1: 0,
+          unknownDword2: 1430,
+          animationType: 'Movement',
+          unknownByte1xda: 0,
+          unknownDword3: 1430
+        }
+      },
+      'Character.ManagedObject': {
+        packet: 'Character.ManagedObject',
+        data: {
+          objectCharacterId: 'test',
+          characterId: 'self'
+        }
+      },
+      'set-state': {
+        packet: 'Character.UpdateCharacterState',
+        data: {
+          characterId: '',
+          states6: { hidesHeat: true }
+        }
+      }
+    };
+
+    function applyPreset(presetKey) {
+      const p = PRESETS[presetKey];
+      if (!p) return;
+      let data = { ...p.data };
+      if (presetKey === 'turn' || presetKey === 'set-state') data.characterId = testZombieId || data.characterId || '0';
+      document.getElementById('packetName').value = p.packet;
+      document.getElementById('dataJson').value = JSON.stringify(data, null, 2);
+    }
+
+    const VERIFY_MESSAGE = '[Dev] 若你看到此句说明客户端在收包并处理';
+    async function verifySend(packet, data) {
+      const status = document.getElementById('verifyChannelStatus');
+      if (clientsList.length !== 1 && !document.getElementById('target').value.trim()) {
+        status.textContent = '多个连接同时在线请先填「接收端」，或只保留一个游戏连接';
+        status.className = 'status error';
+        return;
+      }
+      status.textContent = '发送中…';
+      status.className = 'status';
+      const body = { packet, data };
+      if (clientsList.length !== 1) body.target = document.getElementById('target').value.trim();
+      try {
+        const r = await fetch(API_BASE + '/api/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const res = await r.json().catch(() => ({}));
+        if (r.ok && res.ok) {
+          status.textContent = '已发送。请立刻看游戏内是否出现一段文字（聊天或屏幕提示）。';
+          status.className = 'status ok';
+        } else {
+          status.textContent = res.error || r.statusText || '发送失败';
+          status.className = 'status error';
+        }
+      } catch (e) {
+        status.textContent = '失败: ' + e.message;
+        status.className = 'status error';
+      }
+    }
+
+    document.getElementById('btnVerifyChat').addEventListener('click', function() {
+      verifySend('Chat.ChatText', { message: VERIFY_MESSAGE });
+    });
+    document.getElementById('btnVerifyTextAlert').addEventListener('click', function() {
+      verifySend('ClientUpdate.TextAlert', { message: VERIFY_MESSAGE });
+    });
+
+    document.getElementById('preset').addEventListener('change', function() {
+      applyPreset(this.value);
+    });
+
+    async function sendPacket() {
+      const packetName = document.getElementById('packetName').value.trim();
+      const targetInput = document.getElementById('target').value.trim();
+      const dataStr = document.getElementById('dataJson').value.trim();
+      const status = document.getElementById('sendStatus');
+      if (!packetName) {
+        status.textContent = '请填写包名';
+        status.className = 'status error';
+        return;
+      }
+      let data = {};
+      if (dataStr) {
+        try {
+          data = JSON.parse(dataStr);
+        } catch (e) {
+          status.textContent = 'data 不是合法 JSON: ' + e.message;
+          status.className = 'status error';
+          return;
+        }
+      }
+      const body = { packet: packetName, data };
+      if (targetInput) body.target = targetInput;
+      else if (clientsList.length !== 1) {
+        status.textContent = '多个连接同时在线，请填写「接收端」';
+        status.className = 'status error';
+        return;
+      }
+      status.textContent = '发送中…';
+      status.className = 'status';
+      try {
+        const r = await fetch(API_BASE + '/api/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const resBody = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          throw new Error(resBody.error || r.status + ' ' + r.statusText);
+        }
+        status.textContent = resBody.ok ? '已发送' : (resBody.error || '未知错误');
+        status.className = 'status ' + (resBody.ok ? 'ok' : 'error');
+      } catch (e) {
+        status.textContent = '失败: ' + e.message;
+        status.className = 'status error';
+      }
+    }
+
+    document.getElementById('btnSend').addEventListener('click', sendPacket);
+
+    async function sendRaw() {
+      const rawHex = document.getElementById('rawHex').value.trim().replace(/\s/g, '');
+      const status = document.getElementById('sendRawStatus');
+      if (!rawHex || !/^[0-9a-fA-F]+$/.test(rawHex)) {
+        status.textContent = '请填写有效十六进制（无空格、无 0x 前缀）';
+        status.className = 'status error';
+        return;
+      }
+      if (clientsList.length !== 1 && !document.getElementById('target').value.trim()) {
+        status.textContent = '多个连接同时在线，请填写「接收端」';
+        status.className = 'status error';
+        return;
+      }
+      status.textContent = '发送中…';
+      status.className = 'status';
+      const body = { rawHex };
+      if (clientsList.length !== 1) body.target = document.getElementById('target').value.trim();
+      try {
+        const r = await fetch(API_BASE + '/api/send-raw', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const resBody = await r.json().catch(() => ({}));
+        status.textContent = r.ok && resBody.ok ? '已发送 ' + resBody.bytes + ' 字节' : (resBody.error || '发送失败');
+        status.className = 'status ' + (r.ok && resBody.ok ? 'ok' : 'error');
+      } catch (e) {
+        status.textContent = '失败: ' + e.message;
+        status.className = 'status error';
+      }
+    }
+    document.getElementById('btnSendRaw').addEventListener('click', sendRaw);
+
+    function ucsTargetBody(extra) {
+      const body = Object.assign({}, extra);
+      if (clientsList.length === 0) {
+        return { error: '没有在线的游戏客户端（接收端），无法后台扫位。请先登录并等上方表格出现会话，或刷新页面。' };
+      }
+      if (clientsList.length > 1) {
+        const t = document.getElementById('target').value.trim();
+        if (!t) return { error: '多个连接同时在线时，请填写上方「接收端」（sessionId / 玩家 characterId / 角色名）' };
+        body.target = t;
+      }
+      return { body };
+    }
+
+    document.getElementById('btnFillUcsCase9').addEventListener('click', async function() {
+      const status = document.getElementById('ucsDevStatus');
+      status.textContent = '请求中…';
+      status.className = 'status';
+      const params = new URLSearchParams();
+      if (testZombieId) params.set('characterId', testZombieId);
+      const q1 = (document.getElementById('ucsQ1').value || '').trim() || '1';
+      params.set('q1', q1);
+      try {
+        const r = await fetch(API_BASE + '/api/npcs/ucs-case9-raw-hex?' + params.toString());
+        const res = await r.json().catch(() => ({}));
+        if (!r.ok || !res.ok) {
+          status.textContent = res.error || r.statusText || '失败';
+          status.className = 'status error';
+          return;
+        }
+        document.getElementById('rawHex').value = res.hex || '';
+        const lb = res.lengthBreakdown;
+        const lbStr = lb ? '（' + lb.total + 'B=' + lb.opcode + '+' + lb.characterIdWire + '+' + lb.payloadReTrack22 + '）' : '';
+        status.textContent = '已填充 ' + (res.bytes || 0) + 'B' + lbStr + '，僵尸=' + (res.characterId || '') + '，gameTime 已由服务端填入 → 到上一区块点「发送 raw」';
+        status.className = 'status ok';
+      } catch (e) {
+        status.textContent = '失败: ' + e.message;
+        status.className = 'status error';
+      }
+    });
+
+    async function postUcsSweep(bitStart, bitEnd, characterId) {
+      const status = document.getElementById('ucsDevStatus');
+      const cid = characterId != null && String(characterId).trim() !== ''
+        ? String(characterId).trim()
+        : 'test';
+      const { body, error } = ucsTargetBody({
+        characterId: cid,
+        bitStart,
+        bitEnd,
+        delayMs: 120,
+        incrementGameTime: true
+      });
+      if (error) {
+        status.textContent = error;
+        status.className = 'status error';
+        return;
+      }
+      status.textContent = 'sweep bit ' + bitStart + '–' + bitEnd + ' 发送中…';
+      status.className = 'status';
+      try {
+        const r = await fetch(API_BASE + '/api/npcs/ucs-case9-sweep', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const res = await r.json().catch(() => ({}));
+        if (r.ok && res.ok) {
+          status.textContent = 'sweep 完成：' + (res.count || 0) + ' 包 → ' + (res.characterId || '') + '（目标 ' + cid + '），delay ' + (res.delayMs ?? '') + 'ms';
+          status.className = 'status ok';
+        } else {
+          status.textContent = res.error || r.statusText || '失败';
+          status.className = 'status error';
+        }
+      } catch (e) {
+        status.textContent = '失败: ' + e.message;
+        status.className = 'status error';
+      }
+    }
+
+    document.getElementById('btnUcsSweepLow').addEventListener('click', function() {
+      postUcsSweep(0, 31, 'test');
+    });
+    document.getElementById('btnUcsSweepHigh').addEventListener('click', function() {
+      postUcsSweep(32, 63, 'test');
+    });
+    document.getElementById('btnUcsSweepLowSelf').addEventListener('click', function() {
+      postUcsSweep(0, 31, 'self');
+    });
+    document.getElementById('btnUcsSweepHighSelf').addEventListener('click', function() {
+      postUcsSweep(32, 63, 'self');
+    });
+
+    document.getElementById('btnFillChatRaw').addEventListener('click', async function() {
+      const status = document.getElementById('sendRawStatus');
+      try {
+        const r = await fetch(API_BASE + '/api/chat-text-raw-hex');
+        if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+        const { hex } = await r.json();
+        document.getElementById('rawHex').value = hex || '';
+        status.textContent = hex ? '已填充，点「发送 raw」测试' : '获取 hex 失败';
+        status.className = 'status ' + (hex ? 'ok' : 'error');
+      } catch (e) {
+        status.textContent = '失败: ' + e.message;
+        status.className = 'status error';
+      }
+    });
+
+    document.getElementById('btnSetState').addEventListener('click', async function() {
+      const status = document.getElementById('setStateStatus');
+      status.textContent = '获取中…';
+      status.className = 'status';
+      try {
+        const r = await fetch(API_BASE + '/api/npcs/set-state-raw-hex');
+        const txt = await r.text();
+        let res;
+        try {
+          res = JSON.parse(txt);
+        } catch (_) {
+          const url = API_BASE + '/api/npcs/set-state-raw-hex';
+          status.textContent = '响应解析失败（非 JSON）。请求: ' + url + '，HTTP ' + r.status + '，前 200 字: ' + (txt.length > 200 ? txt.slice(0, 200) + '…' : txt) + '。请通过 http://127.0.0.1:13371/ 打开页面';
+          status.className = 'status error';
+          return;
+        }
+        const errMsg = res && res.error ? res.error : (r.ok ? 'hex 为空' : (r.status + ' ' + (r.statusText || '')));
+        if (!r.ok) {
+          status.textContent = errMsg;
+          status.className = 'status error';
+          return;
+        }
+        const bridge32 = res && res.case9Bridge && res.case9Bridge.hex32;
+        const hexShort = res && res.hex;
+        const hex = bridge32 || hexShort;
+        if (hex) {
+          document.getElementById('rawHex').value = hex;
+          const n = (hex.length / 2) | 0;
+          status.textContent = bridge32
+            ? '已填充 32B case9 桥接（hidesHeat，characterId=' +
+              (res.characterId || '') +
+              '，states6@15=' +
+              (res.case9Bridge && res.case9Bridge.states6ByteAtOffset15 != null
+                ? '0x' + Number(res.case9Bridge.states6ByteAtOffset15).toString(16)
+                : '?') +
+              '）→ 到上方「发送 raw」'
+            : '仅短包 ' +
+              n +
+              'B（无 case9Bridge）→ 客户端可能不解析；请重启 Zone 使用新 API 或减少错误… characterId=' +
+              (res.characterId || '');
+          status.className = 'status ok';
+        } else {
+          status.textContent = errMsg;
+          status.className = 'status error';
+        }
+      } catch (e) {
+        status.textContent = '请求失败: ' + (e && e.message ? e.message : String(e));
+        status.className = 'status error';
+      }
+    });
+
+    document.getElementById('btnFillUcsHidesHeat').addEventListener('click', async function() {
+      const status = document.getElementById('setStateStatus');
+      status.textContent = '请求 ucs-case9-from-h1emu…';
+      status.className = 'status';
+      const params = new URLSearchParams();
+      params.set('hidesHeat', '1');
+      if (testZombieId) params.set('characterId', testZombieId);
+      try {
+        const r = await fetch(API_BASE + '/api/npcs/ucs-case9-from-h1emu?' + params.toString());
+        const res = await r.json().catch(() => ({}));
+        if (!r.ok || !res.ok) {
+          status.textContent = res.error || r.statusText || '失败';
+          status.className = 'status error';
+          return;
+        }
+        const hex32 = res.hex32 || '';
+        if (hex32) {
+          document.getElementById('rawHex').value = hex32;
+          status.textContent =
+            '已填充 32B（ucs-case9-from-h1emu hidesHeat，q1=' +
+            (res.bridge && res.bridge.q1Hex ? '0x' + res.bridge.q1Hex : '?') +
+            '）→ 点「发送 raw」';
+          status.className = 'status ok';
+        } else {
+          status.textContent = '响应无 hex32';
+          status.className = 'status error';
+        }
+      } catch (e) {
+        status.textContent = '请求失败: ' + (e && e.message ? e.message : String(e));
+        status.className = 'status error';
+      }
+    });
+
+    async function postActivateProfile(body) {
+      const status = document.getElementById('setStateStatus');
+      status.textContent = '请求中…';
+      status.className = 'status';
+      try {
+        const r = await fetch(API_BASE + '/api/npcs/activate-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const res = await r.json().catch(() => ({}));
+        if (r.ok && res.ok !== false) {
+          const who = res.characterId ? ' → ' + res.characterId : '';
+          status.textContent = res.sweep
+            ? 'sweep 完成: ' + (res.sweep && res.sweep.length) + ' 个 selector' + who
+            : '已发送 selector=' + (res.selector ?? '') + '，' + (res.packetLength ?? '') + ' 字节' + who;
+          status.className = 'status ok';
+        } else {
+          status.textContent = res.error || r.status + ' ' + r.statusText || '请求失败';
+          status.className = 'status error';
+        }
+      } catch (e) {
+        status.textContent = '失败: ' + (e && e.message ? e.message : String(e));
+        status.className = 'status error';
+      }
+    }
+    document.getElementById('btnActivateProfile0').addEventListener('click', function() {
+      postActivateProfile({ selector: 0 });
+    });
+    document.getElementById('btnActivateProfileSweep').addEventListener('click', function() {
+      postActivateProfile({ sweep: { from: 1, to: 49 }, sweepDelay: 100 });
+    });
+    document.getElementById('btnActivateProfile0Self').addEventListener('click', function() {
+      postActivateProfile({ characterId: 'self', selector: 0 });
+    });
+    document.getElementById('btnActivateProfileSweepSelf').addEventListener('click', function() {
+      postActivateProfile({
+        characterId: 'self',
+        sweep: { from: 1, to: 49 },
+        sweepDelay: 100
+      });
+    });
+
+    document.getElementById('btnSendUcsNpcSendData').addEventListener('click', async function() {
+      const status = document.getElementById('setStateStatus');
+      status.textContent = 'POST send-update-character-state…';
+      status.className = 'status';
+      try {
+        const r = await fetch(API_BASE + '/api/npcs/send-update-character-state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        const res = await r.json().catch(() => ({}));
+        if (r.ok && res.ok) {
+          status.textContent = '已发 Zone UCS → ' + (res.characterId || '') + '（' + (res.preset || '') + '）';
+          status.className = 'status ok';
+        } else {
+          status.textContent = res.error || r.status + ' ' + r.statusText;
+          status.className = 'status error';
+        }
+      } catch (e) {
+        status.textContent = '失败: ' + (e && e.message ? e.message : String(e));
+        status.className = 'status error';
+      }
+    });
+
+    document.getElementById('btnSendUcsSelfSendData').addEventListener('click', async function() {
+      const status = document.getElementById('setStateStatus');
+      if (clientsList.length !== 1 && !document.getElementById('target').value.trim()) {
+        status.textContent = '多个连接同时在线请先填「接收端」，或只保留一个游戏连接';
+        status.className = 'status error';
+        return;
+      }
+      status.textContent = 'POST send-update-character-state（self）…';
+      status.className = 'status';
+      try {
+        const payload = { characterId: 'self' };
+        if (clientsList.length !== 1) payload.target = document.getElementById('target').value.trim();
+        const r = await fetch(API_BASE + '/api/npcs/send-update-character-state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const res = await r.json().catch(() => ({}));
+        if (r.ok && res.ok) {
+          status.textContent =
+            '已发自己 UCS（sendData）→ ' + (res.characterId || '') + '（' + (res.preset || '') + '）';
+          status.className = 'status ok';
+        } else {
+          status.textContent = res.error || r.status + ' ' + r.statusText;
+          status.className = 'status error';
+        }
+      } catch (e) {
+        status.textContent = '失败: ' + (e && e.message ? e.message : String(e));
+        status.className = 'status error';
+      }
+    });
+
+    fetchClients();
+    fetchTestZombie();
+    setInterval(fetchClients, POLL_INTERVAL_MS);
+    setInterval(fetchTestZombie, POLL_INTERVAL_MS);
+  </script>
+</body>
+</html>
