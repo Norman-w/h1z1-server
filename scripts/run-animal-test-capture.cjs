@@ -50,6 +50,7 @@ const npcTypes = new Set([
   "basic"
 ]);
 const durationMs = Number(durationArg);
+const distance = Number(process.env.ANIMAL_TEST_DISTANCE ?? "8");
 const clientWaitMs = Number(
   clientWaitArg ?? process.env.ANIMAL_TEST_CLIENT_WAIT_MS ?? 300000
 );
@@ -67,6 +68,9 @@ if (!npcTypes.has(type)) {
 }
 if (!Number.isInteger(durationMs) || durationMs < 5000 || durationMs > 90000) {
   throw new Error("durationMs must be an integer from 5000 through 90000");
+}
+if (!Number.isFinite(distance) || distance < 3 || distance > 40) {
+  throw new Error("ANIMAL_TEST_DISTANCE must be a number from 3 through 40");
 }
 if (!Number.isInteger(clientWaitMs) || clientWaitMs < 5000 || clientWaitMs > 900000) {
   throw new Error("clientWaitMs must be an integer from 5000 through 900000");
@@ -214,7 +218,10 @@ async function main() {
 
   recorder = spawn(recorderPath, ["--run", runId, "--output", output], {
     stdio: ["pipe", "pipe", "inherit"],
-    windowsHide: true,
+    // Windows Graphics Capture needs the recorder process to have a visible
+    // desktop identity under RDP; hiding the child can prevent the first
+    // source frame from being created even though the game window is alive.
+    windowsHide: false,
     shell: false
   });
   writeTimeline("recording_starting", {
@@ -273,10 +280,10 @@ async function main() {
   writeTimeline("god_mode_enabled", { characterId: client.characterId });
   const spawnResult = await fetchJson("/api/animal-test", {
     method: "POST",
-    body: JSON.stringify({ command: "flat", type, distance: 8, height: 0 })
+    body: JSON.stringify({ command: "flat", type, distance, height: 0 })
   });
-  writeTimeline("animal_spawned", spawnResult);
-  console.log(JSON.stringify({ event: "started", runId, type, output, timeline, characterId: client.characterId }));
+  writeTimeline("animal_spawned", { distance, ...spawnResult });
+  console.log(JSON.stringify({ event: "started", runId, type, distance, output, timeline, characterId: client.characterId }));
 
   pollTimer = setInterval(() => { void pollStatus(); }, 250);
   await new Promise(resolve => setTimeout(resolve, durationMs));
