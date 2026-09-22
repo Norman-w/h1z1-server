@@ -218,6 +218,11 @@ test("production animal entities wire faction, FSM, damage and Recast agents", a
     );
     assert.ok(factoryNpc instanceof testCase.entityClass);
     assert.ok(factoryNpc.fsm, `${testCase.resetClip} NPC must have an FSM`);
+    assert.equal(
+      factoryNpc.nativeTurnReady,
+      true,
+      `${testCase.entityClass.name} must expose the client-native turn contract`
+    );
     assert.equal(factoryNpc.currentAnimation, testCase.resetClip);
     assert.equal(
       factoryNpc.getCurrentAnimationPacket()?.animationName,
@@ -246,6 +251,7 @@ test("production animal entities wire faction, FSM, damage and Recast agents", a
     assert.ok(factoryNpc instanceof PrototypeZombie);
     assert.equal(factoryNpc.npcId, prototypeNpcId);
     assert.ok(factoryNpc.fsm);
+    assert.equal(factoryNpc.nativeTurnReady, true);
     assert.equal(factoryNpc.currentAnimation, "Idle");
     delete server._npcs[factoryNpc.characterId];
   }
