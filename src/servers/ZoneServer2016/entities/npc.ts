@@ -403,14 +403,29 @@ export abstract class Npc extends BaseFullCharacter {
   private static readonly STANCE_MOVE_STANDING_SPRINTING = 66565;
 
   private locomotionMode: "walk" | "sprint" = "walk";
-  /** Last movement speed advertised to the client movement controller. */
+  /**
+   * Server-side movement target used by Recast and the AI controller.
+   *
+   * This is intentionally not the same thing as the speed carried by the
+   * authoritative position stream.  A crowd agent can be accelerating,
+   * braking, turning, or avoiding an obstacle while this target remains
+   * unchanged.
+   */
   private expectedSpeed?: number;
   /**
-   * Native animals defer a positive ExpectedSpeed edge until the first
-   * authoritative sample reaches the authored moving band.  Keeping the
-   * target in `expectedSpeed` lets SeekTarget/Recast use the same value while
-   * this pending edge prevents the client graph from starting a gait before
-   * the server has published any matching displacement.
+   * Last positive/zero Character.ExpectedSpeed value actually sent.
+   *
+   * Production NPCs use server-position authority, so their locomotion graph
+   * receives the measured speed through PlayerUpdatePosition only.  Keeping
+   * this wire mirror separate prevents stop/late-observer code from treating
+   * the Recast target as if it had also been advertised to the client.
+   */
+  private wireExpectedSpeed?: number;
+  /**
+   * Explicit native-root-motion/legacy controllers defer a positive
+   * ExpectedSpeed edge until the first authoritative sample reaches the
+   * authored moving band.  Production server-position NPCs leave this empty
+   * because PlayerUpdatePosition is their only client locomotion input.
    */
   private pendingExpectedSpeed?: number;
   /**
@@ -696,6 +711,11 @@ export abstract class Npc extends BaseFullCharacter {
     return this.pendingExpectedSpeed ?? null;
   }
 
+  /** Last Character.ExpectedSpeed value sent on the wire, if any. */
+  get advertisedLocomotionSpeed(): number | null {
+    return this.wireExpectedSpeed ?? null;
+  }
+
   /** Character GUID retained until the first native moving sample. */
   get pendingNativeSeekTargetId(): string | null {
     return this.pendingNativeSeekTarget?.targetCharacterId ?? null;
@@ -888,7 +908,7 @@ export abstract class Npc extends BaseFullCharacter {
       this.pendingAnimationSpeed = boundedSpeed;
       this.pathfindingMovementSuppressed = true;
       const hadAdvertisedSpeed =
-        this.expectedSpeed !== undefined && this.expectedSpeed > 0;
+        this.wireExpectedSpeed !== undefined && this.wireExpectedSpeed > 0;
       this.expectedSpeed = 0;
       this.pendingExpectedSpeed = undefined;
       if (this.navAgent) {
@@ -929,14 +949,30 @@ export abstract class Npc extends BaseFullCharacter {
       this.clearNativeSeekTarget();
     }
 
-    // Recast's maxSpeed only changes the server-side steering constraint.  A
-    // 2016 client also consumes Character.ExpectedSpeed when blending the
-    // locomotion graph.  For every production server-position NPC, a positive
-    // edge before the first authoritative moving sample can start the client
-    // gait while the replicated body is still standing.  Retain the target
-    // for Recast, but defer the wire edge until goTo() measures displacement.
-    // Zero is always emitted immediately so an action or idle transition
-    // cancels both the pending target and the old client gait.
+    // A server-position NPC already has a complete, measured locomotion
+    // channel in PlayerUpdatePosition.  Publishing the AI target through
+    // Character.ExpectedSpeed as well creates a second speed source while
+    // Recast is still accelerating/braking; the client can then select a
+    // gait for (for example) 5 m/s while the replicated body is moving at
+    // 0.8 m/s.  The retail motion queue consumes the position packet's
+    // velocity vector, so keep ExpectedSpeed limited to the explicit
+    // native-root-motion/legacy controller path where it is the only mover.
+    const publishExpectedSpeed = this.movementAuthority !== "server-position";
+    if (!publishExpectedSpeed) {
+      // Keep the requested value for Recast/AI even when it is intentionally
+      // not mirrored to Character.ExpectedSpeed in server-position mode.
+      this.expectedSpeed = boundedSpeed;
+      this.pendingExpectedSpeed = undefined;
+      if (this.wireExpectedSpeed !== undefined && this.wireExpectedSpeed > 0) {
+        this.emitExpectedSpeed(0);
+      }
+      return;
+    }
+
+    // Native-root-motion/legacy fixtures still use the controller edge.  A
+    // positive value is deferred until the authoritative stream proves that
+    // the actor has started, while zero is emitted immediately at an action or
+    // idle boundary.
     if (
       this.expectedSpeed === boundedSpeed &&
       (boundedSpeed <= 0 || this.pendingExpectedSpeed === undefined)
@@ -944,15 +980,13 @@ export abstract class Npc extends BaseFullCharacter {
       return;
     }
     this.expectedSpeed = boundedSpeed;
-    const deferPositiveServerPositionEdge =
+    const deferPositiveNativeEdge =
       boundedSpeed > 0 &&
-      ((this.movementAuthority === "server-position" &&
-        !this.hasMeasuredAuthoritativeMovement()) ||
-        // Object.create(Npc.prototype) protocol fixtures predate the
-        // authority field; preserve their established AnimalsPhysics gate.
-        (this.nativeLocomotionProfile !== undefined &&
-          !this.hasMeasuredNativeMovement()));
-    if (deferPositiveServerPositionEdge) {
+      // Object.create(Npc.prototype) protocol fixtures predate the authority
+      // field; preserve their established AnimalsPhysics gate.
+      this.nativeLocomotionProfile !== undefined &&
+      !this.hasMeasuredNativeMovement();
+    if (deferPositiveNativeEdge) {
       this.pendingExpectedSpeed = boundedSpeed;
       return;
     }
@@ -969,6 +1003,7 @@ export abstract class Npc extends BaseFullCharacter {
   }
 
   private emitExpectedSpeed(speed: number) {
+    this.wireExpectedSpeed = speed;
     this.server.sendDataToAllWithSpawnedEntity<CharacterExpectedSpeed>(
       this.server._npcs,
       this.characterId,
@@ -1036,6 +1071,7 @@ export abstract class Npc extends BaseFullCharacter {
 
   /** Publish a deferred native gait speed once the measured band is active. */
   private flushPendingExpectedSpeed(): boolean {
+    if (this.movementAuthority === "server-position") return false;
     const pending = this.pendingExpectedSpeed;
     if (pending === undefined || !this.hasMeasuredAuthoritativeMovement()) {
       return false;
@@ -1642,10 +1678,10 @@ export abstract class Npc extends BaseFullCharacter {
    */
   sendInitialLocomotionState(client: ZoneClient2016) {
     // Relevance handoff must preserve the same causal order as the live
-    // movement stream: position sample first, then the positive gait target,
-    // then the native seek controller. Sending ExpectedSpeed first makes a
-    // late observer enter a walk/sprint clip while it still renders the spawn
-    // position, which is the same one-frame slide fixed in goTo().
+    // movement stream: position sample first, then (only for an explicit
+    // native-root-motion/legacy controller) its ExpectedSpeed edge, and then
+    // the native seek controller.  Server-position NPCs have no second target
+    // speed rail; their measured PlayerUpdatePosition sample is sufficient.
     if (this.lastWireMotion !== undefined) {
       const motion: NpcPositionUpdateMotion = {
         stance: this.lastWireMotion.stance,
@@ -1673,14 +1709,18 @@ export abstract class Npc extends BaseFullCharacter {
         }
       );
     }
-    if (
-      this.expectedSpeed !== undefined &&
-      this.pendingExpectedSpeed === undefined
-    ) {
+    const lateObserverExpectedSpeed =
+      this.wireExpectedSpeed ??
+      // A handful of pre-contract protocol fixtures assign the private
+      // target directly on Object.create(Npc.prototype).  Preserve that
+      // compatibility path, but never fall back for a constructed
+      // server-position NPC where the target is deliberately server-only.
+      (this.movementAuthority === undefined ? this.expectedSpeed : undefined);
+    if (lateObserverExpectedSpeed !== undefined) {
       this.server.sendData<CharacterExpectedSpeed>(
         client,
         "Character.ExpectedSpeed",
-        { characterId: this.characterId, speed: this.expectedSpeed }
+        { characterId: this.characterId, speed: lateObserverExpectedSpeed }
       );
     }
     // A native seek rail is never part of the production server-position
@@ -2513,7 +2553,7 @@ export abstract class Npc extends BaseFullCharacter {
     // while ExpectedSpeed/PlayerUpdatePosition have been stopped.
     this.clearNativeSeekTarget();
     const hadAdvertisedSpeed =
-      this.expectedSpeed !== undefined && this.expectedSpeed > 0;
+      this.wireExpectedSpeed !== undefined && this.wireExpectedSpeed > 0;
     this.expectedSpeed = 0;
     this.pendingExpectedSpeed = undefined;
     if (this.navAgent) {
@@ -3300,7 +3340,7 @@ export abstract class Npc extends BaseFullCharacter {
     // sample that ends the locomotion graph.
     const advertisedMotion = this.lastWireMotion;
     const hadAdvertisedMotion =
-      this.expectedSpeed !== undefined && this.expectedSpeed > 0;
+      this.wireExpectedSpeed !== undefined && this.wireExpectedSpeed > 0;
     const hadMovingWireStance =
       advertisedMotion !== undefined &&
       (advertisedMotion.stance === Npc.STANCE_MOVE_STANDING ||
@@ -3603,11 +3643,12 @@ export abstract class Npc extends BaseFullCharacter {
     // samples use the normal adjacent-position rate through lastMotionSample.
     this.lastStoppedMotionSample = undefined;
     // Publish the first position sample before the positive ExpectedSpeed
-    // edge.  Both values are inputs to the native graph; reversing them lets
-    // the client enter a walk/sprint clip while it is still rendering the old
-    // standing position (the observed start-slide).  lastWireMotion was set
-    // above, so the helper still sees this sample even though the packet order
-    // now matches the causal order on the wire.
+    // edge for the explicit native-root-motion/legacy controller only.  Both
+    // values are inputs to that controller; reversing them lets the client
+    // enter a walk/sprint clip while it is still rendering the old standing
+    // position (the observed start-slide).  Server-position NPCs have no
+    // positive ExpectedSpeed edge here: lastWireMotion is still retained for
+    // late observers and diagnostics.
     if (isMoving) {
       this.flushPendingExpectedSpeed();
     }

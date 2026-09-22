@@ -37,7 +37,7 @@ export class DevHttpServerLite {
         `[DevHttp] listening on http://127.0.0.1:${this.port} (current animal test API)`
       );
       console.log(
-        "[ztest] current API: POST /api/animal-test {command:flat|slope|stop|status,type?,distance?,height?}; POST /api/god {enabled?}; POST /api/respawn; POST /api/tp {position:[x,y,z]}"
+        "[ztest] current API: POST /api/animal-test {command:flat|slope|hunt|stop|status,type?,distance?,height?,rabbits?,deer?,arrows?}; POST /api/god {enabled?}; POST /api/respawn; POST /api/tp {position:[x,y,z]}"
       );
     });
   }
@@ -271,8 +271,21 @@ export class DevHttpServerLite {
           this.sendJson(res, 200, this.tests.status());
           return;
         }
+        if (command === "hunt" || command === "hunting") {
+          const rabbits = Number(body.rabbits ?? 3);
+          const deer = Number(body.deer ?? 3);
+          const arrows = Number(body.arrows ?? 100);
+          const result = this.tests.spawnHunt(
+            this.soleClient(),
+            rabbits,
+            deer,
+            arrows
+          );
+          this.sendJson(res, 200, { ...result, status: this.tests.status() });
+          return;
+        }
         if (command !== "flat" && command !== "slope") {
-          throw new Error("command must be flat, slope, stop or status");
+          throw new Error("command must be flat, slope, hunt, stop or status");
         }
         const type = String(body.type ?? "zombie").toLowerCase() as AnimalTestType;
         const distance = Number(body.distance ?? 8);

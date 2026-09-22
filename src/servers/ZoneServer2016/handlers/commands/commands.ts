@@ -2347,8 +2347,24 @@ export const commands: Array<Command> = [
           server.sendChatText(client, `[ztest] ${JSON.stringify(server.animalTestHarness.status())}`);
           return;
         }
+        if (command === "hunt" || command === "hunting") {
+          const rabbits = args[1] === undefined ? 3 : Number(args[1]);
+          const deer = args[2] === undefined ? 3 : Number(args[2]);
+          const arrows = args[3] === undefined ? 100 : Number(args[3]);
+          const result = server.animalTestHarness.spawnHunt(
+            client,
+            rabbits,
+            deer,
+            arrows
+          );
+          server.sendChatText(client, `[ztest] ${JSON.stringify(result)}`);
+          return;
+        }
         if (command !== "flat" && command !== "slope") {
-          server.sendChatText(client, "[ztest] usage: /ztest flat|slope|stop|status [type] [distance] [height]");
+          server.sendChatText(
+            client,
+            "[ztest] usage: /ztest flat|slope|hunt|stop|status [type|rabbits] [distance|deer] [height|arrows]"
+          );
           return;
         }
         const type = (args[1] || "zombie") as AnimalTestType;

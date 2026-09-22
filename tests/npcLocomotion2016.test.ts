@@ -660,7 +660,7 @@ test("facing packets do not starve generic locomotion release", () => {
   assert.equal(packets.at(-1).stance, 66565);
 });
 
-test("server-position NPCs defer ExpectedSpeed until the first moving sample", () => {
+test("server-position NPCs use measured motion without a second target-speed rail", () => {
   const { npc, packets, expectedSpeeds, events } = makeNpc();
   npc.movementAuthority = "server-position";
   npc.navAgent = {
@@ -670,10 +670,15 @@ test("server-position NPCs defer ExpectedSpeed until the first moving sample", (
   };
 
   npc.setSpeed(2.5);
+  assert.equal(
+    npc.locomotionTargetSpeed,
+    2.5,
+    "the requested speed remains available to Recast even when it is not sent as a client rail"
+  );
   assert.deepEqual(
     expectedSpeeds,
     [],
-    "the positive graph edge must wait for an authoritative displacement"
+    "server-position locomotion must not publish a target speed before movement"
   );
   npc.goTo(new Float32Array([0, 0, 0, 1]));
   assert.deepEqual(
@@ -689,13 +694,18 @@ test("server-position NPCs defer ExpectedSpeed until the first moving sample", (
     "the first displacement only proves acceleration has started"
   );
   npc.goTo(new Float32Array([0, 0, 0.5, 1]));
-  assert.deepEqual(expectedSpeeds.map((packet) => packet.speed), [2.5]);
-  assert.deepEqual(
-    events.slice(-2),
-    ["PlayerUpdatePosition", "Character.ExpectedSpeed"],
-    "position must precede the positive graph edge"
-  );
+  assert.deepEqual(expectedSpeeds, []);
+  assert.deepEqual(events, [
+    "PlayerUpdatePosition",
+    "PlayerUpdatePosition",
+    "PlayerUpdatePosition"
+  ]);
   assert.ok(packets.at(-1).horizontalSpeed > 0);
+  assert.equal(
+    npc.advertisedLocomotionSpeed,
+    null,
+    "the measured PlayerUpdatePosition speed is the only client locomotion input"
+  );
 });
 
 test("native animal locomotion waits for the first authored moving band", () => {

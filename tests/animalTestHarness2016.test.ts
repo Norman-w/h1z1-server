@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { AnimalTestHarness } from "../out/servers/ZoneServer2016/managers/animaltestharness";
+import { Items } from "../out/servers/ZoneServer2016/models/enums";
 
 function vec(x: number, y = 0, z = 0): Float32Array {
   return new Float32Array([x, y, z, 1]);
@@ -260,4 +261,104 @@ test("animal status reports both horizontal and 3-D target separation", () => {
   assert.equal(animal.targetMountedVehicleId, null);
   assert.equal(animal.targetMountedSeatId, null);
   assert.equal(animal.targetVehiclePosition, null);
+});
+
+test("hunt harness equips a bow, grants arrows, and tracks a mixed scene", () => {
+  const npcs: Record<string, any> = {};
+  let nextNpcId = 0;
+  let bowLoadout: any;
+  let arrowCount = 0;
+  let skinningKnife: any;
+  const client: any = {
+    sessionId: "hunt-session",
+    character: {
+      isAlive: true,
+      isRespawning: false,
+      currentLoadoutSlot: 0,
+      state: {
+        position: vec(100, 20, 200),
+        yaw: 0,
+        lookAt: vec(0, 0, 1)
+      },
+      getLoadoutItemById(itemDefinitionId: number) {
+        return itemDefinitionId === Items.WEAPON_BOW_WOOD
+          ? bowLoadout
+          : undefined;
+      },
+      lootItem(_server: any, item: any) {
+        if (item.itemDefinitionId === Items.WEAPON_BOW_WOOD) {
+          bowLoadout = { itemDefinitionId: item.itemDefinitionId, slotId: 2 };
+        } else if (item.itemDefinitionId === Items.AMMO_ARROW) {
+          arrowCount += item.stackCount;
+        } else if (item.itemDefinitionId === Items.SKINNING_KNIFE) {
+          skinningKnife = item;
+        }
+      },
+      getInventoryItemAmount(itemDefinitionId: number) {
+        return itemDefinitionId === Items.AMMO_ARROW ? arrowCount : 0;
+      },
+      getItemById(itemDefinitionId: number) {
+        return itemDefinitionId === Items.SKINNING_KNIFE
+          ? skinningKnife
+          : undefined;
+      }
+    }
+  };
+  const server: any = {
+    _soloMode: true,
+    _clients: { "hunt-session": client },
+    _npcs: npcs,
+    navManager: {
+      navMeshQuery: {},
+      getClosestNavPointVec3(position: Float32Array) {
+        return { x: position[0], y: position[1], z: position[2] };
+      }
+    },
+    worldObjectManager: {
+      createNpc(_server: any, _modelId: number, position: Float32Array) {
+        const characterId = `hunt-${++nextNpcId}`;
+        const npc: any = {
+          characterId,
+          state: { position: position.slice() },
+          navAgent: {
+            teleport(next: { x: number; y: number; z: number }) {
+              npc.state.position = vec(next.x, next.y, next.z);
+            }
+          }
+        };
+        npcs[characterId] = npc;
+        return npc;
+      }
+    },
+    generateItem(itemDefinitionId: number, stackCount: number) {
+      return {
+        itemDefinitionId,
+        stackCount,
+        isValid: () => true
+      };
+    },
+    switchLoadoutSlot(_client: any, loadoutItem: any) {
+      client.character.currentLoadoutSlot = loadoutItem.slotId;
+    },
+    spawnEntityForClient() {},
+    deleteEntity(characterId: string, dictionary: Record<string, any>) {
+      if (!dictionary[characterId]) return false;
+      delete dictionary[characterId];
+      return true;
+    }
+  };
+
+  const harness = new AnimalTestHarness(server);
+  const result = harness.spawnHunt(client, 2, 1, 12);
+
+  assert.equal(result.rabbits.length, 2);
+  assert.equal(result.deer.length, 1);
+  assert.equal(result.kit.bowItemDefinitionId, Items.WEAPON_BOW_WOOD);
+  assert.equal(result.kit.arrowsGranted, 12);
+  assert.equal(result.kit.arrowsTotal, 12);
+  assert.equal(result.kit.skinningKnifeGranted, true);
+  assert.equal(client.character.currentLoadoutSlot, 2);
+  assert.equal(Object.keys(npcs).length, 3);
+  assert.equal(harness.stop(), 3);
+  assert.equal(Object.keys(npcs).length, 0);
 });

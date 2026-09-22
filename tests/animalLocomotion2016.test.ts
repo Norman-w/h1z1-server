@@ -176,6 +176,47 @@ test("legacy seekTarget cannot re-enable a second mover in server-position mode"
   );
 });
 
+test("all production NPC families use the measured position speed channel", () => {
+  // Every concrete NPC produced by WorldObjectManager inherits Npc.goTo().
+  // Keep the generic Zombie001 variants and the BasicNpc fallback in this
+  // contract too; they do not have the AnimalsPhysics profile, but they must
+  // still avoid a second target-speed rail.
+  for (const id of [
+    "bear",
+    "wolf",
+    "deer",
+    "rabbit",
+    "zombie",
+    "gasser",
+    "exploder",
+    "screamer",
+    "prototype-zombie",
+    "basic"
+  ]) {
+    const fixture = createProductionNpcFixture(id, vec(0));
+    fixture.npc.movementAuthority = "server-position";
+    fixture.setNavVelocity(4);
+    fixture.npc.setSpeed(4);
+    fixture.npc.goTo(vec(0, 0, 1));
+
+    assert.equal(
+      packetValues(fixture.packets, "Character.ExpectedSpeed").length,
+      0,
+      `${id} must not publish a second target-speed rail`
+    );
+    assert.equal(
+      fixture.npc.locomotionTargetSpeed,
+      4,
+      `${id} still keeps its requested speed for server-side navigation`
+    );
+    const motion = packetValues(
+      fixture.packets,
+      "PlayerUpdatePosition"
+    ).at(-1).positionUpdate;
+    assert.ok(motion.horizontalSpeed > 0, `${id} must publish measured motion`);
+  }
+});
+
 test("native animals do not advertise gait from a stationary first crowd tick", () => {
   const fixture = createProductionNpcFixture("bear", vec(0));
   fixture.npc.nativeLocomotionProfile = ANIMAL_NATIVE_LOCOMOTION_PROFILE;

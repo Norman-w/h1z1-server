@@ -1,7 +1,7 @@
 import type { ZoneClient2016 } from "../classes/zoneclient";
 import type { ZoneServer2016 } from "../zoneserver";
 import type { Npc } from "../entities/npc";
-import { ModelIds, NpcIds } from "../models/enums";
+import { Items, ModelIds, NpcIds } from "../models/enums";
 import { NavManager } from "../../../utils/recast";
 
 export type AnimalTestType =
@@ -30,6 +30,33 @@ type AnimalTestSpawnMeta = {
   navSnapDistance3d: number | null;
   navigationHeightOffset: number | null;
   projectedToNav: boolean;
+};
+
+export type AnimalTestSpawnResult = {
+  characterId: string;
+  type: AnimalTestType;
+  position: number[];
+  requestedPosition: number[];
+  navPosition: number[] | null;
+  navSnapDistance2d: number | null;
+  navSnapDistance3d: number | null;
+  navigationHeightOffset: number | null;
+  projectedToNav: boolean;
+};
+
+export type AnimalHuntKitResult = {
+  bowItemDefinitionId: Items;
+  arrowsGranted: number;
+  arrowsTotal: number;
+  skinningKnifeGranted: boolean;
+  activeLoadoutSlot: number;
+};
+
+export type AnimalHuntResult = {
+  command: "hunt";
+  rabbits: AnimalTestSpawnResult[];
+  deer: AnimalTestSpawnResult[];
+  kit: AnimalHuntKitResult;
 };
 
 const RECIPES: Record<AnimalTestType, AnimalRecipe> = {
@@ -74,6 +101,21 @@ export class AnimalTestHarness {
   private lastNpcId: string | null = null;
 
   constructor(private readonly server: ZoneServer2016) {}
+
+  private assertReadyClient(client: ZoneClient2016): void {
+    if (
+      !this.server._soloMode ||
+      Object.values(this.server._clients).length !== 1
+    ) {
+      throw new Error("Animal test requires one local solo client");
+    }
+    if (this.server._clients[client.sessionId] !== client) {
+      throw new Error("Animal test client is no longer connected");
+    }
+    if (!client.character?.isAlive || client.character.isRespawning) {
+      throw new Error("Enter the world alive before spawning an animal test");
+    }
+  }
 
   spawn(
     client: ZoneClient2016,
@@ -264,6 +306,245 @@ export class AnimalTestHarness {
     this.testNpcIds.clear();
     this.lastNpcId = null;
     return removed;
+  }
+
+  /**
+   * Add the deterministic hunting equipment used by `/ztest hunt`.
+   *
+   * This deliberately goes through the normal inventory/loadout methods so
+   * the test exercises the same active weapon and ammo replication path as a
+   * real player.  It is not a second weapon implementation hidden in the
+   * developer command.
+   */
+  prepareHuntKit(
+    client: ZoneClient2016,
+    arrowCount = 100
+  ): AnimalHuntKitResult {
+    this.assertReadyClient(client);
+    if (!Number.isInteger(arrowCount) || arrowCount < 1 || arrowCount > 9999) {
+      throw new Error("Hunt arrow count must be an integer between 1 and 9999");
+    }
+
+    const character = client.character;
+    let bow = character.getLoadoutItemById(Items.WEAPON_BOW_WOOD);
+    if (!bow) {
+      const generatedBow = this.server.generateItem(
+        Items.WEAPON_BOW_WOOD,
+        1,
+        true
+      );
+      if (!generatedBow) {
+        throw new Error("Wooden bow item definition is unavailable");
+      }
+      character.lootItem(this.server, generatedBow, 1, true);
+      bow = character.getLoadoutItemById(Items.WEAPON_BOW_WOOD);
+    }
+    if (!bow) throw new Error("Could not equip the wooden bow");
+    if (character.currentLoadoutSlot !== bow.slotId) {
+      this.server.switchLoadoutSlot(client, bow);
+    }
+
+    const arrowsBefore = character.getInventoryItemAmount(Items.AMMO_ARROW);
+    const generatedArrows = this.server.generateItem(
+      Items.AMMO_ARROW,
+      arrowCount,
+      true
+    );
+    if (!generatedArrows) {
+      throw new Error("Wooden arrow item definition is unavailable");
+    }
+    character.lootItem(this.server, generatedArrows, arrowCount, true);
+    const arrowsTotal = character.getInventoryItemAmount(Items.AMMO_ARROW);
+    const arrowsGranted = Math.max(0, arrowsTotal - arrowsBefore);
+    if (arrowsGranted < arrowCount) {
+      throw new Error(
+        `Could not add all hunting arrows (${arrowsGranted}/${arrowCount})`
+      );
+    }
+
+    // A knife is helpful for the post-shot harvest check, but is optional so
+    // an old data set without item 110 does not prevent the animal scene.
+    const generatedKnife = this.server.generateItem(
+      Items.SKINNING_KNIFE,
+      1,
+      true
+    );
+    let skinningKnifeGranted = false;
+    if (generatedKnife) {
+      character.lootItem(this.server, generatedKnife, 1, true);
+      skinningKnifeGranted = !!character.getItemById(Items.SKINNING_KNIFE);
+    }
+
+    return {
+      bowItemDefinitionId: Items.WEAPON_BOW_WOOD,
+      arrowsGranted,
+      arrowsTotal,
+      skinningKnifeGranted,
+      activeLoadoutSlot: character.currentLoadoutSlot
+    };
+  }
+
+  private createHuntNpc(
+    client: ZoneClient2016,
+    type: "rabbit" | "deer",
+    requestedPosition: Float32Array
+  ): AnimalTestSpawnResult {
+    const recipe = RECIPES[type];
+    const nearestNavPoint = this.server.navManager?.navMeshQuery
+      ? this.server.navManager.getClosestNavPointVec3(requestedPosition)
+      : null;
+    const navPosition = nearestNavPoint
+      ? NavManager.navToGame(nearestNavPoint)
+      : null;
+    const position = navPosition
+      ? new Float32Array([navPosition[0], navPosition[1], navPosition[2], 1])
+      : requestedPosition;
+    const rotation = client.character.state.lookAt.slice() as Float32Array;
+    const npc = this.server.worldObjectManager.createNpc(
+      this.server,
+      recipe.modelId,
+      position,
+      rotation,
+      0,
+      recipe.npcId
+    );
+
+    if (npc.navAgent && navPosition) {
+      npc.navAgent.teleport({
+        x: navPosition[0],
+        y: navPosition[1],
+        z: navPosition[2]
+      });
+      npc.state.position = new Float32Array([
+        navPosition[0],
+        navPosition[1],
+        navPosition[2],
+        1
+      ]);
+    }
+
+    try {
+      this.server.spawnEntityForClient(client, npc);
+    } catch (error) {
+      if (this.server._npcs[npc.characterId]) {
+        this.server.deleteEntity(npc.characterId, this.server._npcs);
+      }
+      throw error;
+    }
+
+    const actualPosition = Array.from(npc.state.position);
+    const meta: AnimalTestSpawnMeta = {
+      requestedPosition: Array.from(requestedPosition),
+      actualPosition,
+      navPosition: navPosition ? Array.from(navPosition) : null,
+      navSnapDistance2d: navPosition
+        ? Math.hypot(
+            navPosition[0] - requestedPosition[0],
+            navPosition[2] - requestedPosition[2]
+          )
+        : null,
+      navSnapDistance3d: navPosition
+        ? Math.hypot(
+            navPosition[0] - requestedPosition[0],
+            navPosition[1] - requestedPosition[1],
+            navPosition[2] - requestedPosition[2]
+          )
+        : null,
+      navigationHeightOffset: navPosition
+        ? requestedPosition[1] - navPosition[1]
+        : null,
+      projectedToNav: true
+    };
+    this.testNpcIds.add(npc.characterId);
+    this.testNpcMeta.set(npc.characterId, meta);
+    this.lastNpcId = npc.characterId;
+
+    return {
+      characterId: npc.characterId,
+      type,
+      position: actualPosition,
+      requestedPosition: meta.requestedPosition,
+      navPosition: meta.navPosition,
+      navSnapDistance2d: meta.navSnapDistance2d,
+      navSnapDistance3d: meta.navSnapDistance3d,
+      navigationHeightOffset: meta.navigationHeightOffset,
+      projectedToNav: true
+    };
+  }
+
+  /**
+   * Spawn a repeatable, ground-projected hunting range in front of the player.
+   * Rabbits/deer remain outside their passive threat radius until the player
+   * approaches or shoots, which keeps the initial bow draw observable.
+   */
+  spawnHunt(
+    client: ZoneClient2016,
+    rabbitCount = 3,
+    deerCount = 3,
+    arrowCount = 100
+  ): AnimalHuntResult {
+    this.assertReadyClient(client);
+    if (
+      !Number.isInteger(rabbitCount) ||
+      rabbitCount < 0 ||
+      rabbitCount > 8 ||
+      !Number.isInteger(deerCount) ||
+      deerCount < 0 ||
+      deerCount > 8 ||
+      rabbitCount + deerCount < 1 ||
+      rabbitCount + deerCount > 12
+    ) {
+      throw new Error("Hunt counts must total 1-12 animals (each type 0-8)");
+    }
+
+    const kit = this.prepareHuntKit(client, arrowCount);
+    const previousNpcIds = [...this.testNpcIds];
+    const createdNpcIds: string[] = [];
+    const rabbits: AnimalTestSpawnResult[] = [];
+    const deer: AnimalTestSpawnResult[] = [];
+    const player = client.character;
+    const yaw = Number.isFinite(player.state.yaw) ? player.state.yaw : 0;
+    const forwardX = Math.sin(yaw);
+    const forwardZ = Math.cos(yaw);
+    const rightX = Math.cos(yaw);
+    const rightZ = -Math.sin(yaw);
+    const positionAt = (distance: number, lateral: number): Float32Array =>
+      new Float32Array([
+        player.state.position[0] + forwardX * distance + rightX * lateral,
+        player.state.position[1],
+        player.state.position[2] + forwardZ * distance + rightZ * lateral,
+        1
+      ]);
+
+    try {
+      const rabbitLaterals = [-5, 0, 5, -8, 8, -2, 2, 0];
+      for (let i = 0; i < rabbitCount; i++) {
+        const result = this.createHuntNpc(
+          client,
+          "rabbit",
+          positionAt(22, rabbitLaterals[i])
+        );
+        rabbits.push(result);
+        createdNpcIds.push(result.characterId);
+      }
+      const deerLaterals = [-7, 0, 7, -10, 10, -3, 3, 0];
+      for (let i = 0; i < deerCount; i++) {
+        const result = this.createHuntNpc(
+          client,
+          "deer",
+          positionAt(28, deerLaterals[i])
+        );
+        deer.push(result);
+        createdNpcIds.push(result.characterId);
+      }
+    } catch (error) {
+      this.removeNpcIds(createdNpcIds);
+      this.lastNpcId = previousNpcIds[previousNpcIds.length - 1] ?? null;
+      throw error;
+    }
+
+    this.removeNpcIds(previousNpcIds);
+    return { command: "hunt", rabbits, deer, kit };
   }
 
   private removeNpcIds(characterIds: Iterable<string>): number {
@@ -531,8 +812,15 @@ export class AnimalTestHarness {
           state: npc.fsm?.state ?? null,
           // Keep the requested controller speed and the measured wire speed
           // separate. The former is a state target; the latter is what the
-          // client receives in PlayerUpdatePosition.
+          // client receives in PlayerUpdatePosition.  A server-position NPC
+          // deliberately has no positive Character.ExpectedSpeed rail, so
+          // expose that channel independently instead of implying that the
+          // target was also sent to the client.
           expectedSpeed: npc.locomotionTargetSpeed ?? null,
+          advertisedLocomotionSpeed:
+            typeof npc.advertisedLocomotionSpeed === "number"
+              ? npc.advertisedLocomotionSpeed
+              : null,
           nativeLocomotionProfile:
             npc.getNativeLocomotionProfile?.() ??
             npc.nativeLocomotionProfile ??
