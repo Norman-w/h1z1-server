@@ -825,6 +825,13 @@ export class AnimalTestHarness {
             npc.getNativeLocomotionProfile?.() ??
             npc.nativeLocomotionProfile ??
             null,
+          nativeTurnProfile:
+            npc.getNativeTurnProfile?.() ?? npc.nativeTurnProfile ?? null,
+          nativeTurnReady:
+            typeof npc.nativeTurnReady === "boolean"
+              ? npc.nativeTurnReady
+              : null,
+          turnMotion: npc.lastTurnMotion ?? null,
           movementAuthority:
             npc.movementAuthority === "native-root-motion"
               ? "native-root-motion"

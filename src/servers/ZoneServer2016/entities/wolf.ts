@@ -20,7 +20,11 @@ import {
   NpcIds,
   StringIds
 } from "../models/enums";
-import { ANIMAL_NATIVE_LOCOMOTION_PROFILE, Npc } from "./npc";
+import {
+  ANIMAL_NATIVE_LOCOMOTION_PROFILE,
+  Npc,
+  WOLF_NATIVE_TURN_PROFILE
+} from "./npc";
 import { ANIMAL_PROFILE_IDS } from "./animalprofiles";
 import { createWolf } from "../jsms/wolf.jsm";
 import { Factions } from "../jsms/factions";
@@ -49,6 +53,7 @@ export class Wolf extends Npc {
     this.nativeMeleeCapability = "attacker";
     this.profileId = ANIMAL_PROFILE_IDS.WOLF;
     this.nativeLocomotionProfile = ANIMAL_NATIVE_LOCOMOTION_PROFILE;
+    this.nativeTurnProfile = WOLF_NATIVE_TURN_PROFILE;
     // Keep the spawn/late-observer reset clip available without relying on
     // the optional AI FSM being enabled.
     this.initializeAnimation("Idle");

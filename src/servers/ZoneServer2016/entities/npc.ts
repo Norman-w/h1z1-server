@@ -215,6 +215,14 @@ export interface NpcWireMotionTelemetry {
   horizontalSpeed: number;
   verticalSpeed: number;
   orientation: number;
+  /** Signed body-yaw delta carried by the same position sample. */
+  angleChange?: number;
+  /** Measured turn input rate for diagnostics, not a second wire channel. */
+  turnRateRadPerSec?: number;
+  /** Positive/negative keeps the coordinate convention explicit. */
+  turnDirection?: "positive" | "negative" | "none";
+  /** The native graph input selected by the actor, when recovered. */
+  nativeTurnInput?: string | null;
 }
 
 /**
@@ -233,6 +241,96 @@ export interface NpcNativeLocomotionProfile {
   minimumMovingSpeed: number;
   maximumSpeed: number;
   authoredSpeedBands: readonly number[];
+}
+
+/**
+ * Native body-turn contract recovered from the actor MRN graphs.
+ *
+ * `PlayerUpdatePosition.orientation + angleChange` is the only server-to-client
+ * movement packet that carries this input.  The client graph consumes it as
+ * `State_Turning/TurnRate` and selects the authored left/right step clip.  The
+ * 90° durations below are source-asset clocks (not tuning knobs). 180° entries
+ * use the recovered 180° clip where one exists, otherwise the explicit
+ * two-quarter-turn fallback. They are used only to bound a server position
+ * sample so a large nav corner cannot become a pivot.
+ */
+export interface NpcNativeTurnProfile {
+  source: string;
+  inputParameter: "State_Turning/TurnRate";
+  turnLeftClip: string;
+  turnRightClip: string;
+  turn90DurationMs: number;
+  turn180DurationMs?: number;
+}
+
+const ANIMAL_NATIVE_TURN_SOURCE =
+  "AnimalsPhysicsX64.mrn:ControlParameters|State_Turning + ControlParameters|TurnRate";
+const ZOMBIE_NATIVE_TURN_SOURCE =
+  "Zombie001 physics graph:State_Turning/TurnRate";
+
+/** Source-clock profiles for the four AnimalsPhysics model leaves. */
+export const WOLF_NATIVE_TURN_PROFILE: NpcNativeTurnProfile = Object.freeze({
+  source: `${ANIMAL_NATIVE_TURN_SOURCE}; Animals_Wolf001_TurnLeft/TurnRight`,
+  inputParameter: "State_Turning/TurnRate",
+  turnLeftClip: "Animals_Wolf001_TurnLeft",
+  turnRightClip: "Animals_Wolf001_TurnRight",
+  turn90DurationMs: 933,
+  turn180DurationMs: 1866
+});
+
+export const DEER_NATIVE_TURN_PROFILE: NpcNativeTurnProfile = Object.freeze({
+  source: `${ANIMAL_NATIVE_TURN_SOURCE}; Animals_Deer001_TurnLeft/TurnRightB`,
+  inputParameter: "State_Turning/TurnRate",
+  turnLeftClip: "Animals_Deer001_TurnLeft",
+  turnRightClip: "Animals_Deer001_TurnRightB",
+  turn90DurationMs: 1000,
+  turn180DurationMs: 2000
+});
+
+export const BEAR_NATIVE_TURN_PROFILE: NpcNativeTurnProfile = Object.freeze({
+  source: `${ANIMAL_NATIVE_TURN_SOURCE}; Animals_Bear001_TurnLeft/TurnRight`,
+  inputParameter: "State_Turning/TurnRate",
+  turnLeftClip: "Animals_Bear001_TurnLeft",
+  turnRightClip: "Animals_Bear001_TurnRight",
+  turn90DurationMs: 2000,
+  turn180DurationMs: 4000
+});
+
+export const RABBIT_NATIVE_TURN_PROFILE: NpcNativeTurnProfile = Object.freeze({
+  source: `${ANIMAL_NATIVE_TURN_SOURCE}; Animals_Rabbit001_TurnLeft/TurnRight`,
+  inputParameter: "State_Turning/TurnRate",
+  turnLeftClip: "Animals_Rabbit001_TurnLeft",
+  turnRightClip: "Animals_Rabbit001_TurnRight",
+  turn90DurationMs: 1000,
+  turn180DurationMs: 2000
+});
+
+/** Zombie001 has authored 90° and 180° turn leaves for both model variants. */
+export const ZOMBIE_NATIVE_TURN_PROFILE: NpcNativeTurnProfile = Object.freeze({
+  source: `${ZOMBIE_NATIVE_TURN_SOURCE}; Zombie001_{00,11}_TurnLeft/Right90/180`,
+  inputParameter: "State_Turning/TurnRate",
+  turnLeftClip: "Zombie001_TurnLeft90/180",
+  turnRightClip: "Zombie001_TurnRight90/180",
+  turn90DurationMs: 2333,
+  turn180DurationMs: 2500
+});
+
+/** Screamer has the same authored 90°/180° source clocks in its own graph. */
+export const SCREAMER_NATIVE_TURN_PROFILE: NpcNativeTurnProfile = Object.freeze({
+  source:
+    "ThirdPersonZombieScreamerPhysicsX64.mrn:ControlParameters|State_Turning + Screamer_*_TurnLeft/Right90/180",
+  inputParameter: "State_Turning/TurnRate",
+  turnLeftClip: "Screamer_Tied/UnTied_Active_TurnLeft90/180",
+  turnRightClip: "Screamer_Tied/UnTied_Active_TurnRight90/180",
+  turn90DurationMs: 2333,
+  turn180DurationMs: 2500
+});
+
+export interface NpcTurnTelemetry {
+  angleChange: number;
+  turnRateRadPerSec: number;
+  turnDirection: "positive" | "negative" | "none";
+  nativeTurnInput: string | null;
 }
 
 /**
@@ -500,6 +598,8 @@ export abstract class Npc extends BaseFullCharacter {
   meleeWeaponItemDefinitionId: Items = Items.WEAPON_MACHETE01;
   /** Native locomotion graph contract for actors with AnimalsPhysics assets. */
   nativeLocomotionProfile?: NpcNativeLocomotionProfile;
+  /** Native body-turn graph contract, when the actor MRN exposes turn clips. */
+  nativeTurnProfile?: NpcNativeTurnProfile;
   /**
    * Visible transform authority.  This defaults to the only path currently
    * proven to be coherent: Recast -> goTo() -> PlayerUpdatePosition.  Do not
@@ -612,6 +712,8 @@ export abstract class Npc extends BaseFullCharacter {
   private lastStoppedMotionSample?: NpcMotionSample;
   /** Read-only diagnostic mirror of the last position packet sent to clients. */
   lastWireMotion?: NpcWireMotionTelemetry;
+  /** Last signed turn input derived from the authoritative motion stream. */
+  lastTurnMotion?: NpcTurnTelemetry;
   /**
    * Optional vertical offset used only by the local `/ztest slope` harness.
    *
@@ -719,6 +821,16 @@ export abstract class Npc extends BaseFullCharacter {
   /** Character GUID retained until the first native moving sample. */
   get pendingNativeSeekTargetId(): string | null {
     return this.pendingNativeSeekTarget?.targetCharacterId ?? null;
+  }
+
+  /** Whether this actor has a client-authored body-turn graph we can drive. */
+  get nativeTurnReady(): boolean {
+    return this.nativeTurnProfile !== undefined;
+  }
+
+  /** Source/parameter contract exposed to the deterministic test harness. */
+  getNativeTurnProfile(): NpcNativeTurnProfile | null {
+    return this.nativeTurnProfile ?? null;
   }
 
   /** Consecutive moving wire samples since the last stop/action boundary. */
@@ -1787,6 +1899,99 @@ export abstract class Npc extends BaseFullCharacter {
         this.createCombatAnimationState()
       );
     }
+  }
+
+  /**
+   * Resolve the authored turn rate for a requested body-yaw delta.
+   *
+   * The rate is derived from the source 90°/180° clip clocks.  It is not a
+   * species-specific gameplay constant: the same profile is the evidence that
+   * the loaded client graph has a native turn leaf and the duration is the
+   * source animation's own clock.  A missing profile deliberately falls back
+   * to the caller's conservative limit because an unknown model must not be
+   * sent an unverified native turn contract.
+   */
+  private nativeTurnRateForAngle(angle: number): number | undefined {
+    const profile = this.nativeTurnProfile;
+    if (!profile || !Number.isFinite(angle)) return undefined;
+    const absoluteAngle = Math.min(Math.PI, Math.abs(angle));
+    const useHalfTurn = absoluteAngle > Math.PI * 0.75;
+    const authoredAngle = useHalfTurn ? Math.PI : Math.PI / 2;
+    const durationMs = useHalfTurn
+      ? (profile.turn180DurationMs ?? profile.turn90DurationMs * 2)
+      : profile.turn90DurationMs;
+    if (!Number.isFinite(durationMs) || durationMs <= 0) return undefined;
+    return authoredAngle / (durationMs / 1000);
+  }
+
+  /** Clamp a requested yaw delta to both the caller and native source clocks. */
+  private clampTurnDelta(
+    angle: number,
+    elapsedSeconds: number,
+    callerMaxTurnRateRadPerSec?: number
+  ): number {
+    if (!Number.isFinite(angle)) return 0;
+    if (!Number.isFinite(elapsedSeconds) || elapsedSeconds <= 0) return angle;
+
+    const limits: number[] = [];
+    if (
+      callerMaxTurnRateRadPerSec !== undefined &&
+      Number.isFinite(callerMaxTurnRateRadPerSec) &&
+      callerMaxTurnRateRadPerSec > 0
+    ) {
+      limits.push(callerMaxTurnRateRadPerSec);
+    }
+    const nativeRate = this.nativeTurnRateForAngle(angle);
+    if (nativeRate !== undefined) limits.push(nativeRate);
+    if (limits.length === 0) return angle;
+
+    const maximumDelta = Math.min(...limits) * elapsedSeconds;
+    return Math.max(-maximumDelta, Math.min(maximumDelta, angle));
+  }
+
+  /** Elapsed time since the previous authoritative sample, if measurable. */
+  private elapsedSinceMotionSample(sequenceTime: number): number {
+    const anchor = this.lastMotionSample ?? this.lastStoppedMotionSample;
+    if (!anchor) return 0;
+    const elapsedMs = (sequenceTime - anchor.sequenceTime) >>> 0;
+    if (elapsedMs === 0 || elapsedMs >= 0x80000000) return 0;
+    return elapsedMs / 1000;
+  }
+
+  /** Record the exact turn input that accompanied a position packet. */
+  private recordWireMotion(
+    sequenceTime: number,
+    motion: NpcPositionUpdateMotion,
+    elapsedSeconds: number
+  ): void {
+    const angleChange = Number.isFinite(motion.angleChange)
+      ? motion.angleChange
+      : 0;
+    const turnRateRadPerSec =
+      elapsedSeconds > 0 ? Math.abs(angleChange) / elapsedSeconds : 0;
+    const turnDirection: "positive" | "negative" | "none" =
+      angleChange > 1e-6
+        ? "positive"
+        : angleChange < -1e-6
+          ? "negative"
+          : "none";
+    this.lastTurnMotion = {
+      angleChange,
+      turnRateRadPerSec,
+      turnDirection,
+      nativeTurnInput: this.nativeTurnProfile?.inputParameter ?? null
+    };
+    this.lastWireMotion = {
+      sequenceTime,
+      stance: motion.stance,
+      horizontalSpeed: motion.horizontalSpeed,
+      verticalSpeed: motion.verticalSpeed,
+      orientation: motion.orientation,
+      angleChange,
+      turnRateRadPerSec,
+      turnDirection,
+      nativeTurnInput: this.nativeTurnProfile?.inputParameter ?? null
+    };
   }
 
   private createCombatAnimationState(): CharacterUpdateCharacterState {
@@ -3399,13 +3604,7 @@ export abstract class Npc extends BaseFullCharacter {
       verticalSpeed: 0,
       horizontalSpeed: 0
     };
-    this.lastWireMotion = {
-      sequenceTime,
-      stance: motion.stance,
-      horizontalSpeed: motion.horizontalSpeed,
-      verticalSpeed: motion.verticalSpeed,
-      orientation: motion.orientation
-    };
+    this.recordWireMotion(sequenceTime, motion, 0);
     this.lastStoppedMotionSample = {
       sequenceTime,
       position: [
@@ -3431,6 +3630,8 @@ export abstract class Npc extends BaseFullCharacter {
 
   goTo(position: Float32Array) {
     const previousPosition = this.state.position;
+    const sequenceTime = getCurrentServerTimeWrapper().getTruncatedU32();
+    const turnElapsedSeconds = this.elapsedSinceMotionSample(sequenceTime);
     const movementDx = position[0] - previousPosition[0];
     const movementDy = position[1] - previousPosition[1];
     const movementDz = position[2] - previousPosition[2];
@@ -3474,6 +3675,12 @@ export abstract class Npc extends BaseFullCharacter {
     let angleChange = orientation - prevOrientation;
     // normalize to [-π, π]
     angleChange = Math.atan2(Math.sin(angleChange), Math.cos(angleChange));
+    // A sharp Recast corner is still an authoritative position change, but it
+    // must not make an authored animal/zombie body pivot in one render frame.
+    // Keep the position sample intact and feed the client a source-clocked
+    // turn delta so its State_Turning/TurnRate graph can plant/step the feet.
+    angleChange = this.clampTurnDelta(angleChange, turnElapsedSeconds);
+    orientation = prevOrientation + angleChange;
     this.state.yaw = orientation;
     const frontTilt = Math.atan2(movementDy, movementHorizontalDist);
 
@@ -3491,7 +3698,6 @@ export abstract class Npc extends BaseFullCharacter {
     // leaving the latter at its old heading creates a one-frame turn snap.
     this.state.rotation = eul2quat(new Float32Array([orientation, 0, 0]));
 
-    const sequenceTime = getCurrentServerTimeWrapper().getTruncatedU32();
     let horizontalSpeed: number;
     let verticalSpeed: number;
     const readNavVelocity = () => {
@@ -3612,13 +3818,7 @@ export abstract class Npc extends BaseFullCharacter {
       verticalSpeed,
       horizontalSpeed
     };
-    this.lastWireMotion = {
-      sequenceTime,
-      stance: motion.stance,
-      horizontalSpeed: motion.horizontalSpeed,
-      verticalSpeed: motion.verticalSpeed,
-      orientation: motion.orientation
-    };
+    this.recordWireMotion(sequenceTime, motion, turnElapsedSeconds);
     this.server.sendDataToAllWithSpawnedEntity(
       this.server._npcs,
       this.characterId,
@@ -3676,10 +3876,12 @@ export abstract class Npc extends BaseFullCharacter {
     const prevOrientation = this.state.yaw ?? targetOrientation;
     let angleChange = targetOrientation - prevOrientation;
     angleChange = Math.atan2(Math.sin(angleChange), Math.cos(angleChange));
-    if (dt > 0) {
-      const maxStep = maxTurnRateRadPerSec * dt;
-      angleChange = Math.max(-maxStep, Math.min(maxStep, angleChange));
-    }
+    const elapsedSeconds = Number.isFinite(dt) ? Math.max(0, dt) : 0;
+    angleChange = this.clampTurnDelta(
+      angleChange,
+      elapsedSeconds,
+      maxTurnRateRadPerSec
+    );
     const orientation = prevOrientation + angleChange;
     this.state.yaw = orientation;
     this.state.rotation = eul2quat(new Float32Array([orientation, 0, 0]));
@@ -3703,13 +3905,7 @@ export abstract class Npc extends BaseFullCharacter {
       verticalSpeed: 0,
       horizontalSpeed: 0
     };
-    this.lastWireMotion = {
-      sequenceTime,
-      stance: motion.stance,
-      horizontalSpeed: motion.horizontalSpeed,
-      verticalSpeed: motion.verticalSpeed,
-      orientation: motion.orientation
-    };
+    this.recordWireMotion(sequenceTime, motion, elapsedSeconds);
     this.lastStoppedMotionSample = {
       sequenceTime,
       position: [

@@ -14,7 +14,11 @@
 import { ZoneServer2016 } from "../zoneserver";
 import { ZoneClient2016 } from "../classes/zoneclient";
 import { Items, MaterialTypes, NpcIds, StringIds } from "../models/enums";
-import { ANIMAL_NATIVE_LOCOMOTION_PROFILE, Npc } from "./npc";
+import {
+  ANIMAL_NATIVE_LOCOMOTION_PROFILE,
+  DEER_NATIVE_TURN_PROFILE,
+  Npc
+} from "./npc";
 import { ANIMAL_PROFILE_IDS } from "./animalprofiles";
 import { createDeer } from "../jsms/deer.jsm";
 import { Factions } from "../jsms/factions";
@@ -44,6 +48,7 @@ export class Deer extends Npc {
     this.nativeMeleeCapability = "passive";
     this.profileId = ANIMAL_PROFILE_IDS.DEER;
     this.nativeLocomotionProfile = ANIMAL_NATIVE_LOCOMOTION_PROFILE;
+    this.nativeTurnProfile = DEER_NATIVE_TURN_PROFILE;
     // Passive animals still need an authoritative reset clip in their spawn
     // packet when the optional AI FSM is disabled.
     this.initializeAnimation("Idle");

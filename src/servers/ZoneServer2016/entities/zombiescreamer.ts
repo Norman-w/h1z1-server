@@ -25,7 +25,11 @@ import {
   NpcIds,
   StringIds
 } from "../models/enums";
-import { Npc, ZOMBIE_NATIVE_MELEE_CONTACT_WINDOW } from "./npc";
+import {
+  Npc,
+  SCREAMER_NATIVE_TURN_PROFILE,
+  ZOMBIE_NATIVE_MELEE_CONTACT_WINDOW
+} from "./npc";
 import { LoadoutContainer } from "../classes/loadoutcontainer";
 import { Lootbag } from "./lootbag";
 import {
@@ -56,6 +60,7 @@ export class ZombieScreamer extends Npc {
     );
     this.materialType = MaterialTypes.ZOMBIE;
     this.npcMeleeDamage = 3000;
+    this.nativeTurnProfile = SCREAMER_NATIVE_TURN_PROFILE;
     this.meleeContactWindow = { ...ZOMBIE_NATIVE_MELEE_CONTACT_WINDOW };
     this.maxHealth = 30000;
     this.health = this.maxHealth;

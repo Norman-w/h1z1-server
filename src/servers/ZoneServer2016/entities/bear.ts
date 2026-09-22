@@ -20,7 +20,11 @@ import {
   NpcIds,
   StringIds
 } from "../models/enums";
-import { ANIMAL_NATIVE_LOCOMOTION_PROFILE, Npc } from "./npc";
+import {
+  ANIMAL_NATIVE_LOCOMOTION_PROFILE,
+  BEAR_NATIVE_TURN_PROFILE,
+  Npc
+} from "./npc";
 import { ANIMAL_PROFILE_IDS } from "./animalprofiles";
 import { createBear } from "../jsms/bear.jsm";
 import { Factions } from "../jsms/factions";
@@ -49,6 +53,7 @@ export class Bear extends Npc {
     this.nativeMeleeCapability = "attacker";
     this.profileId = ANIMAL_PROFILE_IDS.BEAR;
     this.nativeLocomotionProfile = ANIMAL_NATIVE_LOCOMOTION_PROFILE;
+    this.nativeTurnProfile = BEAR_NATIVE_TURN_PROFILE;
     // AddLightweightNpc is sent after construction; keep a persistent reset
     // clip available even when AI is disabled and no FSM is created.
     this.initializeAnimation("Idle");

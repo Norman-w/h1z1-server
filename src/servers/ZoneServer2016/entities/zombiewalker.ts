@@ -25,7 +25,11 @@ import {
   NpcIds,
   StringIds
 } from "../models/enums";
-import { Npc, ZOMBIE_NATIVE_MELEE_CONTACT_WINDOW } from "./npc";
+import {
+  Npc,
+  ZOMBIE_NATIVE_MELEE_CONTACT_WINDOW,
+  ZOMBIE_NATIVE_TURN_PROFILE
+} from "./npc";
 import { LoadoutContainer } from "../classes/loadoutcontainer";
 import { Lootbag } from "./lootbag";
 import { createZombie } from "../jsms/zombie.jsm";
@@ -58,6 +62,7 @@ export class ZombieWalker extends Npc {
     );
     this.materialType = MaterialTypes.ZOMBIE;
     this.npcMeleeDamage = 2500;
+    this.nativeTurnProfile = ZOMBIE_NATIVE_TURN_PROFILE;
     // Zombie001's client graph chooses the walker/runner attack leaf.  Keep
     // the recovered overlap contact interval on the shared base entity so
     // ZombieWalker, Gasser and Exploder all use the same action contract.
