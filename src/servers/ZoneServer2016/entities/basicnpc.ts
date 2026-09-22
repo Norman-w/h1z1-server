@@ -13,11 +13,40 @@
 
 import { ZoneServer2016 } from "../zoneserver";
 import { ZoneClient2016 } from "../classes/zoneclient";
-import { Npc } from "./npc";
+import { ModelIds } from "../models/enums";
+import { Npc, RAVEN_NATIVE_TURN_PROFILE } from "./npc";
 
 // ponytail: inert NPC — spawns and stands there. No fsm, so no AI tick;
 // no loot/harvest/interaction. Used as the fallback for unknown model ids.
 export class BasicNpc extends Npc {
+  constructor(
+    characterId: string,
+    transientId: number,
+    actorModelId: number,
+    position: Float32Array,
+    rotation: Float32Array,
+    server: ZoneServer2016,
+    spawnerId: number = 0,
+    variant: string = ""
+  ) {
+    super(
+      characterId,
+      transientId,
+      actorModelId,
+      position,
+      rotation,
+      server,
+      spawnerId,
+      variant
+    );
+    // Raven is an inert test/fallback entity today, but its client graph has
+    // native continuous TurnLeft/TurnRight transitions. Preserve that graph
+    // contract instead of treating it as an unknown model with a pivot turn.
+    if (actorModelId === ModelIds.RAVEN) {
+      this.nativeTurnProfile = RAVEN_NATIVE_TURN_PROFILE;
+    }
+  }
+
   protected addLoot(_server: ZoneServer2016): void {}
 
   protected onHarvest(_server: ZoneServer2016, _client: ZoneClient2016): void {}

@@ -259,8 +259,15 @@ export interface NpcNativeTurnProfile {
   inputParameter: "State_Turning/TurnRate";
   turnLeftClip: string;
   turnRightClip: string;
-  turn90DurationMs: number;
+  /**
+   * Authored clip clocks are optional because some graphs (Raven) expose
+   * TurnLeft/TurnRight as continuous graph transitions rather than named
+   * turn animation resources. In that case the client owns the smoothing
+   * curve and the server must not invent a species-specific duration.
+   */
+  turn90DurationMs?: number;
   turn180DurationMs?: number;
+  turnMode?: "authored-clip-clock" | "continuous-graph";
 }
 
 const ANIMAL_NATIVE_TURN_SOURCE =
@@ -324,6 +331,20 @@ export const SCREAMER_NATIVE_TURN_PROFILE: NpcNativeTurnProfile = Object.freeze(
   turnRightClip: "Screamer_Tied/UnTied_Active_TurnRight90/180",
   turn90DurationMs: 2333,
   turn180DurationMs: 2500
+});
+
+/**
+ * Raven uses the bird graph's continuous turn transitions. It has no separate
+ * Raven turn .nsa clips or recoverable turn clock, so preserve the native
+ * TurnRate input and let the client graph perform the smoothing.
+ */
+export const RAVEN_NATIVE_TURN_PROFILE: NpcNativeTurnProfile = Object.freeze({
+  source:
+    "Animals_BirdsPhysicsX64.mrn:ControlParameters|State_Turning + ControlParameters|TurnRate",
+  inputParameter: "State_Turning/TurnRate",
+  turnLeftClip: "Idle_Locomotion|TurnLeft",
+  turnRightClip: "Idle_Locomotion|TurnRight",
+  turnMode: "continuous-graph"
 });
 
 export interface NpcTurnTelemetry {
@@ -598,7 +619,7 @@ export abstract class Npc extends BaseFullCharacter {
   meleeWeaponItemDefinitionId: Items = Items.WEAPON_MACHETE01;
   /** Native locomotion graph contract for actors with AnimalsPhysics assets. */
   nativeLocomotionProfile?: NpcNativeLocomotionProfile;
-  /** Native body-turn graph contract, when the actor MRN exposes turn clips. */
+  /** Native body-turn graph contract, when the actor MRN exposes turn input. */
   nativeTurnProfile?: NpcNativeTurnProfile;
   /**
    * Visible transform authority.  This defaults to the only path currently
@@ -1907,9 +1928,10 @@ export abstract class Npc extends BaseFullCharacter {
    * The rate is derived from the source 90°/180° clip clocks.  It is not a
    * species-specific gameplay constant: the same profile is the evidence that
    * the loaded client graph has a native turn leaf and the duration is the
-   * source animation's own clock.  A missing profile deliberately falls back
-   * to the caller's conservative limit because an unknown model must not be
-   * sent an unverified native turn contract.
+   * source animation's own clock. A continuous graph profile intentionally
+   * returns no server rate; its client graph owns the smoothing curve. A
+   * missing profile falls back to the caller's conservative limit because an
+   * unknown model must not be sent an unverified native turn contract.
    */
   private nativeTurnRateForAngle(angle: number): number | undefined {
     const profile = this.nativeTurnProfile;
@@ -1918,9 +1940,14 @@ export abstract class Npc extends BaseFullCharacter {
     const useHalfTurn = absoluteAngle > Math.PI * 0.75;
     const authoredAngle = useHalfTurn ? Math.PI : Math.PI / 2;
     const durationMs = useHalfTurn
-      ? (profile.turn180DurationMs ?? profile.turn90DurationMs * 2)
+      ? (profile.turn180DurationMs ??
+        (profile.turn90DurationMs === undefined
+          ? undefined
+          : profile.turn90DurationMs * 2))
       : profile.turn90DurationMs;
-    if (!Number.isFinite(durationMs) || durationMs <= 0) return undefined;
+    if (durationMs === undefined || !Number.isFinite(durationMs) || durationMs <= 0) {
+      return undefined;
+    }
     return authoredAngle / (durationMs / 1000);
   }
 

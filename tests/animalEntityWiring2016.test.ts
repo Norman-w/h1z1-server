@@ -270,6 +270,24 @@ test("production animal entities wire faction, FSM, damage and Recast agents", a
   );
   delete server._npcs[fallbackNpc.characterId];
 
+  // Raven is also inert in the current server, but its client-side bird graph
+  // exposes native continuous TurnLeft/TurnRight transitions. It must not be
+  // classified as an unknown model and lose that native turn contract.
+  const ravenNpc = worldObjectManager.createNpc(
+    server,
+    ModelIds.RAVEN,
+    origin,
+    rotation
+  );
+  assert.ok(ravenNpc instanceof BasicNpc);
+  assert.equal(ravenNpc.nativeTurnReady, true);
+  assert.equal(ravenNpc.getNativeTurnProfile()?.turnMode, "continuous-graph");
+  assert.equal(
+    ravenNpc.getNativeTurnProfile()?.inputParameter,
+    "State_Turning/TurnRate"
+  );
+  delete server._npcs[ravenNpc.characterId];
+
   assert.equal(bear.faction, Factions.BEAR);
   assert.equal(wolf.faction, Factions.WOLF);
   assert.equal(deer.faction, Factions.PASSIVE);
