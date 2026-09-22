@@ -14,12 +14,21 @@
 import { ZoneServer2016 } from "../zoneserver";
 import { ZoneClient2016 } from "../classes/zoneclient";
 import { Items, MaterialTypes, NpcIds, StringIds } from "../models/enums";
+import type { AddLightweightNpc } from "types/zone2016packets";
 import { ANIMAL_NATIVE_LOCOMOTION_PROFILE, Npc } from "./npc";
 import { ANIMAL_PROFILE_IDS } from "./animalprofiles";
 import { createRabbit } from "../jsms/rabbit.jsm";
 import { Factions } from "../jsms/factions";
 
 export class Rabbit extends Npc {
+  override pGetLightweight(): AddLightweightNpc {
+    return {
+      ...super.pGetLightweight(),
+      npcDefinitionId: NpcIds.RABBIT,
+      useCollision: 1
+    };
+  }
+
   constructor(
     characterId: string,
     transientId: number,

@@ -282,6 +282,17 @@ test("production animal entities wire faction, FSM, damage and Recast agents", a
   assert.equal(deer.profileId, ANIMAL_PROFILE_IDS.DEER);
   assert.equal(deerBuck.profileId, ANIMAL_PROFILE_IDS.DEER);
   assert.equal(rabbit.profileId, ANIMAL_PROFILE_IDS.RABBIT);
+  const rabbitLightweight = rabbit.pGetLightweight();
+  assert.equal(
+    rabbitLightweight.npcDefinitionId,
+    NpcIds.RABBIT,
+    "Rabbit must provide its native NPC definition for lightweight rendering"
+  );
+  assert.equal(
+    rabbitLightweight.useCollision,
+    1,
+    "Rabbit lightweight spawns must opt into the native collision/render path"
+  );
   assert.equal(bear.nativeMeleeEngagementRange, 2.5);
   assert.equal(wolf.nativeMeleeEngagementRange, 2);
   assert.equal(deer.npcMeleeDamage, 0);
